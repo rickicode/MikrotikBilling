@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WiFi Voucher - A4</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 5px;
+            background: #ffffff;
+            font-size: 10px;
+        }
+        .voucher-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            max-width: 210mm;
+            margin: 0 auto;
+        }
+        .voucher {
+            width: 145px;
+            border: 1px solid #000;
+            page-break-inside: avoid;
+            background: #ffffff;
+        }
+        .voucher table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .voucher td {
+            padding: 2px;
+            border: none;
+        }
+        .rotate {
+            font-weight: bold;
+            border-right: 1px solid black;
+            background-color: #ffea8f;
+            -webkit-print-color-adjust: exact;
+            width: 20px;
+            height: 80px;
+        }
+        .rotate span {
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            display: block;
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.2;
+            padding: 5px 2px;
+        }
+        .company-header {
+            font-weight: bold;
+            font-size: 12px;
+            padding-left: 5px;
+            background: #FBA1B7;
+            color: white;
+            text-align: center;
+        }
+        .company-name {
+            text-align: left;
+        }
+        .voucher-number {
+            text-align: right;
+            font-size: 9px;
+        }
+        .voucher-code {
+            width: 100%;
+            font-weight: 600;
+            font-size: 18px;
+            text-align: center;
+        }
+        .duration {
+            font-size: 11px;
+            padding-right: 5px;
+            text-align: end;
+            background: #FFECAF;
+        }
+        .validity {
+            font-size: 11px;
+            padding-right: 5px;
+            text-align: end;
+            background: #FFECAF;
+        }
+        @media print {
+            body { margin: 2px; }
+            .voucher-container { gap: 2px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="voucher-container">
+        <!-- VOUCHERS_PLACEHOLDER -->
+    </div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<%-
+  /**
+   * Shadcn-style Button Component
+   * Variables:
+   * - type: Button type (button, submit, reset, default: 'button')
+   * - text: Button text (string, required)
+   * - variant: Button variant (default, destructive, ghost, link, outline, secondary, default: 'default')
+   * - size: Button size (sm, md, lg, icon, default: 'md')
+   * - disabled: Disable button (boolean, default: false)
+   * - loading: Show loading state (boolean, default: false)
+   * - loadingText: Text to show when loading (string, optional)
+   * - icon: Icon HTML (string, optional)
+   * - iconPosition: Icon position (left, right, default: 'left')
+   * - onclick: Click handler (string, optional)
+   * - id: Button ID (string, optional)
+   * - name: Button name (string, optional)
+   * - form: Form this button belongs to (string, optional)
+   * - class: Additional CSS classes (string, optional)
+   * - href: If provided, renders as link (string, optional)
+   * - target: Link target (string, optional)
+   */
+
+  // Set defaults
+  const type = locals.type || 'button';
+  const variant = locals.variant || 'default';
+  const size = locals.size || 'md';
+  const disabled = locals.disabled === true;
+  const loading = locals.loading === true;
+  const iconPosition = locals.iconPosition || 'left';
+  const href = locals.href || '';
+  const target = locals.target || '';
+  const text = locals.text || '';
+  const icon = locals.icon || '';
+  const loadingText = locals.loadingText || 'Loading...';
+
+  // Variant configurations following shadcn/ui patterns
+  const variants = {
+    default: [
+      'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
+      'ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'bg-blue-600 text-white hover:bg-blue-700'
+    ].join(' '),
+    destructive: [
+      'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
+      'ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'bg-red-600 text-white hover:bg-red-700'
+    ].join(' '),
+    outline: [
+      'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
+      'ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
+    ].join(' '),
+    secondary: [
+      'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
+      'ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+    ].join(' '),
+    ghost: [
+      'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
+      'ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'hover:bg-accent hover:text-accent-foreground'
+    ].join(' '),
+    link: [
+      'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
+      'ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'text-primary underline-offset-4 hover:underline'
+    ].join(' ')
+  };
+
+  // Size configurations
+  const sizeVariants = {
+    sm: 'h-9 px-3 text-xs',
+    md: 'h-10 px-4 py-2',
+    lg: 'h-11 px-8 text-base',
+    icon: 'h-10 w-10'
+  };
+
+  // Dark theme classes
+  const darkClasses = [
+    'ring-offset-slate-900',
+    'focus-visible:ring-blue-500',
+    variant === 'outline' ? 'border-slate-700 bg-slate-900 hover:bg-slate-800' : '',
+    variant === 'secondary' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : '',
+    variant === 'ghost' ? 'hover:bg-slate-800' : '',
+    variant === 'link' ? 'text-blue-400' : ''
+  ].join(' ');
+
+  const baseClasses = variants[variant] || variants.default;
+  const sizeClass = sizeVariants[size] || sizeVariants.md;
+  const buttonClasses = `${baseClasses} ${sizeClass} ${darkClasses} ${locals.class || ''}`;
+
+  // Loading spinner
+  const spinner = `
+    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  `;
+%>
+
+<% if (href) { %>
+  <a
+    href="<%= href %>"
+    <%= target ? 'target="' + target + '"' : '' %>
+    class="<%= buttonClasses %>"
+    <%= locals.id ? 'id="' + locals.id + '"' : '' %>
+    <%= locals.onclick ? 'onclick="' + locals.onclick + '"' : '' %>
+  >
+    <%= loading ? spinner : '' %>
+    <%= icon && iconPosition === 'left' && !loading ? icon : '' %>
+    <%= loading ? loadingText : text %>
+    <%= icon && iconPosition === 'right' && !loading ? icon : '' %>
+  </a>
+<% } else { %>
+  <button
+    type="<%= type %>"
+    <%= locals.id ? 'id="' + locals.id + '"' : '' %>
+    <%= locals.name ? 'name="' + locals.name + '"' : '' %>
+    <%= locals.form ? 'form="' + locals.form + '"' : '' %>
+    <%= disabled || loading ? 'disabled' : '' %>
+    class="<%= buttonClasses %>"
+    <%= locals.onclick ? 'onclick="' + locals.onclick + '"' : '' %>
+  >
+    <%= loading ? spinner : '' %>
+    <%= icon && iconPosition === 'left' && !loading ? icon : '' %>
+    <%= loading ? loadingText : text %>
+    <%= icon && iconPosition === 'right' && !loading ? icon : '' %>
+  </button>
+<% } %>

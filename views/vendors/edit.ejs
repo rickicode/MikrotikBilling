@@ -1,0 +1,246 @@
+<%- include('../partials/header', { title: 'Edit Vendor', currentUrl: `/vendors/${vendor.id}/edit` }) %>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Edit Vendor</h1>
+            <a href="/vendors" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Kembali
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Edit Informasi Vendor</h6>
+            </div>
+            <div class="card-body">
+                <% if (typeof error !== 'undefined' && error) { %>
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <%= error %>
+                    </div>
+                <% } %>
+
+                <form id="vendorForm" method="POST" novalidate>
+                    <div class="row g-3">
+                        <!-- Nama Vendor -->
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Nama Vendor <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.name : vendor.name %>" required
+                                   placeholder="Masukkan nama vendor">
+                            <div class="invalid-feedback">
+                                Nama vendor harus diisi
+                            </div>
+                        </div>
+
+                        <!-- Status -->
+                        <div class="col-md-6">
+                            <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="active" <%= (typeof formData === 'undefined' || !formData || formData.status === 'active' || (vendor.status === 'active' && !formData)) ? 'selected' : '' %>>Aktif</option>
+                                <option value="inactive" <%= (typeof formData !== 'undefined' && formData && formData.status === 'inactive') || (vendor.status === 'inactive' && typeof formData === 'undefined') ? 'selected' : '' %>>Tidak Aktif</option>
+                            </select>
+                            <div class="invalid-feedback">
+                                Status harus dipilih
+                            </div>
+                        </div>
+
+                        <!-- Kontak Person -->
+                        <div class="col-md-6">
+                            <label for="contact_person" class="form-label">Kontak Person</label>
+                            <input type="text" class="form-control" id="contact_person" name="contact_person"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.contact_person : vendor.contact_person || '' %>"
+                                   placeholder="Nama kontak person">
+                        </div>
+
+                        <!-- Telepon -->
+                        <div class="col-md-6">
+                            <label for="phone" class="form-label">Telepon</label>
+                            <input type="tel" class="form-control" id="phone" name="phone"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.phone : vendor.phone || '' %>"
+                                   placeholder="08xxxxxxxxxx">
+                        </div>
+
+                        <!-- Email -->
+                        <div class="col-12">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.email : vendor.email || '' %>"
+                                   placeholder="vendor@example.com">
+                            <div class="invalid-feedback">
+                                Format email tidak valid
+                            </div>
+                        </div>
+
+                        <!-- Alamat -->
+                        <div class="col-12">
+                            <label for="address" class="form-label">Alamat</label>
+                            <textarea class="form-control" id="address" name="address" rows="3"
+                                      placeholder="Masukkan alamat lengkap vendor"><%= typeof formData !== 'undefined' && formData ? formData.address : vendor.address || '' %></textarea>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="col-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Update Vendor
+                                </button>
+                                <a href="/vendors" class="btn btn-outline-secondary">
+                                    <i class="bi bi-x-circle"></i> Batal
+                                </a>
+                                <a href="/vendors/<%= vendor.id %>/delete" class="btn btn-outline-danger"
+                                   onclick="return confirm('Apakah Anda yakin ingin menghapus vendor ini?')">
+                                    <i class="bi bi-trash"></i> Hapus
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Informasi Vendor</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="avatar-circle me-3">
+                            <%= vendor.name.charAt(0).toUpperCase() %>
+                        </div>
+                        <div>
+                            <h6 class="mb-0"><%= vendor.name %></h6>
+                            <span class="badge bg-<%= vendor.status === 'active' ? 'success' : 'secondary' %>">
+                                <%= vendor.status === 'active' ? 'Aktif' : 'Tidak Aktif' %>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h6>Detail Vendor</h6>
+                <div class="small text-muted">
+                    <div class="mb-2">
+                        <strong>Dibuat:</strong><br>
+                        <%= new Date(vendor.created_at).toLocaleString('id-ID') %>
+                    </div>
+                    <% if (vendor.contact_person) { %>
+                    <div class="mb-2">
+                        <strong>Kontak Person:</strong><br>
+                        <%= vendor.contact_person %>
+                    </div>
+                    <% } %>
+                    <% if (vendor.phone) { %>
+                    <div class="mb-2">
+                        <strong>Telepon:</strong><br>
+                        <%= vendor.phone %>
+                    </div>
+                    <% } %>
+                    <% if (vendor.email) { %>
+                    <div class="mb-2">
+                        <strong>Email:</strong><br>
+                        <%= vendor.email %>
+                    </div>
+                    <% } %>
+                    <% if (vendor.address) { %>
+                    <div class="mb-2">
+                        <strong>Alamat:</strong><br>
+                        <%= vendor.address.replace(/\n/g, '<br>') %>
+                    </div>
+                    <% } %>
+                </div>
+
+                <hr>
+
+                <h6>Statistik Voucher</h6>
+                <div class="small text-muted">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Total Voucher:</span>
+                        <span class="fw-bold" id="totalVouchers">-</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Voucher Aktif:</span>
+                        <span class="fw-bold text-success" id="activeVouchers">-</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Voucher Expired:</span>
+                        <span class="fw-bold text-danger" id="expiredVouchers">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.avatar-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 20px;
+}
+</style>
+
+<script>
+// Form validation
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('vendorForm');
+
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        form.classList.add('was-validated');
+    });
+
+    // Load vendor statistics
+    fetch(`/api/vendors/<%= vendor.id %>/stats`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('totalVouchers').textContent = data.total || 0;
+            document.getElementById('activeVouchers').textContent = data.active || 0;
+            document.getElementById('expiredVouchers').textContent = data.expired || 0;
+        })
+        .catch(error => {
+            console.error('Failed to load vendor statistics:', error);
+        });
+
+    // Real-time name validation
+    const nameInput = document.getElementById('name');
+    nameInput.addEventListener('blur', function() {
+        const name = this.value.trim();
+        if (name) {
+            fetch(`/api/vendors/check-name?name=${encodeURIComponent(name)}&exclude=${encodeURIComponent('<%= vendor.name %>')}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        this.setCustomValidity('Nama vendor sudah digunakan');
+                    } else {
+                        this.setCustomValidity('');
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to check vendor name:', error);
+                });
+        }
+    });
+});
+</script>
+
+<%- include('../partials/footer') %>

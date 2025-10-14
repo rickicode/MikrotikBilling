@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Voucher - <%= settings.company_name || 'Mikrotik Billing System' %></title>
+    <style>
+        @page {
+            size: auto;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: white;
+            color: black;
+            padding: 10mm;
+        }
+
+        .voucher {
+            width: 80mm;
+            border-bottom: 2px dashed #333;
+            padding: 5mm 0;
+            margin-bottom: 5mm;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+
+        .voucher:last-child {
+            border-bottom: none;
+        }
+
+        .voucher-header {
+            margin-bottom: 3mm;
+        }
+
+        .voucher-title {
+            font-size: 12pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 1mm;
+        }
+
+        .voucher-subtitle {
+            font-size: 9pt;
+            color: #666;
+        }
+
+        .voucher-code {
+            font-size: 16pt;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 4mm 0;
+            padding: 3mm;
+            background: #f8f8f8;
+            border: 2px solid #333;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 3px;
+        }
+
+        .voucher-info {
+            font-size: 9pt;
+            margin-bottom: 2mm;
+        }
+
+        .voucher-duration {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 1mm;
+        }
+
+        .voucher-price {
+            font-size: 10pt;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .voucher-footer {
+            margin-top: 3mm;
+            font-size: 8pt;
+            color: #666;
+            border-top: 1px solid #ccc;
+            padding-top: 2mm;
+        }
+
+        .voucher-separator {
+            height: 2px;
+            background: repeating-linear-gradient(90deg, #333 0, #333 5px, transparent 5px, transparent 10px);
+            margin: 5mm 0;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+            }
+        }
+
+        .print-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .print-controls button {
+            margin: 0 5px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .print-controls .btn-print {
+            background: #007bff;
+            color: white;
+        }
+
+        .print-controls .btn-close {
+            background: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls no-print">
+        <button class="btn-print" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print
+        </button>
+        <button class="btn-close" onclick="window.close()">
+            <i class="bi bi-x"></i> Close
+        </button>
+    </div>
+
+    <% vouchers.forEach((voucher, index) => { %>
+    <div class="voucher">
+        <div class="voucher-header">
+            <div class="voucher-title">VOUCHER HOTSPOT</div>
+            <div class="voucher-subtitle"><%= settings.company_name || 'WiFi Hotspot' %></div>
+        </div>
+
+        <div class="voucher-code" id="code-<%= index %>">
+            <%= voucher.voucher_code %>
+        </div>
+
+        <div class="voucher-info">
+            <div class="voucher-duration">
+                <% if (voucher.duration_days > 0) { %>
+                    <%= voucher.duration_days %> Hari
+                <% } %>
+                <% if (voucher.duration_hours > 0) { %>
+                    <%= voucher.duration_hours %> Jam
+                <% } %>
+                <% if (voucher.duration_minutes > 0) { %>
+                    <%= voucher.duration_minutes %> Menit
+                <% } %>
+            </div>
+            <div class="voucher-price">
+                Rp <%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %>
+            </div>
+        </div>
+
+        <div class="voucher-separator"></div>
+
+        <div class="voucher-footer">
+            <div><strong>Profile:</strong> <%= voucher.profile_name %></div>
+            <div><strong>Generated:</strong> <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %></div>
+            <div style="margin-top: 2mm; font-size: 7pt;">
+                Terima kasih telah menggunakan layanan kami
+            </div>
+        </div>
+    </div>
+    <% }); %>
+
+    <script>
+        // Auto print when page loads
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (window.location.search.includes('auto_print=true')) {
+                    window.print();
+                }
+            }, 500);
+        });
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+            if (e.key === 'Escape') {
+                window.close();
+            }
+        });
+    </script>
+</body>
+</html>

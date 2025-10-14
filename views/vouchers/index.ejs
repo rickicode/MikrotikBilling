@@ -1,0 +1,441 @@
+<%- include('../partials/header', { title: 'Voucher Hotspot', currentUrl: '/vouchers' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Voucher Hotspot</h1>
+            <p class="text-slate-400">Kelola dan generate voucher hotspot untuk pelanggan</p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex gap-3">
+            <button onclick="syncVouchers()" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Sync Mikrotik
+            </button>
+            <button onclick="exportVouchers()" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                <i class="fas fa-download mr-2"></i>
+                Export Data
+            </button>
+            <button onclick="showPrintPreview()" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                <i class="fas fa-print mr-2"></i>
+                Print Selected
+            </button>
+            <a href="/vouchers/create" class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                <i class="fas fa-plus mr-2"></i>
+                Generate Voucher
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total Vouchers -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Total Voucher</p>
+                <p class="text-3xl font-bold text-white counter" data-target="0" id="totalVouchers">0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                    <i class="fas fa-ticket-alt text-blue-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-blue-400 flex items-center font-medium">
+                <i class="fas fa-info-circle mr-1"></i>
+                <span id="voucherGrowth">+15%</span>
+            </span>
+            <span class="text-slate-500 ml-2">dari bulan lalu</span>
+        </div>
+    </div>
+
+    <!-- Available Vouchers -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Tersedia</p>
+                <p class="text-3xl font-bold text-white counter" data-target="0" id="availableVouchers">0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
+                    <i class="fas fa-check-circle text-green-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-green-400 flex items-center font-medium">
+                <i class="fas fa-arrow-up mr-1"></i>
+                <span id="availablePercentage">65%</span>
+            </span>
+            <span class="text-slate-500 ml-2">dari total voucher</span>
+        </div>
+    </div>
+
+    <!-- Used Vouchers -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-yellow-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Terpakai</p>
+                <p class="text-3xl font-bold text-white counter" data-target="0" id="usedVouchers">0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
+                    <i class="fas fa-user-check text-yellow-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-yellow-400 flex items-center font-medium">
+                <i class="fas fa-info-circle mr-1"></i>
+                <span id="usedPercentage">25%</span>
+            </span>
+            <span class="text-slate-500 ml-2">sudah digunakan</span>
+        </div>
+    </div>
+
+    <!-- Expired Vouchers -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Kadaluarsa</p>
+                <p class="text-3xl font-bold text-white counter" data-target="0" id="expiredVouchers">0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-red-500/10 rounded-xl flex items-center justify-center border border-red-500/20">
+                    <i class="fas fa-times-circle text-red-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-red-400 flex items-center font-medium">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                <span id="expiredPercentage">10%</span>
+            </span>
+            <span class="text-slate-500 ml-2">sudah kadaluarsa</span>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6 shadow-lg">
+    <form id="searchForm" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <!-- Search Input -->
+        <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-300 mb-2">Cari Voucher</label>
+            <div class="relative">
+                <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="Kode voucher atau nama..."
+                    class="w-full h-10 pl-10 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2"
+                >
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-slate-400"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Filter -->
+        <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Profile</label>
+            <select id="profileFilter" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                <option value="">Semua Profile</option>
+                <% profiles.forEach(profile => { %>
+                    <option value="<%= profile.id %>"><%= profile.name %></option>
+                <% }); %>
+            </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+            <select id="statusFilter" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                <option value="">Semua Status</option>
+                <option value="available">Tersedia</option>
+                <option value="used">Terpakai</option>
+                <option value="expired">Kadaluarsa</option>
+            </select>
+        </div>
+
+        <!-- Vendor Filter -->
+        <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Vendor</label>
+            <select id="vendorFilter" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                <option value="">Semua Vendor</option>
+                <% vendors.forEach(vendor => { %>
+                    <option value="<%= vendor.id %>"><%= vendor.name %></option>
+                <% }); %>
+            </select>
+        </div>
+    </form>
+
+    <!-- Advanced Filters Toggle -->
+    <div class="mt-4 flex items-center justify-between">
+        <button type="button" onclick="toggleAdvancedFilters()" class="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+            <i class="fas fa-filter mr-1"></i>
+            Filter Lanjutan
+        </button>
+        <button type="submit" form="searchForm" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+            <i class="fas fa-search mr-2"></i>
+            Terapkan Filter
+        </button>
+    </div>
+
+    <!-- Advanced Filters Panel -->
+    <div id="advancedFilters" class="hidden mt-4 pt-4 border-t border-slate-700">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Batch ID</label>
+                <select id="batchFilter" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                    <option value="">Semua Batch</option>
+                    <% batches.forEach(batch => { %>
+                        <option value="<%= batch.batch_id %>"><%= batch.batch_id %> - <%= batch.profile_name %> (<%= batch.quantity %> voucher)</option>
+                    <% }); %>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Tanggal Pembuatan</label>
+                <input type="date" id="dateFilter" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Harga Minimum</label>
+                <input type="number" id="minPrice" placeholder="0" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Durasi</label>
+                <select id="durationFilter" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                    <option value="">Semua Durasi</option>
+                    <option value="1h">1 Jam</option>
+                    <option value="6h">6 Jam</option>
+                    <option value="12h">12 Jam</option>
+                    <option value="24h">1 Hari</option>
+                    <option value="7d">7 Hari</option>
+                    <option value="30d">30 Hari</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Urutkan</label>
+                <select id="sortBy" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                    <option value="created_at">Tanggal Dibuat</option>
+                    <option value="code">Kode Voucher</option>
+                    <option value="price">Harga</option>
+                    <option value="duration">Durasi</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Voucher Management Table -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg">
+    <!-- Table Header -->
+    <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-white">Daftar Voucher</h2>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center">
+                    <input type="checkbox" class="h-4 w-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900" id="selectAll">
+                    <label for="selectAll" class="ml-2 text-sm text-slate-300">Pilih Semua</label>
+                </div>
+                <select id="pageSize" class="h-9 px-3 text-sm bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <span class="text-sm text-slate-400">per halaman</span>
+                <span class="text-sm text-slate-400">Menampilkan <span id="showingCount">0</span> voucher</span>
+                <button onclick="refreshVouchers()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Content -->
+    <div class="overflow-x-auto">
+        <table class="w-full" id="vouchersTable">
+            <thead class="bg-slate-900/50 border-b border-slate-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider w-12">
+                        <input type="checkbox" class="h-4 w-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900" id="selectAllHeader">
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Kode Voucher</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Vendor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Profile</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Harga</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Durasi</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Dibuat</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Digunakan</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="vouchersTableBody" class="divide-y divide-slate-700">
+                <tr>
+                    <td colspan="10" class="px-6 py-8 text-center">
+                        <div class="flex flex-col items-center space-y-3">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <span class="text-slate-400">Memuat data voucher...</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Table Footer -->
+    <div class="px-6 py-4 border-t border-slate-700 bg-slate-900/30">
+        <!-- Pagination -->
+        <div id="paginationContainer" class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <!-- Results info -->
+            <div class="text-sm text-slate-400">
+                Menampilkan <span id="startRecord">0</span> hingga <span id="endRecord">0</span> dari <span id="totalRecords">0</span> hasil
+            </div>
+
+            <!-- Pagination controls -->
+            <div class="flex items-center space-x-2">
+                <button id="prevPage" onclick="changePage('prev')" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200" disabled>
+                    <i class="fas fa-chevron-left mr-1"></i>
+                    Sebelumnya
+                </button>
+
+                <div id="pageNumbers" class="flex items-center space-x-1">
+                    <!-- Page numbers will be inserted here -->
+                </div>
+
+                <button id="nextPage" onclick="changePage('next')" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200" disabled>
+                    Berikutnya
+                    <i class="fas fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Voucher Detail Modal -->
+<div id="voucherDetailModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-white" id="modalVoucherTitle">Detail Voucher</h3>
+                <button onclick="closeVoucherModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <div id="voucherDetailContent">
+                    <!-- Voucher details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Print Preview Modal -->
+<div id="printPreviewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-white">Print Preview</h3>
+                <button onclick="closePrintModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Format Print</label>
+                        <select id="printFormat" class="h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                            <option value="a4">A4 (120 per halaman)</option>
+                            <option value="thermal">Thermal (1 per halaman)</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="printVouchers()" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200">
+                            <i class="fas fa-print mr-2"></i>
+                            Print
+                        </button>
+                        <button onclick="downloadPDF()" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                            <i class="fas fa-download mr-2"></i>
+                            Download PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div id="printPreviewContent" class="bg-white rounded-lg p-4 min-h-[400px]">
+                    <!-- Print preview will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700">
+                <h3 class="text-xl font-semibold text-white">Konfirmasi Hapus</h3>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6">
+                <div class="mb-4">
+                    <p class="text-slate-300 mb-2">Apakah Anda yakin ingin menghapus voucher ini?</p>
+                    <div class="bg-slate-900 border border-slate-600 rounded-lg p-3">
+                        <p class="font-medium text-white" id="deleteVoucherCode"></p>
+                        <p class="text-sm text-slate-400" id="deleteVoucherDetails"></p>
+                    </div>
+                </div>
+
+                <div class="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-orange-400 mt-0.5 mr-3"></i>
+                        <div>
+                            <h4 class="font-medium text-orange-400 mb-1">Peringatan!</h4>
+                            <p class="text-sm text-slate-400">Voucher yang sudah digunakan tidak dapat dihapus.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-slate-700 flex justify-end space-x-3">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                    Batal
+                </button>
+                <button onclick="confirmDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                    <i class="fas fa-trash mr-2"></i>
+                    Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-center space-x-4 shadow-2xl">
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-600 border-t-blue-500"></div>
+        <div>
+            <span class="text-slate-200 font-medium">Memuat data...</span>
+            <p class="text-slate-400 text-sm mt-1">Mohon tunggu sebentar</p>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer', { scripts: ['/public/js/vouchers.js'] }) %>

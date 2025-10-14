@@ -1,0 +1,24 @@
+{
+  "watch": ["src", "server.js", "package.json"],
+  "ignore": [
+    "node_modules/",
+    "*.db",
+    "*.sqlite",
+    "sessions/",
+    ".wwebjs_cache/",
+    "logs/",
+    "storage/",
+    "backups/",
+    "server.log",
+    ".env*",
+    "*.tmp",
+    "*.temp",
+    ".git/",
+    "dist/",
+    "build/"
+  ],
+  "ext": "js,json,ejs",
+  "delay": 1000,
+  "verbose": false,
+  "restartable": "rs"
+}

@@ -1,0 +1,209 @@
+<%-
+  /**
+   * Button Component for UI
+   * Variables:
+   * - text: Button text (string, required)
+   * - type: Button type (button, submit, reset, default: 'button')
+   * - variant: Button variant (primary, secondary, success, danger, warning, info, outline, ghost, default: 'primary')
+   * - size: Button size (sm, md, lg, xl, default: 'md')
+   * - icon: FontAwesome icon class (string, optional)
+   * - iconPosition: Icon position (left, right, default: 'left')
+   * - loading: Show loading state (boolean, default: false)
+   * - disabled: Disable button (boolean, default: false)
+   * - fullWidth: Full width button (boolean, default: false)
+   * - href: If provided, renders as link (string, optional)
+   * - target: Link target (string, optional)
+   * - onclick: Click handler (string, optional)
+   * - class: Additional CSS classes (string, optional)
+   * - id: Button ID (string, optional)
+   * - dataAttributes: Object of data attributes (object, optional)
+   */
+
+  // Set defaults
+  const buttonType = locals.type || 'button';
+  const variant = locals.variant || 'primary';
+  const size = locals.size || 'md';
+  const iconPosition = locals.iconPosition || 'left';
+  const loading = locals.loading === true;
+  const disabled = locals.disabled === true;
+  const fullWidth = locals.fullWidth === true;
+  const buttonId = locals.id || 'btn-' + Math.random().toString(36).substr(2, 9);
+  const isLink = locals.href ? true : false;
+
+  // Size configurations
+  const sizeClasses = {
+    sm: {
+      button: 'px-3 py-1.5 text-xs',
+      icon: 'w-3 h-3',
+      spacing: 'gap-1.5'
+    },
+    md: {
+      button: 'px-4 py-2 text-sm',
+      icon: 'w-4 h-4',
+      spacing: 'gap-2'
+    },
+    lg: {
+      button: 'px-6 py-3 text-base',
+      icon: 'w-5 h-5',
+      spacing: 'gap-2.5'
+    },
+    xl: {
+      button: 'px-8 py-4 text-lg',
+      icon: 'w-6 h-6',
+      spacing: 'gap-3'
+    }
+  };
+
+  const currentSize = sizeClasses[size];
+
+  // Variant configurations
+  const variantClasses = {
+    primary: {
+      default: 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 focus:ring-blue-500',
+      disabled: 'bg-blue-800 text-blue-300 border-blue-700 cursor-not-allowed',
+      loading: 'bg-blue-600 text-white border-blue-600 cursor-wait'
+    },
+    secondary: {
+      default: 'bg-dark-700 hover:bg-dark-600 text-white border-dark-600 focus:ring-dark-500',
+      disabled: 'bg-dark-800 text-dark-400 border-dark-700 cursor-not-allowed',
+      loading: 'bg-dark-700 text-white border-dark-600 cursor-wait'
+    },
+    success: {
+      default: 'bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500',
+      disabled: 'bg-green-800 text-green-300 border-green-700 cursor-not-allowed',
+      loading: 'bg-green-600 text-white border-green-600 cursor-wait'
+    },
+    danger: {
+      default: 'bg-red-600 hover:bg-red-700 text-white border-red-600 focus:ring-red-500',
+      disabled: 'bg-red-800 text-red-300 border-red-700 cursor-not-allowed',
+      loading: 'bg-red-600 text-white border-red-600 cursor-wait'
+    },
+    warning: {
+      default: 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600 focus:ring-yellow-500',
+      disabled: 'bg-yellow-800 text-yellow-300 border-yellow-700 cursor-not-allowed',
+      loading: 'bg-yellow-600 text-white border-yellow-600 cursor-wait'
+    },
+    info: {
+      default: 'bg-cyan-600 hover:bg-cyan-700 text-white border-cyan-600 focus:ring-cyan-500',
+      disabled: 'bg-cyan-800 text-cyan-300 border-cyan-700 cursor-not-allowed',
+      loading: 'bg-cyan-600 text-white border-cyan-600 cursor-wait'
+    },
+    outline: {
+      default: 'bg-transparent hover:bg-dark-700 text-white border-dark-600 focus:ring-dark-500',
+      disabled: 'bg-transparent text-dark-500 border-dark-700 cursor-not-allowed',
+      loading: 'bg-transparent text-white border-dark-600 cursor-wait'
+    },
+    ghost: {
+      default: 'bg-transparent hover:bg-dark-700 text-dark-300 hover:text-white border-transparent focus:ring-dark-500',
+      disabled: 'bg-transparent text-dark-600 border-transparent cursor-not-allowed',
+      loading: 'bg-transparent text-white border-transparent cursor-wait'
+    }
+  };
+
+  const currentState = loading ? 'loading' : (disabled ? 'disabled' : 'default');
+  const variantStateClasses = variantClasses[variant][currentState];
+
+  // Base button classes
+  const baseClasses = [
+    'inline-flex',
+    'items-center',
+    'justify-center',
+    'border',
+    'rounded-lg',
+    'font-medium',
+    'transition-all',
+    'duration-200',
+    'focus:outline-none',
+    'focus:ring-2',
+    'focus:ring-offset-2',
+    'focus:ring-offset-dark-900',
+    currentSize.button,
+    variantStateClasses,
+    fullWidth ? 'w-full' : '',
+    locals.class || ''
+  ].filter(Boolean).join(' ');
+
+  // Build data attributes string
+  let dataAttributesString = '';
+  if (locals.dataAttributes) {
+    Object.entries(locals.dataAttributes).forEach(([key, value]) => {
+      dataAttributesString += ` data-${key}="${value}"`;
+    });
+  }
+%>
+
+<% if (isLink) { %>
+  <a
+    href="<%= locals.href %>"
+    <%= locals.target ? 'target="' + locals.target + '"' : '' %>
+    id="<%= buttonId %>"
+    class="<%= baseClasses %>"
+    <%= locals.onclick ? 'onclick="' + locals.onclick + '"' : '' %>
+    <%= dataAttributesString %>
+  >
+    <%= renderButtonContent(locals, currentSize, iconPosition, loading, buttonId) %>
+  </a>
+<% } else { %>
+  <button
+    type="<%= buttonType %>"
+    id="<%= buttonId %>"
+    <%= disabled || loading ? 'disabled' : '' %>
+    class="<%= baseClasses %>"
+    <%= locals.onclick ? 'onclick="' + locals.onclick + '"' : '' %>
+    <%= dataAttributesString %>
+  >
+    <%= renderButtonContent(locals, currentSize, iconPosition, loading, buttonId) %>
+  </button>
+<% } %>
+
+<%
+  function renderButtonContent(locals, size, iconPos, isLoading, btnId) {
+    const icon = locals.icon;
+    const text = locals.text;
+
+    let content = '';
+
+    if (isLoading) {
+      // Loading spinner
+      content += `<span class="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></span>`;
+      if (text) {
+        content += `<span class="ml-2">${text}</span>`;
+      }
+    } else {
+      // Normal state with icon and text
+      if (icon && iconPos === 'left') {
+        content += `<i class="${icon} ${size.icon}"></i>`;
+        if (text) {
+          content += `<span class="ml-2">${text}</span>`;
+        }
+      } else if (text) {
+        content += `<span>${text}</span>`;
+        if (icon && iconPos === 'right') {
+          content += `<span class="ml-2"><i class="${icon} ${size.icon}"></i></span>`;
+        }
+      } else if (icon) {
+        content += `<i class="${icon} ${size.icon}"></i>`;
+      }
+    }
+
+    return content;
+  }
+%>
+
+<% if (locals.loading) { %>
+  <script>
+    (function() {
+      const button = document.getElementById('<%= buttonId %>');
+      if (button) {
+        // Prevent double-click during loading
+        button.addEventListener('click', function(e) {
+          if (this.classList.contains('cursor-wait')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        });
+      }
+    })();
+  </script>
+<% } %>

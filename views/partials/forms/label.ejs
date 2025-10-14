@@ -1,0 +1,56 @@
+<%-
+  /**
+   * Shadcn-style Label Component for Forms
+   * Variables:
+   * - for: Input ID this label is associated with (string, required)
+   * - text: Label text (string, required)
+   * - required: Mark as required (boolean, default: false)
+   * - disabled: Mark as disabled (boolean, default: false)
+   * - error: Error state (boolean, default: false)
+   * - size: Label size (sm, md, lg, default: 'md')
+   * - class: Additional CSS classes (string, optional)
+   * - htmlFor: Alternative to 'for' attribute (string, optional)
+   */
+
+  // Set defaults
+  const htmlFor = locals.htmlFor || locals.for;
+  const size = locals.size || 'md';
+  const required = locals.required === true;
+  const disabled = locals.disabled === true;
+  const error = locals.error === true;
+  const text = locals.text || '';
+
+  // Size variants
+  const sizeVariants = {
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base'
+  };
+
+  // Base classes following shadcn/ui patterns
+  const baseClasses = 'font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70';
+
+  // Color variants for different states
+  const colorVariants = {
+    default: 'text-slate-300',
+    error: 'text-red-400',
+    disabled: 'text-slate-500'
+  };
+
+  const currentSize = sizeVariants[size] || sizeVariants.md;
+  const currentColor = error ? colorVariants.error : (disabled ? colorVariants.disabled : colorVariants.default);
+  const labelClasses = `${baseClasses} ${currentColor} ${currentSize} ${locals.class || ''}`;
+%>
+
+<label
+  class="<%= labelClasses %>"
+  <%= htmlFor ? 'for="' + htmlFor + '"' : '' %>
+  <%= required ? 'data-required="true"' : '' %>
+  <%= disabled ? 'data-disabled="true"' : '' %>
+  <%= error ? 'data-error="true"' : '' %>
+>
+  <%= text %>
+  <% if (required) { %>
+    <span class="text-red-400 ml-1">*</span>
+  <% } %>
+</label>

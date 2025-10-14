@@ -1,0 +1,62 @@
+{
+  "name": "duitku",
+  "version": "1.0.0",
+  "displayName": "DuitKu Payment Gateway",
+  "description": "Integration with DuitKu payment service supporting 80+ payment methods",
+  "author": "HIJINETWORK",
+  "website": "https://duitku.com",
+  "main": "index.js",
+  "category": "ewallet",
+  "currencies": ["IDR"],
+  "fees": {
+    "type": "percentage",
+    "value": 0.7,
+    "min": 0,
+    "max": 5000
+  },
+  "config": {
+    "api_key": {
+      "type": "text",
+      "label": "API Key",
+      "required": true
+    },
+    "merchant_code": {
+      "type": "text",
+      "label": "Merchant Code",
+      "required": true
+    },
+    "environment": {
+      "type": "select",
+      "label": "Environment",
+      "options": ["sandbox", "production"],
+      "default": "sandbox"
+    },
+    "callback_url": {
+      "type": "url",
+      "label": "Callback URL",
+      "required": false
+    },
+    "return_url": {
+      "type": "url",
+      "label": "Return URL",
+      "required": false
+    },
+    "expiry_minutes": {
+      "type": "number",
+      "label": "Expiry (minutes)",
+      "default": 60,
+      "required": false
+    }
+  },
+  "webhooks": {
+    "payment": "/api/payments/webhook/duitku",
+    "status": "/api/payments/status/duitku"
+  },
+  "permissions": [
+    "payment.create",
+    "payment.check",
+    "payment.callback"
+  ],
+  "dependencies": [],
+  "nodeVersion": ">=14.0.0"
+}

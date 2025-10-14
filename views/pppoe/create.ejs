@@ -1,0 +1,365 @@
+<%- include('../partials/header', { title: 'Create PPPoE User', currentUrl: '/pppoe/create' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Create PPPoE User</h1>
+            <p class="text-slate-400">Buat pengguna PPPoE baru dengan paket langganan</p>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Main Form Section -->
+    <div class="lg:col-span-2">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <!-- Form Header -->
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h2 class="text-xl font-semibold text-white">PPPoE User Information</h2>
+            </div>
+
+            <!-- Form Content -->
+            <div class="p-6">
+                <form id="pppoeForm" novalidate class="space-y-6">
+                    <!-- Customer and Profile Selection -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Customer <span class="text-red-400">*</span>
+                            </label>
+                            <div class="flex">
+                                <select id="customerId" required class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                                    <option value="">Select Customer</option>
+                                </select>
+                                <button type="button" id="showCustomerModalBtn" class="h-10 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-r-lg border border-l-0 border-purple-600 transition-colors duration-200">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="customerError">Please select a customer</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Profile <span class="text-red-400">*</span>
+                            </label>
+                            <select id="profileId" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                                <option value="">Select Profile</option>
+                                <% profiles.forEach(profile => { %>
+                                    <option value="<%= profile.id %>"
+                                            data-price-sell="<%= profile.price_sell %>"
+                                            data-price-cost="<%= profile.price_cost %>"
+                                            data-duration="<%= profile.duration_days %>">
+                                        <%= profile.name %> - Rp <%= Number(profile.price_sell).toLocaleString('id-ID') %>
+                                    </option>
+                                <% }); %>
+                            </select>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="profileError">Please select a profile</p>
+                        </div>
+                    </div>
+
+                    <!-- Username and Password -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Username <span class="text-red-400">*</span>
+                            </label>
+                            <div class="flex">
+                                <input type="text" id="username" required
+                                       placeholder="Enter username" minlength="3" maxlength="32"
+                                       class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                                <button type="button" id="generateUsernameBtn" class="h-10 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-r-lg border border-l-0 border-slate-600 transition-colors duration-200">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <p class="mt-1 text-xs text-slate-400">Letters, numbers, underscore, and dash only (3-32 characters)</p>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="usernameError">Please enter a valid username</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Password <span class="text-red-400">*</span>
+                            </label>
+                            <div class="flex">
+                                <input type="password" id="password" required
+                                       placeholder="Enter password" minlength="6"
+                                       class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                                <button type="button" id="generatePasswordBtn" class="h-10 px-3 bg-slate-700 hover:bg-slate-600 text-white border-l-0 border-t border-b border-r border-slate-600 transition-colors duration-200">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button type="button" id="togglePasswordBtn" class="h-10 px-3 bg-slate-700 hover:bg-slate-600 text-white rounded-r-lg border-l-0 border-t border-b border-r border-slate-600 transition-colors duration-200">
+                                    <i class="fas fa-eye" id="passwordToggle"></i>
+                                </button>
+                            </div>
+                            <p class="mt-1 text-xs text-slate-400">Minimum 6 characters</p>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="passwordError">Please enter a password</p>
+                        </div>
+                    </div>
+
+                    <!-- Date Configuration -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Start Date <span class="text-red-400">*</span>
+                            </label>
+                            <input type="date" id="startDate" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                            <p class="mt-1 text-xs text-red-400 hidden" id="startDateError">Please select start date</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Duration <span class="text-red-400">*</span>
+                            </label>
+                            <div class="flex">
+                                <input type="number" id="duration" value="30" min="1" max="365" required class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                                <span class="h-10 px-4 bg-slate-700 border border-l-0 border-t border-b border-r border-slate-600 rounded-r-lg flex items-center text-sm text-slate-300">days</span>
+                            </div>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="durationError">Please enter duration (1-365 days)</p>
+                        </div>
+                    </div>
+
+                    <!-- Pricing -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Sell Price <span class="text-red-400">*</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400">Rp</span>
+                                </div>
+                                <input type="number" id="priceSell" step="0.01" min="0" required class="w-full h-10 pl-12 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                            </div>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="priceSellError">Please enter sell price</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">
+                                Cost Price <span class="text-red-400">*</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400">Rp</span>
+                                </div>
+                                <input type="number" id="priceCost" step="0.01" min="0" required class="w-full h-10 pl-12 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                            </div>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="priceCostError">Please enter cost price</p>
+                        </div>
+                    </div>
+
+                    <!-- Expiry Date Preview -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Expiry Date</label>
+                        <input type="text" id="expiryDate" readonly class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                        <p class="mt-1 text-xs text-slate-400">Automatically calculated based on start date and duration</p>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Notes</label>
+                        <textarea id="notes" rows="3" placeholder="Additional notes..." class="w-full px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2"></textarea>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 border-t border-slate-700">
+                        <a href="/pppoe" class="inline-flex items-center px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors duration-200">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Back
+                        </a>
+                        <button type="submit" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            Create PPPoE User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- Profile Details -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">Profile Details</h3>
+            </div>
+            <div class="p-6" id="profileDetails">
+                <div class="text-center text-slate-400">
+                    <i class="fas fa-info-circle text-4xl mb-3 opacity-50"></i>
+                    <p>Select a profile to view details</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer Summary -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">Customer Summary</h3>
+            </div>
+            <div class="p-6" id="customerSummary">
+                <div class="text-center text-slate-400">
+                    <i class="fas fa-user text-4xl mb-3 opacity-50"></i>
+                    <p>Select a customer to view details</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Card -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">Summary</h3>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-slate-300">Sell Price:</span>
+                    <strong class="text-white" id="summarySellPrice">Rp 0</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-slate-300">Cost Price:</span>
+                    <strong class="text-white" id="summaryCostPrice">Rp 0</strong>
+                </div>
+                <div class="border-t border-slate-700 pt-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-sm text-slate-300">Profit:</span>
+                        <strong class="text-green-400" id="summaryProfit">Rp 0</strong>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-slate-300">Duration:</span>
+                        <strong class="text-white" id="summaryDuration">30 days</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Customer Modal -->
+<div id="customerModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-white">Create New Customer</h3>
+                <button onclick="closeCustomerModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6">
+                <form id="customerForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">
+                            Name <span class="text-red-400">*</span>
+                        </label>
+                        <input type="text" id="newCustomerName" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">
+                            Phone Number <span class="text-red-400">*</span>
+                        </label>
+                        <input type="tel" id="newCustomerPhone" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Email</label>
+                        <input type="email" id="newCustomerEmail" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Address</label>
+                        <textarea id="newCustomerAddress" rows="3" class="w-full px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-purple-500 focus:ring-purple-500 focus:outline-none focus:ring-2"></textarea>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-slate-700 flex justify-end space-x-3">
+                <button onclick="closeCustomerModal()" class="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                    Cancel
+                </button>
+                <button onclick="createCustomer()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200">
+                    Create Customer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div id="successModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-white">PPPoE User Created Successfully</h3>
+                <button onclick="closeSuccessModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6">
+                <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-400 mr-3 text-xl"></i>
+                        <span class="text-green-400 font-medium">PPPoE user has been created successfully!</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <strong class="text-sm text-slate-300">Username:</strong>
+                        <code class="ml-2 px-2 py-1 bg-slate-900 border border-slate-600 rounded text-white" id="createdUsername"></code>
+                    </div>
+                    <div>
+                        <strong class="text-sm text-slate-300">Password:</strong>
+                        <code class="ml-2 px-2 py-1 bg-slate-900 border border-slate-600 rounded text-white" id="createdPassword"></code>
+                    </div>
+                    <div>
+                        <strong class="text-sm text-slate-300">Customer:</strong>
+                        <span class="ml-2 text-white" id="createdCustomer"></span>
+                    </div>
+                    <div>
+                        <strong class="text-sm text-slate-300">Expiry Date:</strong>
+                        <span class="ml-2 text-white" id="createdExpiry"></span>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center">
+                    <input type="checkbox" id="sendNotification" class="h-4 w-4 rounded border-slate-600 bg-slate-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-slate-900">
+                    <label for="sendNotification" class="ml-2 text-sm text-slate-300">
+                        Send notification to customer
+                    </label>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-slate-700 flex justify-end space-x-3">
+                <button onclick="closeSuccessModal()" class="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                    Close
+                </button>
+                <button onclick="createAnother()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200">
+                    Create Another
+                </button>
+                <a href="/pppoe" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200">
+                    View All PPPoE Users
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-center space-x-4 shadow-2xl">
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-600 border-t-purple-500"></div>
+        <div>
+            <span class="text-slate-200 font-medium">Creating PPPoE user...</span>
+            <p class="text-slate-400 text-sm mt-1">Mohon tunggu sebentar</p>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer', { scripts: ['/public/js/pppoe-create.js'] }) %>

@@ -1,0 +1,66 @@
+{
+  "sendMessage": {
+    "type": "object",
+    "properties": {
+      "phone": {
+        "type": "string",
+        "pattern": "^[0-9+]{10,15}$"
+      },
+      "message": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    },
+    "required": ["phone", "message"]
+  },
+  "sendBulkMessage": {
+    "type": "object",
+    "properties": {
+      "recipients": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "phone": {
+              "type": "string",
+              "pattern": "^[0-9+]{10,15}$"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "required": ["phone", "message"]
+        },
+        "minItems": 1,
+        "maxItems": 100
+      }
+    },
+    "required": ["recipients"]
+  },
+  "template": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "variables": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^\\{[a-zA-Z0-9_]+\\}$"
+        }
+      }
+    },
+    "required": ["name", "content"]
+  }
+}

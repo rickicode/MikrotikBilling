@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Dashboard - HIJINETWORK</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .metric-card {
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        .status-healthy { color: #28a745; }
+        .status-warning { color: #ffc107; }
+        .status-critical { color: #dc3545; }
+        .security-event {
+            border-left: 4px solid;
+            padding-left: 1rem;
+        }
+        .security-event.high { border-left-color: #dc3545; }
+        .security-event.medium { border-left-color: #ffc107; }
+        .security-event.low { border-left-color: #28a745; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/dashboard">
+                <i class="bi bi-shield-check"></i> HIJINETWORK
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/dashboard">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+                <a class="nav-link active" href="/security">
+                    <i class="bi bi-shield-lock"></i> Security
+                </a>
+                <a class="nav-link" href="/logout">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="h3 mb-4">
+                    <i class="bi bi-shield-lock"></i> Security Dashboard
+                    <small class="text-muted d-block d-sm-inline">Real-time security monitoring and alerts</small>
+                </h1>
+            </div>
+        </div>
+
+        <!-- Security Status Overview -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-shield-check status-healthy" style="font-size: 2rem;"></i>
+                        <h5 class="card-title mt-2">System Health</h5>
+                        <p class="card-text">
+                            <span class="badge bg-success">Healthy</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-bug status-warning" style="font-size: 2rem;"></i>
+                        <h5 class="card-title mt-2">Threats Detected</h5>
+                        <p class="card-text h4">
+                            <%= securityMetrics.suspiciousActivity?.totalSuspiciousIPs || 0 %>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-exclamation-triangle status-warning" style="font-size: 2rem;"></i>
+                        <h5 class="card-title mt-2">Active Alerts</h5>
+                        <p class="card-text h4">
+                            <%= performanceMetrics.alerts?.length || 0 %>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-clock-history status-healthy" style="font-size: 2rem;"></i>
+                        <h5 class="card-title mt-2">Uptime</h5>
+                        <p class="card-text">
+                            <%= formatUptime(performanceMetrics.system?.uptime || 0) %>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Performance -->
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-cpu"></i> System Resources
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>CPU Usage</span>
+                                <span><%= formatPercentage(performanceMetrics.system?.cpu?.usage || 0) %></span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar <%= getProgressBarClass(performanceMetrics.system?.cpu?.usage || 0) %>"
+                                     style="width: <%= performanceMetrics.system?.cpu?.usage || 0 %>%"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Memory Usage</span>
+                                <span><%= formatPercentage(performanceMetrics.system?.memory?.usage || 0) %></span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar <%= getProgressBarClass(performanceMetrics.system?.memory?.usage || 0) %>"
+                                     style="width: <%= performanceMetrics.system?.memory?.usage || 0 %>%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Load Average</span>
+                                <span><%= performanceMetrics.system?.loadAverage?.[0]?.toFixed(2) || '0.00' %></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-graph-up"></i> Application Performance
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-activity text-primary" style="font-size: 1.5rem;"></i>
+                                    <h6 class="mt-2">Avg Response</h6>
+                                    <p class="mb-0 h5">
+                                        <%= formatResponseTime(performanceMetrics.application?.performance?.averageResponseTime || 0) %>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-people text-success" style="font-size: 1.5rem;"></i>
+                                    <h6 class="mt-2">Active Users</h6>
+                                    <p class="mb-0 h5">
+                                        <%= performanceMetrics.application?.connections?.active || 0 %>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-check-circle text-success" style="font-size: 1.5rem;"></i>
+                                    <h6 class="mt-2">Success Rate</h6>
+                                    <p class="mb-0 h5">
+                                        <%= formatPercentage(calculateSuccessRate(performanceMetrics.application?.requests)) %>%
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Security Events -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-clock-history"></i> Recent Security Events
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="refreshSecurityEvents()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="security-events">
+                            <% if (securityMetrics.recentEvents && securityMetrics.recentEvents.length > 0) { %>
+                                <% securityMetrics.recentEvents.forEach(event => { %>
+                                    <div class="security-event <%= event.severity %> mb-3">
+                                        <div class="d-flex justify-content-between">
+                                            <div>
+                                                <strong><%= event.event %></strong>
+                                                <span class="badge bg-<%= getSeverityBadgeClass(event.severity) %> ms-2"><%= event.severity %></span>
+                                                <small class="text-muted d-block"><%= event.details %></small>
+                                            </div>
+                                            <small class="text-muted"><%= formatDateTime(event.timestamp) %></small>
+                                        </div>
+                                    </div>
+                                <% }); %>
+                            <% } else { %>
+                                <p class="text-muted text-center mb-0">No recent security events</p>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Alerts -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-exclamation-triangle"></i> Active Alerts
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <% if (performanceMetrics.alerts && performanceMetrics.alerts.length > 0) { %>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Type</th>
+                                            <th>Severity</th>
+                                            <th>Message</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% performanceMetrics.alerts.forEach(alert => { %>
+                                            <tr>
+                                                <td><%= formatDateTime(alert.timestamp) %></td>
+                                                <td><%= alert.type %></td>
+                                                <td>
+                                                    <span class="badge bg-<%= getSeverityBadgeClass(alert.severity) %>">
+                                                        <%= alert.severity %>
+                                                    </span>
+                                                </td>
+                                                <td><%= alert.details?.message || alert.type %></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="acknowledgeAlert('<%= alert.id %>')">
+                                                        Acknowledge
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <% }); %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } else { %>
+                            <p class="text-muted text-center mb-0">No active alerts</p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh security events every 30 seconds
+        setInterval(refreshSecurityEvents, 30000);
+
+        function refreshSecurityEvents() {
+            fetch('/api/security/alerts')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateSecurityEvents(data.alerts);
+                    }
+                })
+                .catch(error => console.error('Error refreshing security events:', error));
+        }
+
+        function updateSecurityEvents(events) {
+            const container = document.getElementById('security-events');
+            if (events.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center mb-0">No recent security events</p>';
+                return;
+            }
+
+            container.innerHTML = events.map(event => `
+                <div class="security-event ${event.severity} mb-3">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>${event.event}</strong>
+                            <span class="badge bg-${getSeverityBadgeClass(event.severity)} ms-2">${event.severity}</span>
+                            <small class="text-muted d-block">${event.details}</small>
+                        </div>
+                        <small class="text-muted">${formatDateTime(event.timestamp)}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function acknowledgeAlert(alertId) {
+            fetch(`/api/security/alerts/${alertId}/acknowledge`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            })
+            .catch(error => console.error('Error acknowledging alert:', error));
+        }
+
+        function getSeverityBadgeClass(severity) {
+            const classes = {
+                'low': 'success',
+                'medium': 'warning',
+                'high': 'danger',
+                'critical': 'danger'
+            };
+            return classes[severity] || 'secondary';
+        }
+
+        function formatDateTime(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+    </script>
+</body>
+</html>

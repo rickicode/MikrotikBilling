@@ -1,0 +1,223 @@
+const AuthMiddleware = require('../middleware/auth');
+const { db } = require('../database/DatabaseManager');
+
+async function vendorRoutes(fastify, options) {
+  const auth = new AuthMiddleware(fastify);
+
+  // Vendor list
+  fastify.get('/', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = 20;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (name LIKE ? OR contact_person LIKE ? OR phone LIKE ? OR email LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status) {
+        whereClause += ' AND status = ?';
+        params.push(status);
+      }
+
+      const vendors = fastify.db.query('
+        SELECT v.*,
+               (SELECT COUNT(*) FROM vouchers WHERE vendor_id = v.id) as total_vouchers,
+               (SELECT COUNT(*) FROM vouchers WHERE vendor_id = v.id AND status = 'active') as active_vouchers
+        FROM vendors v
+        ${whereClause}
+        ORDER BY v.created_at DESC
+        LIMIT ? OFFSET ?
+      ', [...params, limit, offset]);
+
+      const total = fastify.db.get(`
+        SELECT COUNT(*) as count
+        FROM vendors v
+        ${whereClause}
+      `, params);
+
+      return reply.view('vendors/index', {
+        admin: request.admin,
+        vendors: vendors,
+        pagination: {
+          current: page,
+          total: Math.ceil(total.count / limit),
+          from: offset + 1,
+          to: Math.min(offset + limit, total.count),
+          total: total.count
+        },
+        search,
+        status
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Create vendor form
+  fastify.get('/create', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      return reply.view('vendors/create', {
+        admin: request.admin
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.view('vendors/create', {
+        admin: request.admin,
+        error: 'Failed to load form'
+      });
+    }
+  });
+
+  // Create vendor
+  fastify.post('/', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { name, contact_person, phone, email, address, status } = request.body;
+
+    try {
+      // Check if vendor name already exists
+      const existingVendor = db.query('SELECT id FROM vendors WHERE name = ?', [name]);
+
+      if (existingVendor) {
+        return reply.view('vendors/create', {
+          admin: request.admin,
+          error: 'Vendor dengan nama tersebut sudah ada',
+          formData: request.body
+        });
+      }
+
+      // Insert vendor
+      const result = await db.insert('vendors', {'name':'name','contact_person':'contact_person','phone':'phone','email':'email','address':'address','status':'status || 'active''});
+
+      return reply.redirect('/vendors?success=Vendor berhasil ditambahkan');
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.view('vendors/create', {
+        admin: request.admin,
+        error: 'Failed to create vendor',
+        formData: request.body
+      });
+    }
+  });
+
+  // Edit vendor form
+  fastify.get('/:id/edit', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const vendor = db.getOne('vendors', {'id':'request.params.id'});
+
+      if (!vendor) {
+        return reply.redirect('/vendors?error=Vendor tidak ditemukan');
+      }
+
+      return reply.view('vendors/edit', {
+        admin: request.admin,
+        vendor: vendor
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect('/vendors?error=Failed to load vendor');
+    }
+  });
+
+  // Update vendor
+  fastify.post('/:id', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { name, contact_person, phone, email, address, status } = request.body;
+    const vendorId = request.params.id;
+
+    try {
+      // Check if vendor name already exists (excluding current vendor)
+      const existingVendor = db.query('SELECT id FROM vendors WHERE name = ? AND id != ?', [name, vendorId]);
+
+      if (existingVendor) {
+        const vendor = db.getOne('vendors', {'id':'vendorId'});
+        return reply.view('vendors/edit', {
+          admin: request.admin,
+          error: 'Vendor dengan nama tersebut sudah ada',
+          vendor: vendor,
+          formData: request.body
+        });
+      }
+
+      // Update vendor
+      await db.update('vendors', {'nam':'name'}, {});
+
+      return reply.redirect('/vendors?success=Vendor berhasil diperbarui');
+    } catch (error) {
+      fastify.log.error(error);
+      const vendor = db.getOne('vendors', {'id':'vendorId'});
+      return reply.view('vendors/edit', {
+        admin: request.admin,
+        error: 'Failed to update vendor',
+        vendor: vendor,
+        formData: request.body
+      });
+    }
+  });
+
+  // Delete vendor
+  fastify.post('/:id/delete', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const vendorId = request.params.id;
+
+      // Check if vendor has associated vouchers
+      const voucherCount = db.query('SELECT COUNT(*) as count FROM vouchers WHERE vendor_id = ?', [vendorId]);
+
+      if (voucherCount.count > 0) {
+        return reply.redirect('/vendors?error=Vendor tidak dapat dihapus karena masih memiliki voucher terkait');
+      }
+
+      // Delete vendor
+      await db.delete('vendors', {'id':'vendorId'});
+
+      return reply.redirect('/vendors?success=Vendor berhasil dihapus');
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect('/vendors?error=Failed to delete vendor');
+    }
+  });
+
+  // Toggle vendor status
+  fastify.post('/:id/toggle', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const vendor = db.query('SELECT status FROM vendors WHERE id = ?', [request.params.id]);
+
+      if (!vendor) {
+        return reply.redirect('/vendors?error=Vendor tidak ditemukan');
+      }
+
+      const newStatus = vendor.status === 'active' ? 'inactive' : 'active';
+
+      fastify.db.run(
+        'UPDATE vendors SET status = ? WHERE id = ?',
+        [newStatus, request.params.id]
+      );
+
+      return reply.redirect('/vendors?success=Status vendor berhasil diperbarui');
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect('/vendors?error=Failed to toggle vendor status');
+    }
+  });
+}
+
+module.exports = vendorRoutes;

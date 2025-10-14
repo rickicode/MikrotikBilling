@@ -1,0 +1,398 @@
+<%- include('../partials/header', { title: 'Manajemen Pembayaran', currentUrl: '/payments' }) %>
+
+<div class="mb-4 row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0 h3">Manajemen Pembayaran</h1>
+            <div>
+                <button class="btn btn-outline-primary btn-sm me-2" id="exportBtn">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <button class="btn btn-outline-success btn-sm me-2" id="reconcileBtn">
+                    <i class="bi bi-arrow-repeat"></i> Reconcile
+                </button>
+                <a href="/payments/create" class="btn btn-primary">
+                    <i class="bi bi-cash"></i> Tambah Pembayaran
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Overview -->
+<div class="mb-4 row">
+    <div class="col-md-3">
+        <div class="text-white card bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Pembayaran</h6>
+                        <h3 class="mb-0" id="totalPayments">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-cash-stack fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Sukses</h6>
+                        <h3 class="mb-0" id="successfulPayments">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-check-circle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Pending</h6>
+                        <h3 class="mb-0" id="pendingPayments">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-clock fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Revenue Bulanan</h6>
+                        <h3 class="mb-0" id="monthlyRevenue">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-graph-up fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter -->
+<div class="mb-4 card">
+    <div class="card-body">
+        <form id="searchForm" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Cari Pembayaran</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput" placeholder="ID, Pelanggan, atau Deskripsi...">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">Semua Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="paid">Lunas</option>
+                    <option value="failed">Gagal</option>
+                    <option value="cancelled">Dibatalkan</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Metode</label>
+                <select class="form-select" id="methodFilter">
+                    <option value="">Semua Metode</option>
+                    <option value="cash">Cash</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="duitku">DuitKu</option>
+                    <option value="credit">Saldo</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Tanggal</label>
+                <div class="input-group">
+                    <input type="date" class="form-control" id="startDate" name="startDate">
+                    <span class="input-group-text">s/d</span>
+                    <input type="date" class="form-control" id="endDate" name="endDate">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="mb-4 card">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="border rounded p-3">
+                    <h6 class="mb-3"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h6>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-success btn-sm" id="processDuitKuBtn">
+                            <i class="bi bi-credit-card me-2"></i>Proses DuitKu Pending
+                        </button>
+                        <button type="button" class="btn btn-outline-info btn-sm" id="generateReportsBtn">
+                            <i class="bi bi-file-earmark-text me-2"></i>Generate Laporan
+                        </button>
+                        <button type="button" class="btn btn-outline-warning btn-sm" id="checkOverdueBtn">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Cek Pembayaran Terlambat
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3">
+                    <h6 class="mb-3"><i class="bi bi-bar-chart me-2"></i>Summary Hari Ini</h6>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="text-success">
+                                <div class="fs-4 fw-bold" id="todayCount">0</div>
+                                <small>Transaksi</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-primary">
+                                <div class="fs-4 fw-bold" id="todayAmount">0</div>
+                                <small>Nominal</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3">
+                    <h6 class="mb-3"><i class="bi bi-calendar-check me-2"></i>Reconciliation Status</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span id="reconciliationStatus">Up to date</span>
+                        <span class="badge bg-success" id="reconciliationBadge">OK</span>
+                    </div>
+                    <small class="text-muted">Last reconcile: <span id="lastReconcile">Never</span></small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payments Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Daftar Pembayaran</h6>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-primary me-2" id="resultCount">0 Hasil</span>
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary" id="refreshBtn">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <button type="button" class="btn btn-outline-info" id="autoReconcileBtn">
+                    <i class="bi bi-arrow-repeat"></i> Auto-Reconcile
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="paymentsTable">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                        </th>
+                        <th>ID</th>
+                        <th>Pelanggan</th>
+                        <th>Berlangganan</th>
+                        <th>Jumlah</th>
+                        <th>Metode</th>
+                        <th>Status</th>
+                        <th>Tanggal</th>
+                        <th>Deskripsi</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentsTableBody">
+                    <tr>
+                        <td colspan="10" class="py-4 text-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Memuat data...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Enhanced Pagination -->
+        <%- include('../partials/pagination') %>
+    </div>
+</div>
+
+<!-- Bulk Actions Bar -->
+<div class="card mt-3" id="bulkActionsBar" style="display: none;">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="me-3">
+                    <i class="bi bi-check-square me-1"></i>
+                    <span id="selectedCount">0</span> dipilih
+                </span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-success" id="bulkApproveSelected">
+                        <i class="bi bi-check-circle"></i> Approve
+                    </button>
+                    <button type="button" class="btn btn-outline-warning" id="bulkRejectSelected">
+                        <i class="bi bi-x-circle"></i> Reject
+                    </button>
+                    <button type="button" class="btn btn-outline-info" id="bulkExportSelected">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="clearSelectionBtn">
+                <i class="bi bi-x-circle"></i> Batal Pilih
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Proses Pembayaran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="paymentModalBody">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Process DuitKu Modal -->
+<div class="modal fade" id="processDuitKuModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Proses Pembayaran DuitKu Pending</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="duitKuPendingList">
+                    <!-- Pending payments will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" id="processSelectedDuitKu">
+                    <i class="bi bi-check-circle"></i> Proses yang Dipilih
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generate Reports Modal -->
+<div class="modal fade" id="reportsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Generate Laporan Pembayaran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="generateReportForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="reportType" class="form-label">Jenis Laporan</label>
+                        <select class="form-select" id="reportType" name="report_type" required>
+                            <option value="summary">Ringkasan Pembayaran</option>
+                            <option value="detailed">Detail Pembayaran</option>
+                            <option value="revenue">Revenue Report</option>
+                            <option value="aging">Aging Report</option>
+                            <option value="method">Metode Pembayaran</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reportPeriod" class="form-label">Periode</label>
+                        <select class="form-select" id="reportPeriod" name="period">
+                            <option value="today">Hari Ini</option>
+                            <option value="week">Minggu Ini</option>
+                            <option value="month">Bulan Ini</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+
+                    <div id="customDateRange" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="customStartDate" class="form-label">Dari Tanggal</label>
+                                <input type="date" class="form-control" id="customStartDate" name="start_date">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customEndDate" class="form-label">Sampai Tanggal</label>
+                                <input type="date" class="form-control" id="customEndDate" name="end_date">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reportFormat" class="form-label">Format</label>
+                        <select class="form-select" id="reportFormat" name="format">
+                            <option value="pdf">PDF</option>
+                            <option value="excel">Excel</option>
+                            <option value="csv">CSV</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-file-earmark-text"></i> Generate
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.payment-row {
+    transition: all 0.2s ease;
+}
+.payment-row:hover {
+    background-color: #f8f9fa;
+}
+.payment-row.selected {
+    background-color: #e7f3ff;
+}
+.status-badge {
+    font-size: 0.8em;
+}
+.payment-amount {
+    font-weight: bold;
+}
+.payment-amount.success {
+    color: #28a745;
+}
+.payment-amount.warning {
+    color: #ffc107;
+}
+.payment-amount.danger {
+    color: #dc3545;
+}
+</style>
+
+<%- include('../partials/footer', { scripts: ['/public/js/payments.js'] }) %>

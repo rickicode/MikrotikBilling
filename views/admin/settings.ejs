@@ -1,0 +1,805 @@
+<%- include('../partials/header', { title: 'Pengaturan Sistem', currentUrl: '/settings' }) %>
+
+<!-- Page Header -->
+<div class="mb-8" role="region" aria-labelledby="settings-heading">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 id="settings-heading" class="text-3xl font-bold text-white mb-2">Pengaturan Sistem</h1>
+            <p class="text-slate-400">Kelola konfigurasi sistem dan preferensi aplikasi</p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex space-x-3">
+            <button id="testConnectionBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800">
+                <i class="fas fa-plug mr-2"></i>
+                Test Koneksi
+            </button>
+            <button id="saveSettingsBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                <i class="fas fa-save mr-2"></i>
+                Simpan
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Tabs Container -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg overflow-hidden" role="region" aria-labelledby="settings-tabs-heading">
+
+    <!-- Tab Navigation -->
+    <div class="bg-slate-900/30 border-b border-slate-700 p-1">
+        <h2 id="settings-tabs-heading" class="sr-only">Pengaturan Tab Navigation</h2>
+        <nav class="flex flex-wrap gap-1" role="tablist" aria-label="Pengaturan kategori">
+            <button class="settings-tab active px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    id="general-tab"
+                    data-tab="general"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="general-panel">
+                <i class="fas fa-gear mr-2"></i>
+                Umum
+            </button>
+            <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    id="mikrotik-tab"
+                    data-tab="mikrotik"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="mikrotik-panel">
+                <i class="fas fa-router mr-2"></i>
+                Mikrotik
+            </button>
+            <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    id="database-tab"
+                    data-tab="database"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="database-panel">
+                <i class="fas fa-database mr-2"></i>
+                Database
+            </button>
+            <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    id="notification-tab"
+                    data-tab="notification"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="notification-panel">
+                <i class="fas fa-bell mr-2"></i>
+                Notifikasi
+            </button>
+            <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    id="payment-tab"
+                    data-tab="payment"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="payment-panel">
+                <i class="fas fa-credit-card mr-2"></i>
+                Pembayaran
+            </button>
+            <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    id="system-tab"
+                    data-tab="system"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="system-panel">
+                <i class="fas fa-cpu mr-2"></i>
+                Sistem
+            </button>
+        </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="p-6">
+        <!-- General Settings Panel -->
+        <div id="general-panel" class="settings-panel active" role="tabpanel" aria-labelledby="general-tab">
+            <form id="generalSettingsForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="companyName" class="block text-sm font-medium text-slate-300 mb-2">
+                            Nama Perusahaan
+                            <span class="text-red-400 ml-1" aria-label="Required">*</span>
+                        </label>
+                        <input type="text"
+                               id="companyName"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.company_name || 'Mikrotik Billing System' %>"
+                               required>
+                    </div>
+                    <div>
+                        <label for="companyAddress" class="block text-sm font-medium text-slate-300 mb-2">
+                            Alamat
+                        </label>
+                        <input type="text"
+                               id="companyAddress"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.company_address || '' %>">
+                    </div>
+                    <div>
+                        <label for="companyPhone" class="block text-sm font-medium text-slate-300 mb-2">
+                            Telepon
+                        </label>
+                        <input type="tel"
+                               id="companyPhone"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.company_phone || '' %>">
+                    </div>
+                    <div>
+                        <label for="companyEmail" class="block text-sm font-medium text-slate-300 mb-2">
+                            Email
+                        </label>
+                        <input type="email"
+                               id="companyEmail"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.company_email || '' %>">
+                    </div>
+                    <div>
+                        <label for="currency" class="block text-sm font-medium text-slate-300 mb-2">
+                            Mata Uang
+                        </label>
+                        <select id="currency"
+                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                            <option value="IDR" <%= settings?.currency === 'IDR' ? 'selected' : '' %>>Rupiah (IDR)</option>
+                            <option value="USD" <%= settings?.currency === 'USD' ? 'selected' : '' %>>US Dollar (USD)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="language" class="block text-sm font-medium text-slate-300 mb-2">
+                            Bahasa
+                        </label>
+                        <select id="language"
+                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                            <option value="id" <%= settings?.language === 'id' ? 'selected' : '' %>>Bahasa Indonesia</option>
+                            <option value="en" <%= settings?.language === 'en' ? 'selected' : '' %>>English</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- General Save Button -->
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="saveGeneralBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                        <i class="fas fa-save mr-2"></i>
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Mikrotik Settings Panel -->
+        <div id="mikrotik-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="mikrotik-tab">
+            <!-- Connection Status -->
+            <div class="mb-6 p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-medium text-slate-300">Status Koneksi Mikrotik</h3>
+                    <span class="mikrotik-status-indicator px-3 py-1 rounded-full text-xs font-medium bg-slate-600 text-slate-300"
+                          data-mikrotik-status="unknown">
+                        Checking...
+                    </span>
+                </div>
+                <div id="connectionInfo" class="mt-2"></div>
+            </div>
+
+            <form id="mikrotikSettingsForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="mikrotikHost" class="block text-sm font-medium text-slate-300 mb-2">
+                            Host/IP Address
+                            <span class="text-red-400 ml-1" aria-label="Required">*</span>
+                        </label>
+                        <input type="text"
+                               id="mikrotikHost"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.mikrotik_host || '' %>"
+                               required
+                               placeholder="192.168.1.1">
+                    </div>
+                    <div>
+                        <label for="mikrotikPort" class="block text-sm font-medium text-slate-300 mb-2">
+                            Port
+                        </label>
+                        <input type="number"
+                               id="mikrotikPort"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.mikrotik_port || 8728 %>"
+                               min="1"
+                               max="65535">
+                    </div>
+                    <div>
+                        <label for="mikrotikUsername" class="block text-sm font-medium text-slate-300 mb-2">
+                            Username
+                            <span class="text-red-400 ml-1" aria-label="Required">*</span>
+                        </label>
+                        <input type="text"
+                               id="mikrotikUsername"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.mikrotik_username || '' %>"
+                               required>
+                    </div>
+                    <div>
+                        <label for="mikrotikPassword" class="block text-sm font-medium text-slate-300 mb-2">
+                            Password
+                        </label>
+                        <input type="password"
+                               id="mikrotikPassword"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.mikrotik_password || '' %>">
+                    </div>
+                    <div>
+                        <label for="hotspotCommentMarker" class="block text-sm font-medium text-slate-300 mb-2">
+                            Hotspot Comment Marker
+                        </label>
+                        <input type="text"
+                               id="hotspotCommentMarker"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.hotspot_comment_marker || 'VOUCHER_SYSTEM' %>"
+                               placeholder="VOUCHER_SYSTEM">
+                    </div>
+                    <div>
+                        <label for="pppoeCommentMarker" class="block text-sm font-medium text-slate-300 mb-2">
+                            PPPoE Comment Marker
+                        </label>
+                        <input type="text"
+                               id="pppoeCommentMarker"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.pppoe_comment_marker || 'PPPOE_SYSTEM' %>"
+                               placeholder="PPPOE_SYSTEM">
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center">
+                        <input type="checkbox"
+                               id="useSSL"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                               <%= settings?.mikrotik_use_ssl === 'true' ? 'checked' : '' %>>
+                        <label for="useSSL" class="ml-2 block text-sm text-slate-300">
+                            Gunakan SSL/TLS
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Profile Sync Section -->
+                <div class="mt-8 p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
+                    <h3 class="text-sm font-medium text-slate-300 mb-4">Profile Synchronization</h3>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <div class="flex-1">
+                            <p class="text-xs text-slate-400 mb-3">Sync profiles from Mikrotik to local database. This ensures your available profiles match what's configured in Mikrotik.</p>
+                            <div class="flex gap-2">
+                                <button id="syncProfilesBtn" class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors duration-200">
+                                    <i class="fas fa-sync mr-2"></i>
+                                    Sync Profiles
+                                </button>
+                                <button id="refreshProfilesBtn" class="inline-flex items-center px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white text-sm rounded-lg transition-colors duration-200">
+                                    <i class="fas fa-eye mr-2"></i>
+                                    View Profiles
+                                </button>
+                            </div>
+                        </div>
+                        <div id="profileSyncStatus" class="flex-1">
+                            <div class="text-xs text-slate-400">
+                                <span id="profileCount">0</span> profiles in database
+                            </div>
+                            <div id="profileSyncResult" class="mt-2 text-xs"></div>
+                        </div>
+                    </div>
+
+                    <!-- Profile List -->
+                    <div id="profileList" class="mt-4 hidden">
+                        <h4 class="text-xs font-medium text-slate-400 mb-2">Available Profiles:</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" id="profileGrid">
+                            <!-- Profiles will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mikrotik Save Button -->
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="saveMikrotikBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                        <i class="fas fa-save mr-2"></i>
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Database Settings Panel -->
+        <div id="database-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="database-tab">
+            <form id="databaseSettingsForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="databaseType" class="block text-sm font-medium text-slate-300 mb-2">
+                            Database Type
+                        </label>
+                        <select id="databaseType"
+                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                            <option value="sqlite" <%= settings?.database_type === 'sqlite' ? 'selected' : '' %>>SQLite</option>
+                            <option value="postgresql" <%= settings?.database_type === 'postgresql' ? 'selected' : '' %>>PostgreSQL</option>
+                            <option value="supabase" <%= settings?.database_type === 'supabase' ? 'selected' : '' %>>Supabase</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="backupInterval" class="block text-sm font-medium text-slate-300 mb-2">
+                            Backup Interval (menit)
+                        </label>
+                        <input type="number"
+                               id="backupInterval"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.backup_interval || 60 %>"
+                               min="5">
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <input type="checkbox"
+                               id="autoBackup"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                               <%= settings?.auto_backup ? 'checked' : '' %>>
+                        <label for="autoBackup" class="ml-2 block text-sm text-slate-300">
+                            Auto Backup Database
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox"
+                               id="optimizeOnStartup"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                               <%= settings?.optimize_on_startup ? 'checked' : '' %>>
+                        <label for="optimizeOnStartup" class="ml-2 block text-sm text-slate-300">
+                            Optimize Database on Startup
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Database Save Button -->
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="saveDatabaseBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                        <i class="fas fa-save mr-2"></i>
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Notification Settings Panel -->
+        <div id="notification-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="notification-tab">
+            <form id="notificationSettingsForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="whatsappProvider" class="block text-sm font-medium text-slate-300 mb-2">
+                            WhatsApp Provider
+                        </label>
+                        <select id="whatsappProvider"
+                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                            <option value="">Disabled</option>
+                            <option value="fonnte" <%= settings?.whatsapp_provider === 'fonnte' ? 'selected' : '' %>>Fonnte</option>
+                            <option value="wablas" <%= settings?.whatsapp_provider === 'wablas' ? 'selected' : '' %>>Wablas</option>
+                            <option value="custom" <%= settings?.whatsapp_provider === 'custom' ? 'selected' : '' %>>Custom Webhook</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="whatsappApiKey" class="block text-sm font-medium text-slate-300 mb-2">
+                            WhatsApp API Key
+                        </label>
+                        <input type="password"
+                               id="whatsappApiKey"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.whatsapp_api_key || '' %>">
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-4">Notification Triggers</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="notifyVoucherCreated"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                                   <%= settings?.notify_voucher_created ? 'checked' : '' %>>
+                            <label for="notifyVoucherCreated" class="ml-2 block text-sm text-slate-300">
+                                Voucher Created
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="notifyExpiryWarning"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                                   <%= settings?.notify_expiry_warning ? 'checked' : '' %>>
+                            <label for="notifyExpiryWarning" class="ml-2 block text-sm text-slate-300">
+                                Expiry Warning (H-3)
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="notifyExpired"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                                   <%= settings?.notify_expired ? 'checked' : '' %>>
+                            <label for="notifyExpired" class="ml-2 block text-sm text-slate-300">
+                                Expired
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notification Save Button -->
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="saveNotificationBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                        <i class="fas fa-save mr-2"></i>
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Payment Settings Panel -->
+        <div id="payment-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="payment-tab">
+            <form id="paymentSettingsForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="duitkuMerchantCode" class="block text-sm font-medium text-slate-300 mb-2">
+                            DuitKu Merchant Code
+                        </label>
+                        <input type="text"
+                               id="duitkuMerchantCode"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.duitku_merchant_code || '' %>">
+                    </div>
+                    <div>
+                        <label for="duitkuApiKey" class="block text-sm font-medium text-slate-300 mb-2">
+                            DuitKu API Key
+                        </label>
+                        <input type="password"
+                               id="duitkuApiKey"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.duitku_api_key || '' %>">
+                    </div>
+                    <div>
+                        <label for="duitkuEnvironment" class="block text-sm font-medium text-slate-300 mb-2">
+                            DuitKu Environment
+                        </label>
+                        <select id="duitkuEnvironment"
+                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                            <option value="sandbox" <%= settings?.duitku_environment === 'sandbox' ? 'selected' : '' %>>Sandbox</option>
+                            <option value="production" <%= settings?.duitku_environment === 'production' ? 'selected' : '' %>>Production</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="duitkuCallbackUrl" class="block text-sm font-medium text-slate-300 mb-2">
+                            Callback URL
+                        </label>
+                        <input type="url"
+                               id="duitkuCallbackUrl"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.duitku_callback_url || '' %>"
+                               placeholder="https://yourdomain.com/api/duitku/callback">
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center">
+                        <input type="checkbox"
+                               id="enableDuitku"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                               <%= settings?.enable_duitku ? 'checked' : '' %>>
+                        <label for="enableDuitku" class="ml-2 block text-sm text-slate-300">
+                            Enable DuitKu Payment
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Payment Save Button -->
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="savePaymentBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                        <i class="fas fa-save mr-2"></i>
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- System Settings Panel -->
+        <div id="system-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="system-tab">
+            <form id="systemSettingsForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="sessionTimeout" class="block text-sm font-medium text-slate-300 mb-2">
+                            Session Timeout (menit)
+                        </label>
+                        <input type="number"
+                               id="sessionTimeout"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.session_timeout || 30 %>"
+                               min="5">
+                    </div>
+                    <div>
+                        <label for="logLevel" class="block text-sm font-medium text-slate-300 mb-2">
+                            Log Level
+                        </label>
+                        <select id="logLevel"
+                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                            <option value="error" <%= settings?.log_level === 'error' ? 'selected' : '' %>>Error</option>
+                            <option value="warn" <%= settings?.log_level === 'warn' ? 'selected' : '' %>>Warning</option>
+                            <option value="info" <%= settings?.log_level === 'info' ? 'selected' : '' %>>Info</option>
+                            <option value="debug" <%= settings?.log_level === 'debug' ? 'selected' : '' %>>Debug</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="cleanupSchedule" class="block text-sm font-medium text-slate-300 mb-2">
+                            Cleanup Schedule (jam)
+                        </label>
+                        <input type="number"
+                               id="cleanupSchedule"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.cleanup_schedule || 24 %>"
+                               min="1">
+                    </div>
+                    <div>
+                        <label for="maxLogDays" class="block text-sm font-medium text-slate-300 mb-2">
+                            Max Log Days
+                        </label>
+                        <input type="number"
+                               id="maxLogDays"
+                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                               value="<%= settings?.max_log_days || 30 %>"
+                               min="7">
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-4">Features</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="enableRegistration"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                                   <%= settings?.enable_registration ? 'checked' : '' %>>
+                            <label for="enableRegistration" class="ml-2 block text-sm text-slate-300">
+                                Enable User Registration
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="enableDemo"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                                   <%= settings?.enable_demo ? 'checked' : '' %>>
+                            <label for="enableDemo" class="ml-2 block text-sm text-slate-300">
+                                Demo Mode
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="enableMaintenance"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
+                                   <%= settings?.enable_maintenance ? 'checked' : '' %>>
+                            <label for="enableMaintenance" class="ml-2 block text-sm text-slate-300">
+                                Maintenance Mode
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-4">Template Settings</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="printTemplateType" class="block text-sm font-medium text-slate-300 mb-2">
+                                Default Print Template
+                            </label>
+                            <select id="printTemplateType"
+                                    class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                                <option value="a4" <%= settings?.print_template_type === 'a4' ? 'selected' : '' %>>A4 (Kertas Standar)</option>
+                                <option value="thermal" <%= settings?.print_template_type === 'thermal' ? 'selected' : '' %>>Thermal Printer (80mm)</option>
+                            </select>
+                            <p class="mt-1 text-xs text-slate-500">Template yang akan digunakan saat mencetak voucher</p>
+                        </div>
+                        <div>
+                            <label for="templateName" class="block text-sm font-medium text-slate-300 mb-2">
+                                Template Name
+                            </label>
+                            <input type="text"
+                                   id="templateName"
+                                   class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                   value="<%= settings?.template_name || 'Default' %>">
+                            <p class="mt-1 text-xs text-slate-500">Nama untuk identifikasi template</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Save Button -->
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="saveSystemBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                        <i class="fas fa-save mr-2"></i>
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="bg-slate-900/30 border-t border-slate-700 px-6 py-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div class="flex flex-wrap gap-3">
+                <button id="resetSettingsBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-800">
+                    <i class="fas fa-undo mr-2"></i>
+                    Reset Default
+                </button>
+                <button id="exportSettingsBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-slate-800">
+                    <i class="fas fa-download mr-2"></i>
+                    Export
+                </button>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                  <button id="saveAllSettingsBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
+                    <i class="fas fa-check mr-2"></i>
+                    Simpan Semua
+                </button>
+            </div>
+
+  
+<!-- Test Connection Modal -->
+<div id="testConnectionModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-slate-700">
+            <div class="flex items-center justify-between">
+                <h3 id="modal-title" class="text-lg font-semibold text-white">Test Koneksi Mikrotik</h3>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-white transition-colors" aria-label="Close modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div id="connectionTestResult">
+                <div class="text-center">
+                    <div class="inline-flex items-center justify-center w-12 h-12 border-4 border-slate-600 border-t-blue-500 rounded-full animate-spin mb-4" role="status" aria-label="Loading"></div>
+                    <p class="text-slate-300">Menguji koneksi ke Mikrotik...</p>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-700">
+            <button id="closeModalBtn2" class="w-full px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors duration-200">
+                Tutup
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Success Notification -->
+<div id="successNotification" class="hidden fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 translate-x-full" role="alert" aria-live="polite">
+    <div class="flex items-center">
+        <i class="fas fa-check-circle mr-3"></i>
+        <span>Pengaturan berhasil disimpan!</span>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50" role="progressbar" aria-valuetext="Loading...">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-center space-x-4 shadow-2xl">
+        <div class="animate-spin rounded-full h-8 w-8 border-4 border-slate-600 border-t-blue-500"></div>
+        <div>
+            <span class="text-slate-200 font-medium">Menyimpan pengaturan...</span>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+<!-- Admin Settings Script -->
+<script src="/public/js/admin-settings.js"></script>
+
+<!-- Inline Tab Script (Fallback) -->
+<script>
+// Simple tab functionality - inline as fallback
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Inline tab script loaded');
+
+    // Wait a bit for everything to load
+    setTimeout(() => {
+        const tabs = document.querySelectorAll('.settings-tab[data-tab]');
+        console.log('Found tabs:', tabs.length);
+
+        // Remove any existing event listeners by cloning nodes
+        tabs.forEach(tab => {
+            const newTab = tab.cloneNode(true);
+            tab.parentNode.replaceChild(newTab, tab);
+        });
+
+        // Re-select the cloned tabs
+        const freshTabs = document.querySelectorAll('.settings-tab[data-tab]');
+
+        freshTabs.forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Tab clicked:', this.dataset.tab);
+
+                // Remove active class from all tabs
+                freshTabs.forEach(t => {
+                    t.classList.remove('active');
+                    t.classList.remove('bg-blue-600', 'text-white');
+                    t.classList.add('text-slate-400');
+                });
+
+                // Add active class to clicked tab
+                this.classList.add('active', 'bg-blue-600', 'text-white');
+                this.classList.remove('text-slate-400');
+
+                // Hide all panels using direct style (important! to override CSS)
+                document.querySelectorAll('.settings-panel').forEach(panel => {
+                    panel.classList.remove('active');
+                    // Force hide using setProperty to override !important
+                    panel.style.setProperty('display', 'none', 'important');
+                });
+
+                // Show selected panel
+                const panelId = this.dataset.tab + '-panel';
+                const panel = document.getElementById(panelId);
+                if (panel) {
+                    panel.classList.add('active');
+                    // Force show using setProperty to override !important
+                    panel.style.setProperty('display', 'block', 'important');
+                    console.log('Panel shown:', panelId);
+
+                    // Verify the panel is actually visible
+                    setTimeout(() => {
+                        const computedStyle = window.getComputedStyle(panel);
+                        console.log('Panel computed display:', computedStyle.display);
+                        console.log('Panel visible:', computedStyle.display !== 'none');
+                        console.log('Panel offsetHeight:', panel.offsetHeight);
+                    }, 50);
+                } else {
+                    console.error('Panel not found:', panelId);
+                }
+            });
+        });
+    }, 100);
+});
+</script>
+
+<%- include('../partials/footer') %>
+
+<style>
+/* Tab Styles */
+.settings-tab {
+    @apply text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 cursor-pointer;
+}
+
+.settings-tab.active {
+    @apply bg-blue-600 text-white hover:bg-blue-700 !important;
+}
+
+/* Panel Styles */
+.settings-panel {
+    display: none !important;
+}
+
+.settings-panel.active {
+    display: block !important;
+}
+
+/* Status Indicator Styles */
+.mikrotik-status-indicator[data-mikrotik-status="connected"] {
+    @apply bg-green-500 text-white;
+}
+
+.mikrotik-status-indicator[data-mikrotik-status="disconnected"] {
+    @apply bg-red-500 text-white;
+}
+
+.mikrotik-status-indicator[data-mikrotik-status="unknown"] {
+    @apply bg-slate-600 text-slate-300;
+}
+
+/* Form validation styles */
+input:invalid, select:invalid {
+    @apply border-red-500;
+}
+
+input:focus:invalid, select:focus:invalid {
+    @apply ring-red-500;
+}
+
+/* Checkbox focus styles */
+input[type="checkbox"]:focus {
+    @apply ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-800;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .settings-tab {
+        @apply flex-1 justify-center px-2 py-1.5 text-xs;
+    }
+}
+</style>
+

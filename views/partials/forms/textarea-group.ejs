@@ -1,0 +1,126 @@
+<%-
+  /**
+   * Textarea Group Component for Forms
+   * Variables:
+   * - label: Textarea label (string, required)
+   * - name: Textarea name attribute (string, required)
+   * - id: Textarea ID (string, optional, defaults to name)
+   * - placeholder: Textarea placeholder (string, optional)
+   * - value: Textarea value (string, optional)
+   * - required: Mark as required (boolean, default: false)
+   * - disabled: Disable textarea (boolean, default: false)
+   * - readonly: Make textarea readonly (boolean, default: false)
+   * - error: Error message (string, optional)
+   * - helper: Helper text (string, optional)
+   * - rows: Number of rows (number, default: 4)
+   * - maxlength: Maximum length (number, optional)
+   * - minlength: Minimum length (number, optional)
+   * - resize: Resize behavior (none, both, horizontal, vertical, default: 'vertical')
+   * - class: Additional CSS classes (string, optional)
+   */
+
+  // Set defaults
+  const rows = locals.rows || 4;
+  const resize = locals.resize || 'vertical';
+  const required = locals.required === true;
+  const disabled = locals.disabled === true;
+  const readonly = locals.readonly === true;
+  const inputId = locals.id || locals.name;
+  const error = locals.error || '';
+  const helper = locals.helper || '';
+
+  // Resize classes
+  const resizeClasses = {
+    none: 'resize-none',
+    both: 'resize',
+    horizontal: 'resize-x',
+    vertical: 'resize-y'
+  };
+
+  // State classes
+  const stateClasses = {
+    default: 'bg-dark-700 border-dark-600 text-white placeholder-dark-400 focus:border-blue-500 focus:ring-blue-500',
+    error: 'bg-dark-700 border-red-500 text-white placeholder-dark-400 focus:border-red-500 focus:ring-red-500',
+    disabled: 'bg-dark-800 border-dark-600 text-dark-400 placeholder-dark-500 cursor-not-allowed',
+    readonly: 'bg-dark-800 border-dark-600 text-white cursor-default'
+  };
+
+  const currentState = error ? 'error' : (disabled ? 'disabled' : (readonly ? 'readonly' : 'default'));
+  const textareaStateClasses = stateClasses[currentState];
+
+  // Label classes
+  const labelClasses = {
+    default: 'text-dark-300',
+    error: 'text-red-400',
+    disabled: 'text-dark-500',
+    readonly: 'text-dark-300'
+  };
+
+  const labelStateClasses = labelClasses[currentState];
+%>
+
+<div class="space-y-2 <%= locals.class || '' %>">
+  <% if (locals.label) { %>
+    <label for="<%= inputId %>" class="block text-sm font-medium <%= labelStateClasses %> <%= required ? 'after:content-[\"*\"] after:ml-1 after:text-red-400' : '' %>">
+      <%= locals.label %>
+    </label>
+  <% } %>
+
+  <textarea
+    id="<%= inputId %>"
+    name="<%= locals.name %>"
+    placeholder="<%= locals.placeholder || '' %>"
+    rows="<%= rows %>"
+    <%= required ? 'required' : '' %>
+    <%= disabled ? 'disabled' : '' %>
+    <%= readonly ? 'readonly' : '' %>
+    <%= locals.maxlength ? 'maxlength="' + locals.maxlength + '"' : '' %>
+    <%= locals.minlength ? 'minlength="' + locals.minlength + '"' : '' %>
+    class="w-full rounded-lg border px-4 py-3 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 <%= textareaStateClasses %> <%= resizeClasses[resize] %>"
+  ><%= locals.value || '' %></textarea>
+
+  <% if (error) { %>
+    <p class="text-sm text-red-400 flex items-center">
+      <i class="fas fa-exclamation-circle mr-1"></i>
+      <%= error %>
+    </p>
+  <% } else if (helper) { %>
+    <p class="text-sm text-dark-400 flex items-center">
+      <i class="fas fa-info-circle mr-1"></i>
+      <%= helper %>
+    </p>
+  <% } %>
+
+  <% if (locals.maxlength) { %>
+    <div class="flex justify-between">
+      <span class="text-xs text-dark-500">
+        Karakter tersisa: <span id="<%= inputId %>-remaining"><%= locals.maxlength - (locals.value ? locals.value.length : 0) %></span>
+      </span>
+    </div>
+    <script>
+      (function() {
+        const textarea = document.getElementById('<%= inputId %>');
+        const remaining = document.getElementById('<%= inputId %>-remaining');
+
+        if (textarea && remaining) {
+          textarea.addEventListener('input', function() {
+            const remainingCount = <%= locals.maxlength %> - this.value.length;
+            remaining.textContent = remainingCount;
+
+            if (remainingCount < 50) {
+              remaining.classList.add('text-orange-400');
+            } else {
+              remaining.classList.remove('text-orange-400');
+            }
+
+            if (remainingCount < 10) {
+              remaining.classList.add('text-red-400');
+            } else {
+              remaining.classList.remove('text-red-400');
+            }
+          });
+        }
+      })();
+    </script>
+  <% } %>
+</div>

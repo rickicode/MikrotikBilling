@@ -1,0 +1,57 @@
+{
+  "name": "manual",
+  "version": "1.0.0",
+  "displayName": "Manual/Cash Payment",
+  "description": "Manual payment processing including cash, bank transfer, and credit recording",
+  "author": "HIJINETWORK",
+  "website": "",
+  "main": "index.js",
+  "category": "manual",
+  "currencies": ["IDR", "USD", "EUR"],
+  "fees": {
+    "type": "fixed",
+    "value": 0
+  },
+  "config": {
+    "allow_credit": {
+      "type": "checkbox",
+      "label": "Allow Credit/Debt",
+      "default": true
+    },
+    "max_credit_amount": {
+      "type": "number",
+      "label": "Max Credit Amount",
+      "default": 500000,
+      "required": false
+    },
+    "credit_terms_days": {
+      "type": "number",
+      "label": "Credit Terms (Days)",
+      "default": 30,
+      "required": false
+    },
+    "auto_receipt": {
+      "type": "checkbox",
+      "label": "Auto Generate Receipt",
+      "default": true
+    },
+    "require_approval": {
+      "type": "checkbox",
+      "label": "Require Approval for Credit",
+      "default": false
+    },
+    "receipt_prefix": {
+      "type": "text",
+      "label": "Receipt Number Prefix",
+      "default": "RCPT",
+      "required": false
+    }
+  },
+  "permissions": [
+    "payment.create",
+    "payment.check",
+    "payment.complete"
+  ],
+  "dependencies": [],
+  "nodeVersion": ">=14.0.0"
+}

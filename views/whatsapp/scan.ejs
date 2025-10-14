@@ -1,0 +1,961 @@
+<%- include('../partials/header', { title: 'WhatsApp QR Scanner', currentUrl: '/whatsapp/scan' }) %>
+
+<div class="main-content">
+    <div class="container-fluid mt-4">
+        <!-- WhatsApp Navigation -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body py-3">
+                        <nav class="nav">
+                            <a class="nav-link <%= currentUrl === '/whatsapp/management' ? 'active' : '' %>" href="/whatsapp/management">
+                                <i class="bi bi-house"></i> Dashboard
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/scan') ? 'active' : '' %>" href="/whatsapp/scan">
+                                <i class="bi bi-qr-code"></i> QR Scanner
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/history') ? 'active' : '' %>" href="/whatsapp/history">
+                                <i class="bi bi-chat-dots"></i> Message History
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/message-templates-page') ? 'active' : '' %>" href="/whatsapp/message-templates-page">
+                                <i class="bi bi-file-text"></i> Templates
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/whatsapp-settings') ? 'active' : '' %>" href="/whatsapp/whatsapp-settings">
+                                <i class="bi bi-gear"></i> Settings
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">WhatsApp QR Scanner</h1>
+            <div>
+                <button type="button" class="btn btn-outline-secondary me-2" onclick="refreshScanStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- QR Code Scanner Section -->
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            <i class="bi bi-qr-code-scan"></i> WhatsApp Web Connection
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <!-- Connection Status -->
+                        <div class="text-center mb-4">
+                            <div id="whatsappConnectionStatus" class="alert alert-warning">
+                                <i class="bi bi-circle-fill"></i>
+                                <span id="whatsappStatusText">Checking connection status...</span>
+                            </div>
+                        </div>
+
+                        <!-- QR Code Display -->
+                        <div id="qrCodeSection" class="text-center" style="display: none;">
+                            <div class="qr-code-container mb-4">
+                                <img id="whatsappQrCodeImage" src="" alt="Scan QR Code with WhatsApp" class="img-fluid border rounded" style="max-width: 300px; height: auto;" />
+                            </div>
+
+                            <!-- Instructions -->
+                            <div id="whatsappInstructions" class="alert alert-info">
+                                <h5><i class="bi bi-info-circle"></i> How to connect WhatsApp:</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ol class="text-start">
+                                            <li>Open WhatsApp on your smartphone</li>
+                                            <li>Tap <strong>Menu</strong> or <strong>Settings</strong></li>
+                                            <li>Select <strong>Linked Devices</strong></li>
+                                            <li>Tap <strong>"Link a device"</strong></li>
+                                        </ol>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ol start="5" class="text-start">
+                                            <li>Point your phone camera to this QR code</li>
+                                            <li>Wait for the code to scan automatically</li>
+                                            <li>Connection will be established</li>
+                                            <li>You're ready to send messages!</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- QR Code Timer -->
+                            <div class="progress mb-3">
+                                <div id="qrTimer" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <p class="text-muted small">QR code expires in <span id="timeRemaining">--:--</span></p>
+                        </div>
+
+                        <!-- Connected State -->
+                        <div id="connectedSection" class="text-center" style="display: none;">
+                            <div class="success-animation mb-4">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                            </div>
+                            <h4 class="text-success mb-3">WhatsApp Connected Successfully!</h4>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <p class="mb-2"><strong>Connected Phone:</strong></p>
+                                    <h5 id="whatsappPhoneNumber" class="text-primary mb-3">--</h5>
+                                    <p class="mb-2"><strong>Connected at:</strong></p>
+                                    <p id="whatsappLastActivity" class="text-muted mb-0">--</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error State -->
+                        <div id="errorSection" class="text-center" style="display: none;">
+                            <div class="error-animation mb-4">
+                                <i class="bi bi-x-circle-fill text-danger" style="font-size: 4rem;"></i>
+                            </div>
+                            <h4 class="text-danger mb-3">Connection Failed</h4>
+                            <div class="alert alert-danger">
+                                <p class="mb-2"><strong>Error:</strong></p>
+                                <p id="whatsappErrorStatusText" class="mb-0">Unable to connect to WhatsApp. Please try again.</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="retryConnection()">
+                                <i class="bi bi-arrow-clockwise"></i> Retry Connection
+                            </button>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="text-center mt-4">
+                            <div id="actionButtons">
+                                <button id="whatsappConnectBtn" class="btn btn-primary btn-lg" onclick="startWhatsAppConnection()" style="display: none;">
+                                    <i class="bi bi-qr-code-scan"></i> Start Connection
+                                </button>
+                                <button id="whatsappRefreshQrBtn" class="btn btn-info btn-lg me-2" onclick="refreshQRCode()" style="display: none;">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh QR Code
+                                </button>
+                                <button id="whatsappDisconnectBtn" class="btn btn-danger btn-lg" onclick="disconnectWhatsApp()" style="display: none;">
+                                    <i class="bi bi-x-circle"></i> Disconnect
+                                </button>
+                                <button id="whatsappReconnectBtn" class="btn btn-warning btn-lg" onclick="reconnectWhatsApp()" style="display: none;">
+                                    <i class="bi bi-arrow-clockwise"></i> Reconnect
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+
+<%- include('../partials/footer', { scripts: [] }) %>
+
+<!-- Cache busting for WhatsApp scan page -->
+<script>
+    // Force refresh of WhatsApp scan page JavaScript
+    console.log('WhatsApp Scan Page v<%= new Date().getTime() %> - Loaded');
+    // WhatsApp Scan Page Specific JavaScript
+    let currentStatus = null;
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Content Loaded - Starting initialization');
+        console.log('Document readyState:', document.readyState);
+
+        // Debug: Check if elements exist immediately
+        const immediateStatusElement = document.getElementById('whatsappConnectionStatus');
+        const immediateStatusText = document.getElementById('whatsappStatusText');
+        console.log('Immediate element check:', {
+            statusElement: !!immediateStatusElement,
+            statusText: !!immediateStatusText
+        });
+
+        // Wait a moment for all elements to be properly rendered
+        setTimeout(() => {
+            console.log('Timeout reached - checking elements again');
+
+            // Check if required elements exist before starting
+            const statusElement = document.getElementById('whatsappConnectionStatus');
+            const statusText = document.getElementById('whatsappStatusText');
+
+            console.log('Timeout element check:', {
+                statusElement: !!statusElement,
+                statusText: !!statusText,
+                statusElementHTML: statusElement ? statusElement.outerHTML.substring(0, 100) : 'not found'
+            });
+
+            if (!statusElement || !statusText) {
+                console.error('Required WhatsApp status elements not found in DOM', {
+                    statusElement: !!statusElement,
+                    statusText: !!statusText,
+                    allElements: document.querySelectorAll('[id]'),
+                    statusElements: document.querySelectorAll('[id*="whatsappConnectionStatus"]'),
+                    textElements: document.querySelectorAll('[id*="whatsappStatusText"]')
+                });
+                return;
+            }
+
+            console.log('WhatsApp status elements found successfully');
+            console.log('Starting refreshScanStatus...');
+            refreshScanStatus();
+
+            // Auto-refresh every 5 seconds when scanning, 10 seconds otherwise
+            console.log('Setting up interval for status refresh');
+            setInterval(refreshScanStatus, 5000);
+        }, 500);
+    });
+
+    // Refresh scan status with proper handling
+    async function refreshScanStatus() {
+        try {
+            console.log('Refreshing WhatsApp status...');
+            const response = await fetch('/whatsapp/api/status');
+            const data = await response.json();
+
+            console.log('WhatsApp status response:', data);
+            currentStatus = data.connection;
+            updateScanStatusUI(data.connection);
+
+        } catch (error) {
+            console.error('Error refreshing status:', error);
+            showError('Gagal memperbarui status WhatsApp');
+        }
+    }
+
+    // Monitor QR scan status with real-time updates
+    async function monitorQRScanStatus() {
+        try {
+            console.log('Monitoring QR scan status...');
+            const response = await fetch('/whatsapp/api/qr-status');
+            const data = await response.json();
+
+            console.log('QR scan status response:', data);
+
+            if (data.scanEvent) {
+                // QR code has been scanned or connection is ready
+                handleQRScanEvent(data.scanEvent);
+                return data.scanEvent; // Return the event
+            }
+
+            // Update UI with current status
+            updateScanStatusUI({
+                status: data.status,
+                isConnected: data.isConnected,
+                phoneNumber: data.phoneNumber,
+                qrCode: data.qrCode,
+                message: data.message
+            });
+
+            return null;
+        } catch (error) {
+            console.error('Error monitoring QR scan status:', error);
+            return null;
+        }
+    }
+
+    // Handle QR scan events
+    function handleQRScanEvent(scanEvent) {
+        console.log('🎉 QR scan event detected:', scanEvent);
+
+        if (scanEvent.status === 'authenticated') {
+            showSuccess(scanEvent.message || 'QR code berhasil di-scan! Menyelesaikan autentikasi...');
+            updateStatus('AUTHENTICATED', scanEvent.message);
+
+            // Start monitoring for connection ready
+            setTimeout(() => {
+                monitorForConnectionReady();
+            }, 2000);
+
+        } else if (scanEvent.status === 'connected') {
+            showSuccess(scanEvent.message || 'WhatsApp berhasil terhubung!');
+            updateStatus('CONNECTED', scanEvent.message);
+
+            // Stop monitoring and redirect or update UI
+            stopQRMonitoring();
+
+            // Auto redirect to dashboard after successful connection
+            setTimeout(() => {
+                window.location.href = '/whatsapp/management';
+            }, 3000);
+        }
+    }
+
+    // Monitor for connection ready status
+    async function monitorForConnectionReady() {
+        let attempts = 0;
+        const maxAttempts = 15; // 15 * 2 seconds = 30 seconds max
+
+        const checkConnection = async () => {
+            try {
+                const response = await fetch('/whatsapp/api/status');
+                const data = await response.json();
+
+                if (data.connection.status === 'connected') {
+                    showSuccess('✅ WhatsApp berhasil terhubung dan siap digunakan!');
+                    updateStatus('CONNECTED', 'WhatsApp berhasil terhubung dan siap digunakan!');
+                    stopQRMonitoring();
+
+                    // Auto redirect to dashboard
+                    setTimeout(() => {
+                        window.location.href = '/whatsapp/management';
+                    }, 2000);
+                    return;
+                }
+
+                attempts++;
+                if (attempts < maxAttempts) {
+                    setTimeout(checkConnection, 2000);
+                } else {
+                    showError('Timeout menunggu koneksi siap. Silakan refresh halaman.');
+                }
+            } catch (error) {
+                console.error('Error checking connection:', error);
+                attempts++;
+                if (attempts < maxAttempts) {
+                    setTimeout(checkConnection, 2000);
+                }
+            }
+        };
+
+        checkConnection();
+    }
+
+    // QR monitoring variables
+    let qrMonitoringInterval = null;
+    let isMonitoringQR = false;
+
+    // Start QR monitoring when in scanning mode
+    function startQRMonitoring() {
+        if (isMonitoringQR) return;
+
+        console.log('Starting QR scan monitoring...');
+        isMonitoringQR = true;
+
+        // Check for QR scan events every 2 seconds
+        qrMonitoringInterval = setInterval(async () => {
+            const scanEvent = await monitorQRScanStatus();
+            if (scanEvent && (scanEvent.status === 'authenticated' || scanEvent.status === 'connected')) {
+                stopQRMonitoring();
+            }
+        }, 2000);
+    }
+
+    // Stop QR monitoring
+    function stopQRMonitoring() {
+        if (qrMonitoringInterval) {
+            clearInterval(qrMonitoringInterval);
+            qrMonitoringInterval = null;
+        }
+        isMonitoringQR = false;
+        console.log('QR monitoring stopped');
+    }
+
+    // Update status helper function
+    function updateStatus(status, message) {
+        const statusElement = document.getElementById('whatsappConnectionStatus');
+        const statusText = document.getElementById('whatsappStatusText');
+
+        if (statusElement && statusText) {
+            // Update status based on status type
+            statusElement.className = 'alert alert-info';
+
+            switch(status) {
+                case 'SCANNING':
+                    statusElement.className = 'alert alert-warning';
+                    break;
+                case 'AUTHENTICATED':
+                    statusElement.className = 'alert alert-info';
+                    break;
+                case 'CONNECTED':
+                    statusElement.className = 'alert alert-success';
+                    break;
+                case 'ERROR':
+                    statusElement.className = 'alert alert-danger';
+                    break;
+            }
+
+            statusText.textContent = message;
+        }
+    }
+
+    // Ensure status elements exist - recreate if destroyed
+    function ensureStatusElements() {
+        let statusElement = document.getElementById('whatsappConnectionStatus');
+        let statusText = document.getElementById('whatsappStatusText');
+
+        // If elements don't exist, recreate them
+        if (!statusElement) {
+            console.log('Status element missing, recreating...');
+            const statusContainer = document.querySelector('.text-center.mb-4');
+            if (statusContainer) {
+                statusElement = document.createElement('div');
+                statusElement.id = 'whatsappConnectionStatus';
+                statusElement.className = 'alert alert-warning';
+                statusElement.innerHTML = '<i class="bi bi-circle-fill"></i><span id="whatsappStatusText">Checking connection status...</span>';
+                statusContainer.appendChild(statusElement);
+                console.log('Status element recreated');
+            }
+        }
+
+        // Re-get statusText after potential recreation
+        statusText = document.getElementById('whatsappStatusText');
+        if (!statusText && statusElement) {
+            console.log('Status text missing, recreating...');
+            statusText = document.createElement('span');
+            statusText.id = 'whatsappStatusText';
+            statusText.textContent = 'Checking connection status...';
+
+            // Insert after the icon
+            const icon = statusElement.querySelector('i');
+            if (icon) {
+                icon.parentNode.insertBefore(statusText, icon.nextSibling);
+            } else {
+                statusElement.appendChild(statusText);
+            }
+            console.log('Status text recreated');
+        }
+
+        // Also ensure instructions element exists
+        let instructions = document.getElementById('whatsappInstructions');
+        if (!instructions) {
+            console.log('Instructions element missing, recreating...');
+            const qrCodeSection = document.getElementById('qrCodeSection');
+            if (qrCodeSection) {
+                instructions = document.createElement('div');
+                instructions.id = 'whatsappInstructions';
+                instructions.className = 'alert alert-info';
+                instructions.innerHTML = `
+                    <h5><i class="bi bi-info-circle"></i> How to connect WhatsApp:</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ol class="text-start">
+                                <li>Open WhatsApp on your smartphone</li>
+                                <li>Tap <strong>Menu</strong> or <strong>Settings</strong></li>
+                                <li>Select <strong>Linked Devices</strong></li>
+                                <li>Tap <strong>"Link a device"</strong></li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <ol start="5" class="text-start">
+                                <li>Point your phone camera to this QR code</li>
+                                <li>Wait for the code to scan automatically</li>
+                                <li>Connection will be established</li>
+                                <li>You're ready to send messages!</li>
+                            </ol>
+                        </div>
+                    </div>
+                `;
+
+                // Insert instructions after the QR code image container
+                const qrCodeContainer = qrCodeSection.querySelector('.qr-code-container');
+                if (qrCodeContainer) {
+                    qrCodeContainer.parentNode.insertBefore(instructions, qrCodeContainer.nextSibling);
+                } else {
+                    qrCodeSection.appendChild(instructions);
+                }
+                console.log('Instructions element recreated');
+            }
+        }
+
+        return {
+            statusElement: document.getElementById('whatsappConnectionStatus'),
+            statusText: document.getElementById('whatsappStatusText'),
+            instructions: document.getElementById('whatsappInstructions')
+        };
+    }
+
+    // Update scan status UI properly
+    function updateScanStatusUI(connection) {
+        console.log('Updating WhatsApp status UI with:', connection);
+        console.log('Current document readyState:', document.readyState);
+        console.log('Looking for elements in DOM...');
+
+        // Ensure status elements exist
+        const { statusElement, statusText, instructions } = ensureStatusElements();
+        const qrCodeSection = document.getElementById('qrCodeSection');
+        const qrCodeImage = document.getElementById('whatsappQrCodeImage');
+        const connectedSection = document.getElementById('connectedSection');
+        const errorSection = document.getElementById('errorSection');
+
+        console.log('Elements found:', {
+            statusElement: !!statusElement,
+            statusText: !!statusText,
+            qrCodeSection: !!qrCodeSection,
+            qrCodeImage: !!qrCodeImage,
+            instructions: !!instructions,
+            connectedSection: !!connectedSection,
+            errorSection: !!errorSection,
+            statusElementId: statusElement ? statusElement.id : 'not found',
+            statusTextId: statusText ? statusText.id : 'not found'
+        });
+
+        // Debug: Show DOM structure around status element
+        if (statusElement) {
+            console.log('Status element HTML:', statusElement.outerHTML);
+            console.log('Status element children:', statusElement.children.length);
+            for (let i = 0; i < statusElement.children.length; i++) {
+                console.log(`Child ${i}:`, statusElement.children[i].tagName, statusElement.children[i].id, statusElement.children[i].className);
+            }
+        }
+
+        // Check if essential elements exist
+        if (!statusElement || !statusText) {
+            console.error('Required WhatsApp status elements not found', {
+                statusElement: !!statusElement,
+                statusText: !!statusText,
+                documentContainsStatus: document.contains(document.getElementById('whatsappConnectionStatus')),
+                documentContainsText: document.contains(document.getElementById('whatsappStatusText')),
+                allStatusElements: document.querySelectorAll('[id*="whatsappConnectionStatus"]'),
+                allTextElements: document.querySelectorAll('[id*="whatsappStatusText"]')
+            });
+            return;
+        }
+
+        // Handle different connection states
+        switch (connection.status) {
+            case 'scanning':
+                // Only update class and text, never innerHTML
+                if (statusElement) {
+                    statusElement.className = 'alert alert-warning';
+                    // Update icon directly
+                    const iconElement = statusElement.querySelector('i');
+                    if (iconElement) {
+                        iconElement.className = 'bi bi-qr-code-scan';
+                    }
+                }
+                // Update text directly without destroying DOM
+                if (statusText) {
+                    statusText.textContent = 'Silakan scan QR code dengan WhatsApp Anda';
+                }
+
+                // Show QR code if available
+                if (connection.qrCode && qrCodeImage) {
+                    qrCodeImage.src = connection.qrCode;
+                    qrCodeSection.style.display = 'block';
+                    if (instructions) instructions.style.display = 'block';
+                    // Start QR code timer
+                    startQRTimer();
+
+                    // Start QR monitoring for real-time scan detection
+                    startQRMonitoring();
+                }
+
+                if (connectedSection) connectedSection.style.display = 'none';
+                if (errorSection) errorSection.style.display = 'none';
+
+                // Show refresh button during scanning
+                hideAllActionButtons();
+                const refreshBtn = document.getElementById('whatsappRefreshQrBtn');
+                if (refreshBtn) refreshBtn.style.display = 'inline-block';
+                break;
+
+            case 'authenticated':
+                // QR code has been scanned, processing authentication
+                if (statusElement) {
+                    statusElement.className = 'alert alert-info';
+                    // Update icon directly
+                    const iconElement = statusElement.querySelector('i');
+                    if (iconElement) {
+                        iconElement.className = 'bi bi-arrow-repeat';
+                    }
+                }
+                // Update text directly without destroying DOM
+                if (statusText) {
+                    statusText.textContent = 'QR code berhasil di-scan! Menyelesaikan autentikasi...';
+                }
+
+                // Hide QR code section
+                if (qrCodeSection) qrCodeSection.style.display = 'none';
+                if (instructions) instructions.style.display = 'none';
+                if (connectedSection) connectedSection.style.display = 'none';
+                if (errorSection) errorSection.style.display = 'none';
+
+                // Hide all action buttons during authentication
+                hideAllActionButtons();
+
+                // Continue monitoring for connection ready
+                monitorForConnectionReady();
+                break;
+
+            case 'connected':
+                if (statusElement) {
+                    statusElement.className = 'alert alert-success';
+                    // Update icon directly
+                    const connectedIconElement = statusElement.querySelector('i');
+                    if (connectedIconElement) {
+                        connectedIconElement.className = 'bi bi-check-circle-fill';
+                    }
+                }
+                // Update text directly without destroying DOM
+                if (statusText) {
+                    statusText.textContent = `Terhubung sebagai ${connection.phoneNumber || 'Unknown'}`;
+                }
+
+                if (qrCodeSection) qrCodeSection.style.display = 'none';
+                if (instructions) instructions.style.display = 'none';
+                if (connectedSection) connectedSection.style.display = 'block';
+                if (errorSection) errorSection.style.display = 'none';
+
+                // Update connected phone number and connection time
+                const phoneNumber = document.getElementById('whatsappPhoneNumber');
+                const lastActivity = document.getElementById('whatsappLastActivity');
+                if (phoneNumber) {
+                    phoneNumber.textContent = connection.phoneNumber || 'Unknown';
+                }
+                if (lastActivity) {
+                    lastActivity.textContent = connection.lastActivity ?
+                        new Date(connection.lastActivity).toLocaleString('id-ID') :
+                        'Unknown';
+                }
+
+                // Show disconnect button when connected
+                hideAllActionButtons();
+                const disconnectBtn = document.getElementById('whatsappDisconnectBtn');
+                if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
+                break;
+
+            case 'connecting':
+                if (statusElement) {
+                    statusElement.className = 'alert alert-warning';
+                    // Update icon directly
+                    const connectingIconElement = statusElement.querySelector('i');
+                    if (connectingIconElement) {
+                        connectingIconElement.className = 'bi bi-arrow-repeat';
+                    }
+                }
+                // Update text directly without destroying DOM
+                if (statusText) {
+                    statusText.textContent = 'Menginisialisasi WhatsApp Web...';
+                }
+
+                if (qrCodeSection) qrCodeSection.style.display = 'none';
+                if (connectedSection) connectedSection.style.display = 'none';
+                if (errorSection) errorSection.style.display = 'none';
+
+                // Hide buttons during connecting
+                hideAllActionButtons();
+                break;
+
+            case 'authenticated':
+                if (statusElement) {
+                    statusElement.className = 'alert alert-success';
+                    // Update icon directly
+                    const authenticatedIconElement = statusElement.querySelector('i');
+                    if (authenticatedIconElement) {
+                        authenticatedIconElement.className = 'bi bi-shield-check';
+                    }
+                }
+                // Update text directly without destroying DOM
+                if (statusText) {
+                    statusText.textContent = 'Menyelesaikan koneksi...';
+                }
+
+                if (qrCodeSection) qrCodeSection.style.display = 'none';
+                if (connectedSection) connectedSection.style.display = 'none';
+                if (errorSection) errorSection.style.display = 'none';
+
+                // Hide buttons during authentication
+                hideAllActionButtons();
+                break;
+
+            case 'disconnected':
+            default:
+                if (statusElement) {
+                    statusElement.className = 'alert alert-warning';
+
+                    // Check if QR code is available even in disconnected state
+                    if (connection.qrCode && qrCodeImage) {
+                        // Update icon directly
+                        const disconnectedQrIconElement = statusElement.querySelector('i');
+                        if (disconnectedQrIconElement) {
+                            disconnectedQrIconElement.className = 'bi bi-qr-code-scan';
+                        }
+                        // Update text directly without destroying DOM
+                        if (statusText) {
+                            statusText.textContent = 'QR Code Tersedia';
+                        }
+
+                        qrCodeImage.src = connection.qrCode;
+                        if (qrCodeSection) qrCodeSection.style.display = 'block';
+                        if (instructions) instructions.style.display = 'block';
+
+                        // Start QR code timer
+                        startQRTimer();
+
+                        // Show refresh button when QR is available
+                        hideAllActionButtons();
+                        const refreshBtn = document.getElementById('whatsappRefreshQrBtn');
+                        if (refreshBtn) refreshBtn.style.display = 'inline-block';
+                    } else {
+                        // Update icon directly
+                        const disconnectedIconElement = statusElement.querySelector('i');
+                        if (disconnectedIconElement) {
+                            disconnectedIconElement.className = 'bi bi-circle';
+                        }
+                        // Update text directly without destroying DOM
+                        if (statusText) {
+                            statusText.textContent = 'Klik tombol di bawah untuk memulai koneksi WhatsApp';
+                        }
+
+                        if (qrCodeSection) qrCodeSection.style.display = 'none';
+
+                        // Show connect button only when no QR code is available
+                        hideAllActionButtons();
+                        const connectBtn = document.getElementById('whatsappConnectBtn');
+                        if (connectBtn) connectBtn.style.display = 'inline-block';
+                    }
+                }
+
+                if (connectedSection) connectedSection.style.display = 'none';
+                if (errorSection) errorSection.style.display = 'none';
+                break;
+
+            case 'error':
+                if (statusElement) {
+                    statusElement.className = 'alert alert-danger';
+                    // Update icon directly
+                    const errorIconElement = statusElement.querySelector('i');
+                    if (errorIconElement) {
+                        errorIconElement.className = 'bi bi-exclamation-triangle-fill';
+                    }
+                }
+                // Update text directly without destroying DOM
+                if (statusText) {
+                    statusText.textContent = 'Terjadi kesalahan. Silakan coba lagi.';
+                }
+
+                if (qrCodeSection) qrCodeSection.style.display = 'none';
+                if (connectedSection) connectedSection.style.display = 'none';
+                if (errorSection) errorSection.style.display = 'block';
+
+                // Show reconnect button on error
+                hideAllActionButtons();
+                const reconnectBtn = document.getElementById('whatsappReconnectBtn');
+                if (reconnectBtn) reconnectBtn.style.display = 'inline-block';
+                break;
+        }
+
+        // Update timer if QR code is visible
+        if ((connection.status === 'scanning' || (connection.status === 'disconnected' && connection.qrCode)) && connection.qrCode) {
+            startQRTimer();
+        } else {
+            stopQRTimer();
+        }
+    }
+
+    // QR Code timer functionality
+    let qrTimerInterval = null;
+    let timeRemaining = 120; // 2 minutes
+
+    function startQRTimer() {
+        if (qrTimerInterval) return;
+
+        timeRemaining = 120;
+        updateQRTimerDisplay();
+
+        qrTimerInterval = setInterval(() => {
+            timeRemaining--;
+            updateQRTimerDisplay();
+
+            if (timeRemaining <= 0) {
+                stopQRTimer();
+                refreshScanStatus(); // Refresh status to get new QR
+            }
+        }, 1000);
+    }
+
+    function stopQRTimer() {
+        if (qrTimerInterval) {
+            clearInterval(qrTimerInterval);
+            qrTimerInterval = null;
+        }
+    }
+
+    function updateQRTimerDisplay() {
+        const timerElement = document.getElementById('timeRemaining');
+        const progressBar = document.getElementById('qrTimer');
+
+        if (timerElement) {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        if (progressBar) {
+            const percentage = (timeRemaining / 120) * 100;
+            progressBar.style.width = `${percentage}%`;
+        }
+    }
+
+    // Hide all action buttons helper
+    function hideAllActionButtons() {
+        const connectBtn = document.getElementById('whatsappConnectBtn');
+        const disconnectBtn = document.getElementById('whatsappDisconnectBtn');
+        const reconnectBtn = document.getElementById('whatsappReconnectBtn');
+
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+        if (reconnectBtn) reconnectBtn.style.display = 'none';
+    }
+
+    // Start WhatsApp connection
+    async function startWhatsAppConnection() {
+        try {
+            showInfo('Memulai koneksi WhatsApp...');
+
+            const response = await fetch('/whatsapp/scan-start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('QR scanning dimulai. Silakan scan QR code.');
+                // Wait a moment then refresh status
+                setTimeout(refreshScanStatus, 2000);
+            } else {
+                showError('Gagal memulai koneksi: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error starting connection:', error);
+            showError('Gagal memulai koneksi WhatsApp');
+        }
+    }
+
+    // Disconnect WhatsApp
+    async function disconnectWhatsApp() {
+        if (!confirm('Apakah Anda yakin ingin memutuskan koneksi WhatsApp?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/whatsapp/api/disconnect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Koneksi WhatsApp terputus');
+                refreshScanStatus();
+            } else {
+                showError(data.message || 'Gagal memutuskan koneksi');
+            }
+        } catch (error) {
+            console.error('Error disconnecting:', error);
+            showError('Terjadi kesalahan saat memutuskan koneksi');
+        }
+    }
+
+    // Reconnect WhatsApp
+    async function reconnectWhatsApp() {
+        try {
+            showInfo('Menghubungkan ulang WhatsApp...');
+
+            const response = await fetch('/whatsapp/api/reconnect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Menghubungkan ulang WhatsApp...');
+                refreshScanStatus();
+            } else {
+                showError(data.message || 'Gagal menghubungkan ulang');
+            }
+        } catch (error) {
+            console.error('Error reconnecting:', error);
+            showError('Terjadi kesalahan saat menghubungkan ulang');
+        }
+    }
+
+    // Retry connection
+    function retryConnection() {
+        startWhatsAppConnection();
+    }
+
+    // Refresh status
+    function refreshStatus() {
+        refreshScanStatus();
+    }
+
+    // Refresh QR Code function
+    async function refreshQRCode() {
+        try {
+            // Show loading state
+            const refreshBtn = document.getElementById('whatsappRefreshQrBtn');
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise bi-spin"></i> Refreshing...';
+            refreshBtn.disabled = true;
+
+            const response = await fetch('/whatsapp/refresh-qr', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showSuccess(result.message);
+
+                // Update QR code image with new timestamp to prevent caching
+                const qrImage = document.getElementById('whatsappQrCodeImage');
+                if (qrImage && result.qrCode) {
+                    qrImage.src = 'data:image/png;base64,' + result.qrCode + '?t=' + Date.now();
+                }
+
+                // Update status to scanning
+                updateStatus('SCANNING', 'Connected successfully! Phone companion app scanning...');
+
+                // Hide refresh button initially, show it again after a delay
+                setTimeout(() => {
+                    refreshBtn.style.display = 'inline-block';
+                }, 5000);
+            } else {
+                showError(result.message || 'Failed to refresh QR code');
+            }
+        } catch (error) {
+            console.error('Error refreshing QR code:', error);
+            showError('Error refreshing QR code');
+        } finally {
+            // Restore button state
+            const refreshBtn = document.getElementById('whatsappRefreshQrBtn');
+            refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh QR Code';
+            refreshBtn.disabled = false;
+        }
+    }
+
+    // Show toast notifications using ToastSystem
+    function showInfo(message) {
+        if (typeof ToastSystem !== 'undefined') {
+            ToastSystem.info('Info', message);
+        }
+    }
+
+    function showSuccess(message) {
+        if (typeof ToastSystem !== 'undefined') {
+            ToastSystem.success('Sukses', message);
+        }
+    }
+
+    function showError(message) {
+        if (typeof ToastSystem !== 'undefined') {
+            ToastSystem.error('Error', message);
+        }
+    }
+</script>

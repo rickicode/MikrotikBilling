@@ -1,0 +1,809 @@
+<%- include('../partials/header', { title: 'Template Voucher', currentUrl: '/templates' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Template Voucher</h1>
+            <p class="text-slate-400">Kelola template cetakan voucher hotspot</p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex gap-3">
+            <button id="showExamplesBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200">
+                <i class="fas fa-file-text mr-2"></i> Lihat Contoh
+            </button>
+            <button id="saveTemplateBtnMain" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                <i class="fas fa-save mr-2"></i> Simpan Template
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Template Configuration -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+    <!-- Tab Navigation -->
+    <div class="border-b border-slate-700">
+        <nav class="flex space-x-1 px-6" aria-label="Tabs">
+            <button onclick="switchTab('config')" id="config-tab" class="tab-button active py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-400">
+                <i class="fas fa-cog mr-2"></i> Konfigurasi Template
+            </button>
+            <button onclick="switchTab('preview')" id="preview-tab" class="tab-button py-4 px-1 border-b-2 font-medium text-sm border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600">
+                <i class="fas fa-eye mr-2"></i> Preview
+            </button>
+            <button onclick="switchTab('help')" id="help-tab" class="tab-button py-4 px-1 border-b-2 font-medium text-sm border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600">
+                <i class="fas fa-question-circle mr-2"></i> Panduan
+            </button>
+        </nav>
+    </div>
+
+    <div class="p-6">
+        <% if (typeof success !== 'undefined' && success) { %>
+            <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-6 flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                    <span class="text-green-200"><%= success %></span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-green-400 hover:text-green-200 ml-4">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        <% } %>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6 flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-400 mr-3"></i>
+                    <span class="text-red-200"><%= error %></span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-200 ml-4">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        <% } %>
+
+        <!-- Tab Content -->
+        <div id="config-content" class="tab-content">
+            <form id="templateSettingsForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Jenis Template</label>
+                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="templateType" name="template_type">
+                            <option value="a4" <%= settings?.template_type === 'a4' ? 'selected' : '' %>>A4 (Kertas Standar)</option>
+                            <option value="thermal" <%= settings?.template_type === 'thermal' ? 'selected' : '' %>>Thermal Printer (80mm)</option>
+                        </select>
+                        <p class="text-sm text-slate-500 mt-1">Pilih jenis template</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Nama Template</label>
+                        <input type="text" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="templateName" name="template_name"
+                               value="<%= settings?.template_name || 'Default' %>"
+                               placeholder="Nama template">
+                        <p class="text-sm text-slate-500 mt-1">Nama untuk identifikasi template</p>
+                    </div>
+                </div>
+
+                <div class="border-t pt-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Template Default untuk Print</label>
+                            <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="printTemplateType" name="print_template_type">
+                                <option value="a4" <%= settings?.print_template_type === 'a4' ? 'selected' : '' %>>A4 (Kertas Standar)</option>
+                                <option value="thermal" <%= settings?.print_template_type === 'thermal' ? 'selected' : '' %>>Thermal Printer (80mm)</option>
+                            </select>
+                            <p class="text-sm text-slate-500 mt-1">Template yang akan digunakan saat mencetak voucher</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Status Template Default</label>
+                            <div class="flex items-center space-x-2">
+                                <span class="px-3 py-1 text-xs font-semibold rounded-full <%= settings?.print_template_type === 'thermal' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400' %>">
+                                    <%= settings?.print_template_type === 'thermal' ? 'Thermal' : 'A4' %>
+                                </span>
+                            </div>
+                            <p class="text-sm text-slate-500 mt-1">Template yang aktif digunakan untuk print voucher</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Template HTML</label>
+                    <textarea class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm" id="templateContent" name="template_content"
+                              rows="25" required><%= settings?.template_type === 'thermal' ? (settings?.template_thermal || '') : (settings?.template_a4 || '') %></textarea>
+                    <div class="mt-2">
+                        <p class="text-sm text-slate-400">
+                            <strong>Variabel yang tersedia:</strong> {KodeVoucher}, {NamaPerusahaan}, {DurasiHari}, {TanggalExpired}, {HargaJual}
+                        </p>
+                        <p class="text-xs text-slate-500">Template A4 compact: Hanya menampilkan informasi penting untuk menghemat ruang</p>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div id="preview-content" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-white">Preview Template</h3>
+                <button class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 flex items-center gap-2 text-sm" id="refreshPreviewBtn">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div class="border border-slate-600 rounded-lg overflow-hidden bg-white" style="height: 600px;">
+                <iframe id="previewFrame" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+        </div>
+
+        <div id="help-content" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-lg font-semibold text-white mb-4">Variabel Template</h3>
+                    <div class="bg-slate-700/50 rounded-lg overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-slate-800 border-b border-slate-600">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-slate-300">Variabel</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-slate-300">Deskripsi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-600">
+                                <tr>
+                                    <td class="px-4 py-3 text-sm"><code class="bg-slate-600 px-2 py-1 rounded text-slate-200">{KodeVoucher}</code></td>
+                                    <td class="px-4 py-3 text-sm text-slate-400">Kode unik voucher</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm"><code class="bg-slate-600 px-2 py-1 rounded text-slate-200">{NamaPerusahaan}</code></td>
+                                    <td class="px-4 py-3 text-sm text-slate-400">Nama perusahaan/wifi</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm"><code class="bg-slate-600 px-2 py-1 rounded text-slate-200">{NamaProfile}</code></td>
+                                    <td class="px-4 py-3 text-sm text-slate-400">Nama profile Mikrotik</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm"><code class="bg-slate-600 px-2 py-1 rounded text-slate-200">{DurasiHari}</code></td>
+                                    <td class="px-4 py-3 text-sm text-slate-400">Durasi aktif dalam hari</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm"><code class="bg-slate-600 px-2 py-1 rounded text-slate-200">{HargaJual}</code></td>
+                                    <td class="px-4 py-3 text-sm text-slate-400">Harga jual voucher</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm"><code class="bg-slate-600 px-2 py-1 rounded text-slate-200">{TanggalBuat}</code></td>
+                                    <td class="px-4 py-3 text-sm text-slate-400">Tanggal pembuatan voucher</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm"><code class="bg-slate-600 px-2 py-1 rounded text-slate-200">{TanggalExpired}</code></td>
+                                    <td class="px-4 py-3 text-sm text-slate-400">Tanggal expired voucher</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-white mb-4">Tips & Trik</h3>
+                    <div class="space-y-4">
+                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-lightbulb text-blue-400 mt-0.5 mr-3"></i>
+                                <div>
+                                    <h4 class="font-medium text-blue-200">Template A4</h4>
+                                    <p class="text-sm text-blue-300 mt-1">Gunakan grid layout untuk menampilkan multiple voucher per halaman. Ideal untuk print batch.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-lightbulb text-amber-400 mt-0.5 mr-3"></i>
+                                <div>
+                                    <h4 class="font-medium text-amber-200">Template Thermal</h4>
+                                    <p class="text-sm text-amber-300 mt-1">Set width 80mm dan gunakan font monospace untuk hasil print yang optimal di thermal printer.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-lightbulb text-green-400 mt-0.5 mr-3"></i>
+                                <div>
+                                    <h4 class="font-medium text-green-200">CSS Print</h4>
+                                    <p class="text-sm text-green-300 mt-1">Gunakan <code class="bg-green-500/20 px-2 py-1 rounded text-green-200">@media print</code> untuk mengoptimalkan tampilan saat dicetak.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="border-t border-slate-700 px-6 py-4">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div class="flex flex-wrap gap-3">
+                <button id="resetTemplateBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200">
+                    <i class="fas fa-undo mr-2"></i> Reset Default
+                </button>
+                <button id="previewTemplateBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200">
+                    <i class="fas fa-eye mr-2"></i> Preview
+                </button>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <button id="testTemplateBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200">
+                    <i class="fas fa-play-circle mr-2"></i> Test Variabel
+                </button>
+                <button id="saveTemplateBtnModal" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                    <i class="fas fa-check mr-2"></i> Simpan Template
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="previewModal" class="fixed inset-0 z-50 hidden overflow-y-auto" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" onclick="closePreviewModal()"></div>
+
+        <div class="relative bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+                <h3 class="text-lg font-semibold text-white">Preview Template</h3>
+                <button onclick="closePreviewModal()" class="text-slate-400 hover:text-white transition-colors duration-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <iframe id="previewModalFrame" style="width: 100%; height: 500px; border: 1px solid #475569; border-radius: 4px;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Examples Modal -->
+<div id="examplesModal" class="fixed inset-0 z-50 hidden overflow-y-auto" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" onclick="closeExamplesModal()"></div>
+
+        <div class="relative bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+                <h3 class="text-lg font-semibold text-white">Contoh Template</h3>
+                <button onclick="closeExamplesModal()" class="text-slate-400 hover:text-white transition-colors duration-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="flex space-x-1 mb-4">
+                    <button onclick="switchExampleTab('a4')" id="a4-example-tab" class="example-tab-button active px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white">
+                        <i class="fas fa-file-text mr-2"></i> A4 Template
+                    </button>
+                    <button onclick="switchExampleTab('thermal')" id="thermal-example-tab" class="example-tab-button px-4 py-2 text-sm font-medium rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600">
+                        <i class="fas fa-printer mr-2"></i> Thermal Template
+                    </button>
+                </div>
+
+                <div id="a4-example-content" class="example-content">
+                    <pre class="bg-slate-900 p-4 rounded-lg text-sm overflow-x-auto max-h-96 border border-slate-700"><code class="text-slate-200">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;WiFi Voucher - A4&lt;/title&gt;
+    &lt;style&gt;
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 5px;
+            background: #ffffff;
+            font-size: 10px;
+        }
+        .voucher-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            max-width: 210mm;
+            margin: 0 auto;
+        }
+        .voucher {
+            width: 145px;
+            border: 1px solid #000;
+            page-break-inside: avoid;
+            background: #ffffff;
+        }
+        .voucher table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .voucher td {
+            padding: 2px;
+            border: none;
+        }
+        .rotate {
+            font-weight: bold;
+            border-right: 1px solid black;
+            background-color: #ffea8f;
+            -webkit-print-color-adjust: exact;
+            width: 20px;
+            height: 80px;
+        }
+        .rotate span {
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            display: block;
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.2;
+            padding: 5px 2px;
+        }
+        .company-header {
+            font-weight: bold;
+            font-size: 12px;
+            padding-left: 5px;
+            background: #FBA1B7;
+            color: white;
+            text-align: center;
+        }
+        .company-name {
+            text-align: left;
+        }
+        .voucher-number {
+            text-align: right;
+            font-size: 9px;
+        }
+        .voucher-code {
+            width: 100%;
+            font-weight: 600;
+            font-size: 18px;
+            text-align: center;
+        }
+        .duration {
+            font-size: 11px;
+            padding-right: 5px;
+            text-align: end;
+            background: #FFECAF;
+        }
+        .validity {
+            font-size: 11px;
+            padding-right: 5px;
+            text-align: end;
+            background: #FFECAF;
+        }
+        @media print {
+            body { margin: 2px; }
+            .voucher-container { gap: 2px; }
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class="voucher-container"&gt;
+        &lt;div class="voucher"&gt;
+            &lt;table&gt;
+                &lt;tbody&gt;
+                    &lt;tr&gt;
+                        &lt;td class="rotate" rowspan="4"&gt;&lt;span&gt;Rp {HargaJual}&lt;/span&gt;&lt;/td&gt;
+                        &lt;td class="company-header" colspan="2"&gt;
+                            &lt;span class="company-name"&gt;{NamaPerusahaan}&lt;/span&gt;
+                            &lt;span class="voucher-number"&gt;[1]&lt;/span&gt;
+                        &lt;/td&gt;
+                    &lt;/tr&gt;
+                    &lt;tr&gt;
+                        &lt;td class="voucher-code" colspan="2"&gt;{KodeVoucher}&lt;/td&gt;
+                    &lt;/tr&gt;
+                    &lt;tr&gt;
+                        &lt;td class="duration" colspan="2"&gt; Durasi: {DurasiHari}&lt;/td&gt;
+                    &lt;/tr&gt;
+                    &lt;tr&gt;
+                        &lt;td class="validity" colspan="2"&gt; Valid: {TanggalExpired}&lt;/td&gt;
+                    &lt;/tr&gt;
+                &lt;/tbody&gt;
+            &lt;/table&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                </div>
+
+                <div id="thermal-example-content" class="example-content hidden">
+                    <pre class="bg-slate-900 p-4 rounded-lg text-sm overflow-x-auto max-h-96 border border-slate-700"><code class="text-slate-200">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;WiFi Voucher - Thermal&lt;/title&gt;
+    &lt;style&gt;
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 5px;
+            padding: 5px;
+            width: 80mm;
+            background: white;
+        }
+        .voucher {
+            border-bottom: 1px dashed #000;
+            padding: 10px 0;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .header {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .code {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 5px;
+            margin: 8px 0;
+            letter-spacing: 2px;
+        }
+        .info {
+            font-size: 10px;
+            margin: 3px 0;
+        }
+        .price {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .separator {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class="voucher"&gt;
+        &lt;div class="header"&gt;{NamaPerusahaan}&lt;/div&gt;
+        &lt;div class="code"&gt;{KodeVoucher}&lt;/div&gt;
+        &lt;div class="info"&gt;Profile: {NamaProfile}&lt;/div&gt;
+        &lt;div class="info"&gt;Durasi: {DurasiHari} hari&lt;/div&gt;
+        &lt;div class="info"&gt;Dibuat: {TanggalBuat}&lt;/div&gt;
+        &lt;div class="info"&gt;Expired: {TanggalExpired}&lt;/div&gt;
+        &lt;div class="price"&gt;Rp {HargaJual}&lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class="separator"&gt;&lt;/div&gt;
+
+    &lt;!-- Repeat voucher div for more vouchers --&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                </div>
+            </div>
+            <div class="border-t border-slate-700 px-6 py-4">
+                <button onclick="useCurrentExample()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 text-sm">
+                    <i class="fas fa-check"></i> Gunakan Contoh Ini
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-content {
+    display: block;
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
+.tab-button.active {
+    border-bottom-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.example-tab-button.active {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.example-content {
+    display: block;
+}
+
+.example-content.hidden {
+    display: none;
+}
+</style>
+
+<script>
+// Tab switching functions
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    // Remove active class from all tab buttons
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active');
+        button.classList.add('border-transparent', 'text-slate-400');
+        button.classList.remove('border-blue-500', 'text-blue-600');
+    });
+
+    // Show selected tab content
+    document.getElementById(tabName + '-content').classList.remove('hidden');
+
+    // Add active class to selected tab button
+    const activeTab = document.getElementById(tabName + '-tab');
+    activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
+    activeTab.classList.remove('border-transparent', 'text-slate-400');
+
+    // Update preview when switching to preview tab
+    if (tabName === 'preview') {
+        updatePreview();
+    }
+}
+
+function switchExampleTab(exampleType) {
+    // Hide all example contents
+    document.querySelectorAll('.example-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    // Remove active class from all example tab buttons
+    document.querySelectorAll('.example-tab-button').forEach(button => {
+        button.classList.remove('active', 'bg-blue-100', 'text-blue-700');
+        button.classList.add('text-slate-400');
+    });
+
+    // Show selected example content
+    document.getElementById(exampleType + '-example-content').classList.remove('hidden');
+
+    // Add active class to selected example tab button
+    const activeTab = document.getElementById(exampleType + '-example-tab');
+    activeTab.classList.add('active', 'bg-blue-100', 'text-blue-700');
+    activeTab.classList.remove('text-slate-400');
+}
+
+// Modal functions
+function closePreviewModal() {
+    document.getElementById('previewModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+function closeExamplesModal() {
+    document.getElementById('examplesModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Show modal functions
+function showExamples() {
+    document.getElementById('examplesModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function previewTemplate() {
+    const template = document.getElementById('templateContent').value;
+
+    // Replace variables with sample data
+    let previewHTML = template
+        .replace(/{KodeVoucher}/g, 'SAMPLE-001')
+        .replace(/{NamaPerusahaan}/g, '<%= settings?.company_name || "WiFi Hotspot" %>')
+        .replace(/{NamaProfile}/g, 'Profile Sample')
+        .replace(/{DurasiHari}/g, '7')
+        .replace(/{HargaJual}/g, '10.000')
+        .replace(/{TanggalBuat}/g, new Date().toLocaleDateString('id-ID'))
+        .replace(/{TanggalExpired}/g, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('id-ID'));
+
+    document.getElementById('previewModalFrame').srcdoc = previewHTML;
+    document.getElementById('previewModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+// Use example from modal
+function useCurrentExample() {
+    const activeTab = document.querySelector('.example-tab-button.active');
+    const exampleType = activeTab.id.includes('a4') ? 'a4' : 'thermal';
+
+    document.getElementById('templateType').value = exampleType;
+
+    // Get the template content from the appropriate pre element
+    const templateContent = document.querySelector(exampleType === 'a4' ? '#a4-example-content code' : '#thermal-example-content code').textContent;
+    document.getElementById('templateContent').value = templateContent;
+
+    updatePreview();
+
+    // Close modal
+    closeExamplesModal();
+    showToast('Contoh template telah digunakan', 'success');
+}
+
+// Update preview in iframe
+function updatePreview() {
+    const template = document.getElementById('templateContent').value;
+
+    // Replace variables with sample data
+    let previewHTML = template
+        .replace(/{KodeVoucher}/g, 'SAMPLE-001')
+        .replace(/{NamaPerusahaan}/g, '<%= settings?.company_name || "WiFi Hotspot" %>')
+        .replace(/{NamaProfile}/g, 'Profile Sample')
+        .replace(/{DurasiHari}/g, '7')
+        .replace(/{HargaJual}/g, '10.000')
+        .replace(/{TanggalBuat}/g, new Date().toLocaleDateString('id-ID'))
+        .replace(/{TanggalExpired}/g, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('id-ID'));
+
+    document.getElementById('previewFrame').srcdoc = previewHTML;
+}
+
+// Toast notification function
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toastContainer') || createToastContainer();
+
+    const toast = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    toast.className = `${bgColor} text-white px-4 py-3 rounded-md shadow-lg mb-2 flex items-center justify-between`;
+    toast.innerHTML = `
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-slate-200">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.className = 'fixed top-4 right-4 z-50 space-y-2';
+    document.body.appendChild(container);
+    return container;
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    const templateType = document.getElementById('templateType');
+    const templateContent = document.getElementById('templateContent');
+    const saveTemplateBtn = document.getElementById('saveTemplateBtnMain');
+    const saveTemplateBtnModal = document.getElementById('saveTemplateBtnModal');
+    const resetTemplateBtn = document.getElementById('resetTemplateBtn');
+    const previewTemplateBtn = document.getElementById('previewTemplateBtn');
+    const testTemplateBtn = document.getElementById('testTemplateBtn');
+    const showExamplesBtn = document.getElementById('showExamplesBtn');
+    const refreshPreviewBtn = document.getElementById('refreshPreviewBtn');
+
+    // Initialize template based on current type
+    function initializeTemplate() {
+        const currentTemplate = templateContent.value.trim();
+        if (!currentTemplate) {
+            updatePreview();
+        } else {
+            updatePreview();
+        }
+    }
+
+    // Template type change handler
+    templateType.addEventListener('change', function() {
+        const newType = this.value;
+        const shouldLoad = confirm(`Apakah Anda ingin memuat template ${newType.toUpperCase()}?`);
+        if (shouldLoad) {
+            // This would typically load from server, but for now we'll just update preview
+            updatePreview();
+        }
+    });
+
+    // Save template
+    async function saveTemplateSettings() {
+        try {
+            const templateTypeValue = templateType.value;
+            const templateContentValue = templateContent.value;
+            const templateNameValue = document.getElementById('templateName').value;
+            const printTemplateTypeValue = document.getElementById('printTemplateType').value;
+
+            // Show loading state
+            const saveButtons = document.querySelectorAll('[id*="saveTemplateBtn"]');
+            saveButtons.forEach(btn => {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-hourglass-half"></i> Menyimpan...';
+            });
+
+            const response = await fetch('/templates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    template_type: templateTypeValue,
+                    template_content: templateContentValue,
+                    template_name: templateNameValue,
+                    print_template_type: printTemplateTypeValue
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                window.location.href = '/templates?success=Template berhasil disimpan';
+            } else {
+                showToast(result.message || 'Gagal menyimpan template', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving template:', error);
+            showToast('Terjadi kesalahan saat menyimpan template', 'error');
+        } finally {
+            // Reset button state
+            const saveButtons = document.querySelectorAll('[id*="saveTemplateBtn"]');
+            saveButtons.forEach(btn => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Simpan Template';
+            });
+        }
+    }
+
+    // Test template variables
+    function testTemplate() {
+        const variables = [
+            '{KodeVoucher}', '{NamaPerusahaan}', '{NamaProfile}',
+            '{DurasiHari}', '{HargaJual}', '{TanggalBuat}', '{TanggalExpired}'
+        ];
+
+        const template = templateContent.value;
+        const missingVariables = [];
+        const foundVariables = [];
+
+        variables.forEach(variable => {
+            if (template.includes(variable)) {
+                foundVariables.push(variable);
+            } else {
+                missingVariables.push(variable);
+            }
+        });
+
+        let message = `Variabel ditemukan: ${foundVariables.join(', ')}\n`;
+        if (missingVariables.length > 0) {
+            message += `Variabel tidak digunakan: ${missingVariables.join(', ')}`;
+        }
+
+        showToast(message, foundVariables.length > 0 ? 'success' : 'warning');
+    }
+
+    // Reset template
+    function resetTemplate() {
+        if (confirm('Apakah Anda yakin ingin mereset template ke default?')) {
+            templateContent.value = '';
+            updatePreview();
+            showToast('Template telah direset ke default', 'info');
+        }
+    }
+
+    // Event listeners
+    saveTemplateBtn.addEventListener('click', saveTemplateSettings);
+    saveTemplateBtnModal.addEventListener('click', saveTemplateSettings);
+    resetTemplateBtn.addEventListener('click', resetTemplate);
+    previewTemplateBtn.addEventListener('click', previewTemplate);
+    testTemplateBtn.addEventListener('click', testTemplate);
+    showExamplesBtn.addEventListener('click', showExamples);
+    refreshPreviewBtn.addEventListener('click', updatePreview);
+
+    // Auto-update preview when template content changes
+    templateContent.addEventListener('input', debounce(updatePreview, 1000));
+
+    // Initialize on page load
+    initializeTemplate();
+});
+
+// Debounce function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Close modals on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closePreviewModal();
+        closeExamplesModal();
+    }
+});
+</script>
+
+<%- include('../partials/footer') %>

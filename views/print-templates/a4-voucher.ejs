@@ -1,0 +1,36 @@
+<div class="voucher">
+    <table>
+        <tr>
+            <td class="rotate"><span>VOUCHER</span></td>
+            <td>
+                <table>
+                    <tr>
+                        <td class="company-header" colspan="2">
+                            <div class="company-name"><%= settings.company_name || 'WiFi Hotspot' %></div>
+                            <div class="voucher-number">[<%= index + 1 %>]</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="voucher-code" colspan="2">
+                            <%= voucher.voucher_code %>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="duration"><%= Math.floor(voucher.duration_hours / 24) %> Hari</td>
+                        <td class="validity"><%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="font-size: 8px; text-align: center; color: #666;">
+                            Profile: <%= voucher.profile_name %>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="font-size: 7px; text-align: center; color: #999;">
+                            Created: <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</div>

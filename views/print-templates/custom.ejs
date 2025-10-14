@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Voucher - <%= settings.company_name || 'Mikrotik Billing System' %></title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: white;
+            color: black;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .page-header h1 {
+            font-size: 24pt;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .page-header .subtitle {
+            font-size: 14pt;
+            color: #666;
+        }
+
+        .voucher-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .voucher {
+            border: 3px double #333;
+            padding: 15px;
+            text-align: center;
+            position: relative;
+            background: linear-gradient(135deg, #f9f9f9 0%, #f0f0f0 100%);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            page-break-inside: avoid;
+        }
+
+        .voucher-header {
+            background: #333;
+            color: white;
+            padding: 8px;
+            margin: -15px -15px 10px -15px;
+            border-radius: 5px 5px 0 0;
+        }
+
+        .voucher-title {
+            font-size: 14pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .voucher-company {
+            font-size: 10pt;
+            opacity: 0.8;
+        }
+
+        .voucher-code-container {
+            margin: 15px 0;
+        }
+
+        .voucher-code-label {
+            font-size: 10pt;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .voucher-code {
+            font-size: 18pt;
+            font-weight: bold;
+            letter-spacing: 2px;
+            padding: 10px;
+            background: #fff;
+            border: 2px solid #333;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            color: #333;
+            text-transform: uppercase;
+        }
+
+        .voucher-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            text-align: left;
+            font-size: 11pt;
+        }
+
+        .voucher-detail {
+            background: rgba(255,255,255,0.7);
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #333;
+        }
+
+        .voucher-detail-label {
+            font-weight: bold;
+            color: #333;
+            display: block;
+            margin-bottom: 3px;
+            font-size: 9pt;
+            text-transform: uppercase;
+        }
+
+        .voucher-detail-value {
+            color: #333;
+            font-size: 11pt;
+        }
+
+        .voucher-footer {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            font-size: 9pt;
+            color: #666;
+            text-align: left;
+        }
+
+        .voucher-footer-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+        }
+
+        .voucher-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            opacity: 0.05;
+            font-size: 30pt;
+            font-weight: bold;
+            color: #333;
+            z-index: 1;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .page-footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ccc;
+            font-size: 10pt;
+            color: #666;
+        }
+
+        .summary-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .summary-info h3 {
+            font-size: 14pt;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .summary-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .summary-value {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .summary-label {
+            font-size: 9pt;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+            }
+
+            .voucher {
+                page-break-inside: avoid;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+        }
+
+        .print-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .print-controls h4 {
+            margin: 0 0 10px 0;
+            font-size: 12pt;
+        }
+
+        .print-controls button {
+            margin: 2px;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10pt;
+        }
+
+        .print-controls .btn-print {
+            background: #007bff;
+            color: white;
+        }
+
+        .print-controls .btn-close {
+            background: #6c757d;
+            color: white;
+        }
+
+        .print-controls .template-select {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls no-print">
+        <h4>Print Controls</h4>
+        <select class="template-select" onchange="changeTemplate(this.value)">
+            <option value="custom">Custom Template</option>
+            <option value="default">Default Template</option>
+            <option value="thermal">Thermal Template</option>
+        </select>
+        <div>
+            <button class="btn-print" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print
+            </button>
+            <button class="btn-close" onclick="window.close()">
+                <i class="bi bi-x"></i> Close
+            </button>
+        </div>
+    </div>
+
+    <div class="page-header">
+        <h1><%= settings.company_name || 'Mikrotik Billing System' %></h1>
+        <div class="subtitle">Voucher Hotspot Print Report</div>
+    </div>
+
+    <div class="summary-info">
+        <h3>Generation Summary</h3>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value"><%= vouchers.length %></div>
+                <div class="summary-label">Total Vouchers</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value"><%= vouchers[0]?.profile_name || 'N/A' %></div>
+                <div class="summary-label">Profile</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">Rp <%= formatCurrency(totalRevenue).replace('Rp', '').trim() %></div>
+                <div class="summary-label">Total Revenue</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value"><%= new Date().toLocaleDateString('id-ID') %></div>
+                <div class="summary-label">Print Date</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="voucher-grid">
+        <% vouchers.forEach((voucher, index) => { %>
+        <div class="voucher">
+            <div class="voucher-watermark"><%= settings.company_name || 'Mikrotik' %></div>
+
+            <div class="voucher-header">
+                <div class="voucher-title">VOUCHER HOTSPOT</div>
+                <div class="voucher-company"><%= settings.company_name || 'WiFi Hotspot' %></div>
+            </div>
+
+            <div class="voucher-code-container">
+                <div class="voucher-code-label">Kode Voucher</div>
+                <div class="voucher-code" id="code-<%= index %>">
+                    <%= voucher.voucher_code %>
+                </div>
+            </div>
+
+            <div class="voucher-details">
+                <div class="voucher-detail">
+                    <span class="voucher-detail-label">Durasi</span>
+                    <span class="voucher-detail-value">
+                        <% if (voucher.duration_days > 0) { %>
+                            <%= voucher.duration_days %> Hari
+                        <% } %>
+                        <% if (voucher.duration_hours > 0) { %>
+                            <%= voucher.duration_hours %> Jam
+                        <% } %>
+                        <% if (voucher.duration_minutes > 0) { %>
+                            <%= voucher.duration_minutes %> Menit
+                        <% } %>
+                    </span>
+                </div>
+                <div class="voucher-detail">
+                    <span class="voucher-detail-label">Harga</span>
+                    <span class="voucher-detail-value">
+                        Rp <%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %>
+                    </span>
+                </div>
+                <div class="voucher-detail">
+                    <span class="voucher-detail-label">Bandwidth</span>
+                    <span class="voucher-detail-value">
+                        <%= voucher.bandwidth || 'Standard' %>
+                    </span>
+                </div>
+                <div class="voucher-detail">
+                    <span class="voucher-detail-label">Tipe</span>
+                    <span class="voucher-detail-value">
+                        <%= voucher.type || 'Hotspot' %>
+                    </span>
+                </div>
+            </div>
+
+            <div class="voucher-footer">
+                <div class="voucher-footer-row">
+                    <span><strong>Dibuat:</strong> <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %></span>
+                    <span><strong>ID:</strong> <%= voucher.id %></span>
+                </div>
+                <div class="voucher-footer-row">
+                    <span><strong>Profile:</strong> <%= voucher.profile_name %></span>
+                    <span><strong>Status:</strong> Aktif</span>
+                </div>
+            </div>
+        </div>
+        <% }); %>
+    </div>
+
+    <div class="page-footer">
+        <p>Generated by <%= settings.company_name || 'Mikrotik Billing System' %> on <%= new Date().toLocaleString('id-ID') %></p>
+        <p>This is an official voucher document. Please keep it safe.</p>
+    </div>
+
+    <script>
+        // Auto print when page loads
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (window.location.search.includes('auto_print=true')) {
+                    window.print();
+                }
+            }, 500);
+        });
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+            if (e.key === 'Escape') {
+                window.close();
+            }
+        });
+
+        // Change template function
+        function changeTemplate(template) {
+            const url = new URL(window.location);
+            url.searchParams.set('template', template);
+            window.location.href = url.toString();
+        }
+
+        // Get current template from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentTemplate = urlParams.get('template') || 'custom';
+        document.querySelector('.template-select').value = currentTemplate;
+    </script>
+</body>
+</html>

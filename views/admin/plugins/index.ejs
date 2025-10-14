@@ -1,0 +1,368 @@
+<%- include('../partials/header') %>
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Plugin Management</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadPluginModal">
+          <i class="bi bi-upload"></i> Upload Plugin
+        </button>
+      </div>
+
+      <!-- Plugin Stats -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-primary text-white">
+            <div class="card-body">
+              <h5 class="card-title">Total Plugins</h5>
+              <h2 class="mb-0"><%= plugins.length %></h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-success text-white">
+            <div class="card-body">
+              <h5 class="card-title">Active</h5>
+              <h2 class="mb-0"><%= plugins.filter(p => p.is_active).length %></h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-white">
+            <div class="card-body">
+              <h5 class="card-title">Inactive</h5>
+              <h2 class="mb-0"><%= plugins.filter(p => !p.is_active).length %></h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body">
+              <h5 class="card-title">Built-in</h5>
+              <h2 class="mb-0">2</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plugins Table -->
+      <div class="card">
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Version</th>
+                  <th>Status</th>
+                  <th>Description</th>
+                  <th>Author</th>
+                  <th>Loaded At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% plugins.forEach(plugin => { %>
+                  <tr>
+                    <td>
+                      <strong><%= plugin.name %></strong>
+                      <% if (['duitku', 'manual'].includes(plugin.name)) { %>
+                        <span class="badge bg-secondary ms-2">Built-in</span>
+                      <% } %>
+                    </td>
+                    <td><%= plugin.config?.version || 'N/A' %></td>
+                    <td>
+                      <% if (plugin.is_active) { %>
+                        <span class="badge bg-success">Active</span>
+                      <% } else { %>
+                        <span class="badge bg-warning">Inactive</span>
+                      <% } %>
+                    </td>
+                    <td><%= plugin.config?.description || 'No description' %></td>
+                    <td><%= plugin.config?.author || 'Unknown' %></td>
+                    <td><%= plugin.loaded_at ? new Date(plugin.loaded_at).toLocaleString() : 'N/A' %></td>
+                    <td>
+                      <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                onclick="togglePlugin('<%= plugin.name %>', <%= !plugin.is_active %>)">
+                          <% if (plugin.is_active) { %>
+                            <i class="bi bi-pause"></i> Deactivate
+                          <% } else { %>
+                            <i class="bi bi-play"></i> Activate
+                          <% } %>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-info"
+                                onclick="configurePlugin('<%= plugin.name %>')">
+                          <i class="bi bi-gear"></i> Configure
+                        </button>
+                        <% if (!['duitku', 'manual'].includes(plugin.name)) { %>
+                          <button type="button" class="btn btn-sm btn-outline-danger"
+                                  onclick="deletePlugin('<%= plugin.name %>')">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        <% } %>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Plugin Modal -->
+<div class="modal fade" id="uploadPluginModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Upload New Plugin</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="uploadPluginForm" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label for="pluginFile" class="form-label">Plugin ZIP File</label>
+            <input type="file" class="form-control" id="pluginFile" name="file" accept=".zip" required>
+            <div class="form-text">
+              Upload a ZIP file containing the plugin. Maximum size: 10MB
+            </div>
+          </div>
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            The ZIP file should contain:
+            <ul class="mb-0 mt-2">
+              <li><code>index.js</code> - Main plugin file</li>
+              <li><code>manifest.json</code> - Plugin metadata</li>
+              <li><code>assets/</code> - Plugin assets (optional)</li>
+            </ul>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="uploadPlugin()">Upload Plugin</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Configure Plugin Modal -->
+<div class="modal fade" id="configurePluginModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Configure Plugin</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="configurePluginForm">
+          <div id="pluginConfigFields"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="savePluginConfig()">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentPluginName = null;
+
+  async function togglePlugin(name, activate) {
+    try {
+      const response = await fetch(`/plugins/${name}/toggle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ active: activate })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        location.reload();
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error toggling plugin:', error);
+      alert('Failed to toggle plugin');
+    }
+  }
+
+  async function configurePlugin(name) {
+    currentPluginName = name;
+    try {
+      const response = await fetch(`/plugins/${name}`);
+      const result = await response.json();
+
+      if (result.plugin) {
+        // Load manifest to get config schema
+        const manifestResponse = await fetch(`/plugins/${name}/manifest`);
+        const manifest = await manifestResponse.json();
+
+        // Build config form
+        const fieldsHtml = Object.entries(manifest.config || {}).map(([key, config]) => {
+          const value = result.plugin.config[key] || config.default || '';
+
+          let fieldHtml = '';
+          if (config.type === 'text' || config.type === 'url') {
+            fieldHtml = `
+              <div class="mb-3">
+                <label for="config_${key}" class="form-label">${config.label}</label>
+                <input type="${config.type === 'url' ? 'url' : 'text'}"
+                       class="form-control"
+                       id="config_${key}"
+                       name="${key}"
+                       value="${value}"
+                       ${config.required ? 'required' : ''}>
+              </div>
+            `;
+          } else if (config.type === 'number') {
+            fieldHtml = `
+              <div class="mb-3">
+                <label for="config_${key}" class="form-label">${config.label}</label>
+                <input type="number"
+                       class="form-control"
+                       id="config_${key}"
+                       name="${key}"
+                       value="${value}"
+                       ${config.required ? 'required' : ''}>
+              </div>
+            `;
+          } else if (config.type === 'checkbox') {
+            fieldHtml = `
+              <div class="mb-3 form-check">
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="config_${key}"
+                       name="${key}"
+                       ${value ? 'checked' : ''}>
+                <label class="form-check-label" for="config_${key}">
+                  ${config.label}
+                </label>
+              </div>
+            `;
+          } else if (config.type === 'select') {
+            const options = config.options.map(opt =>
+              `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`
+            ).join('');
+            fieldHtml = `
+              <div class="mb-3">
+                <label for="config_${key}" class="form-label">${config.label}</label>
+                <select class="form-select" id="config_${key}" name="${key}">
+                  ${options}
+                </select>
+              </div>
+            `;
+          }
+          return fieldHtml;
+        }).join('');
+
+        document.getElementById('pluginConfigFields').innerHTML = fieldsHtml;
+        new bootstrap.Modal(document.getElementById('configurePluginModal')).show();
+      }
+    } catch (error) {
+      console.error('Error loading plugin config:', error);
+      alert('Failed to load plugin configuration');
+    }
+  }
+
+  async function savePluginConfig() {
+    if (!currentPluginName) return;
+
+    const form = document.getElementById('configurePluginForm');
+    const formData = new FormData(form);
+    const config = {};
+
+    for (let [key, value] of formData.entries()) {
+      if (form.querySelector(`[name="${key}"]`).type === 'checkbox') {
+        config[key] = true;
+      } else if (form.querySelector(`[name="${key}"]`).type === 'number') {
+        config[key] = parseInt(value);
+      } else {
+        config[key] = value;
+      }
+    }
+
+    // Handle unchecked checkboxes
+    document.querySelectorAll('#configurePluginForm input[type="checkbox"]').forEach(checkbox => {
+      if (!checkbox.checked) {
+        config[checkbox.name] = false;
+      }
+    });
+
+    try {
+      const response = await fetch(`/plugins/${currentPluginName}/config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        bootstrap.Modal.getInstance(document.getElementById('configurePluginModal')).hide();
+        alert('Configuration saved successfully');
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error saving config:', error);
+      alert('Failed to save configuration');
+    }
+  }
+
+  async function uploadPlugin() {
+    const form = document.getElementById('uploadPluginForm');
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch('/plugins/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        bootstrap.Modal.getInstance(document.getElementById('uploadPluginModal')).hide();
+        location.reload();
+      } else {
+        alert('Error: ' + result.error + (result.note ? '\n' + result.note : ''));
+      }
+    } catch (error) {
+      console.error('Error uploading plugin:', error);
+      alert('Failed to upload plugin');
+    }
+  }
+
+  function deletePlugin(name) {
+    if (confirm(`Are you sure you want to delete the plugin "${name}"? This action cannot be undone.`)) {
+      fetch(`/plugins/${name}`, {
+        method: 'DELETE'
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          location.reload();
+        } else {
+          alert('Error: ' + result.error);
+        }
+      })
+      .catch(error => {
+        console.error('Error deleting plugin:', error);
+        alert('Failed to delete plugin');
+      });
+    }
+  }
+</script>
+
+<%- include('../partials/footer') %>

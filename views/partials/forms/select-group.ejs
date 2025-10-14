@@ -1,0 +1,110 @@
+<%-
+  /**
+   * Select Group Component for Forms
+   * Variables:
+   * - label: Select label (string, required)
+   * - name: Select name attribute (string, required)
+   * - id: Select ID (string, optional, defaults to name)
+   * - options: Array of options [{label: string, value: string, disabled: boolean}]
+   * - value: Selected value (string, optional)
+   * - required: Mark as required (boolean, default: false)
+   * - disabled: Disable select (boolean, default: false)
+   * - multiple: Allow multiple selection (boolean, default: false)
+   * - error: Error message (string, optional)
+   * - helper: Helper text (string, optional)
+   * - placeholder: Placeholder text for first option (string, optional)
+   * - size: Select size (sm, md, lg, default: 'md')
+   * - class: Additional CSS classes (string, optional)
+   */
+
+  // Set defaults
+  const size = locals.size || 'md';
+  const required = locals.required === true;
+  const disabled = locals.disabled === true;
+  const multiple = locals.multiple === true;
+  const inputId = locals.id || locals.name;
+  const error = locals.error || '';
+  const helper = locals.helper || '';
+  const placeholder = locals.placeholder || 'Pilih opsi...';
+  const options = locals.options || [];
+
+  // Size configurations
+  const sizeClasses = {
+    sm: {
+      select: 'px-3 py-2 text-sm',
+      label: 'text-sm'
+    },
+    md: {
+      select: 'px-4 py-3 text-sm',
+      label: 'text-sm'
+    },
+    lg: {
+      select: 'px-4 py-4 text-base',
+      label: 'text-base'
+    }
+  };
+
+  const currentSize = sizeClasses[size];
+
+  // State classes
+  const stateClasses = {
+    default: 'bg-dark-700 border-dark-600 text-white focus:border-blue-500 focus:ring-blue-500',
+    error: 'bg-dark-700 border-red-500 text-white focus:border-red-500 focus:ring-red-500',
+    disabled: 'bg-dark-800 border-dark-600 text-dark-400 cursor-not-allowed'
+  };
+
+  const currentState = error ? 'error' : (disabled ? 'disabled' : 'default');
+  const selectStateClasses = stateClasses[currentState];
+
+  // Label classes
+  const labelClasses = {
+    default: 'text-dark-300',
+    error: 'text-red-400',
+    disabled: 'text-dark-500'
+  };
+
+  const labelStateClasses = labelClasses[currentState];
+%>
+
+<div class="space-y-2 <%= locals.class || '' %>">
+  <% if (locals.label) { %>
+    <label for="<%= inputId %>" class="block <%= currentSize.label %> font-medium <%= labelStateClasses %> <%= required ? 'after:content-[\"*\"] after:ml-1 after:text-red-400' : '' %>">
+      <%= locals.label %>
+    </label>
+  <% } %>
+
+  <select
+    id="<%= inputId %>"
+    name="<%= locals.name %>"
+    <%= required ? 'required' : '' %>
+    <%= disabled ? 'disabled' : '' %>
+    <%= multiple ? 'multiple' : '' %>
+    class="<%= currentSize.select %> w-full rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 <%= selectStateClasses %>"
+  >
+    <% if (!multiple && placeholder) { %>
+      <option value="" class="bg-dark-700"><%= placeholder %></option>
+    <% } %>
+    <% options.forEach(option => { %>
+      <option
+        value="<%= option.value %>"
+        <%= locals.value && locals.value.includes(option.value) ? 'selected' : '' %>
+        <%= option.disabled ? 'disabled' : '' %}
+        class="bg-dark-700 <%= locals.value === option.value ? 'text-blue-400' : 'text-white' %>"
+      >
+        <%= option.label %>
+      </option>
+    <% }); %>
+  </select>
+
+  <% if (error) { %>
+    <p class="text-sm text-red-400 flex items-center">
+      <i class="fas fa-exclamation-circle mr-1"></i>
+      <%= error %>
+    </p>
+  <% } else if (helper) { %>
+    <p class="text-sm text-dark-400 flex items-center">
+      <i class="fas fa-info-circle mr-1"></i>
+      <%= helper %>
+    </p>
+  <% } %>
+</div>

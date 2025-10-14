@@ -1,0 +1,486 @@
+<%- include('../partials/header', { title: 'Manajemen Profil', currentUrl: '/profiles' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Manajemen Profil</h1>
+            <p class="text-slate-400">Kelola profil hotspot dan PPPoE untuk layanan internet</p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex gap-3">
+            <button onclick="syncProfiles()" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Sync Mikrotik
+            </button>
+            <button onclick="injectScripts()" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600" title="Inject scripts ke semua profil system yang tersinkron">
+                <i class="fas fa-code mr-2"></i>
+                Inject Scripts
+            </button>
+            <button onclick="showAddProfileModal()" class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                <i class="fas fa-plus mr-2"></i>
+                Tambah Profil
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total Profiles -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Total Profil</p>
+                <p class="text-3xl font-bold text-white" id="totalProfiles">
+                    <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                    <i class="fas fa-tachometer-alt text-blue-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-blue-400 flex items-center font-medium">
+                <i class="fas fa-info-circle mr-1"></i>
+                <span id="profileGrowth">+5%</span>
+            </span>
+            <span class="text-slate-500 ml-2">dari bulan lalu</span>
+        </div>
+    </div>
+
+    <!-- Hotspot Profiles -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Profil Hotspot</p>
+                <p class="text-3xl font-bold text-white" id="hotspotProfiles">
+                    <div class="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
+                    <i class="fas fa-wifi text-green-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-green-400 flex items-center font-medium">
+                <i class="fas fa-check-circle mr-1"></i>
+                <span id="hotspotPercentage">60%</span>
+            </span>
+            <span class="text-slate-500 ml-2">dari total profil</span>
+        </div>
+    </div>
+
+    <!-- PPPoE Profiles -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-yellow-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Profil PPPoE</p>
+                <p class="text-3xl font-bold text-white" id="pppoeProfiles">
+                    <div class="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
+                    <i class="fas fa-network-wired text-yellow-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-yellow-400 flex items-center font-medium">
+                <i class="fas fa-info-circle mr-1"></i>
+                <span id="pppoePercentage">40%</span>
+            </span>
+            <span class="text-slate-500 ml-2">dari total profil</span>
+        </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Status Sync</p>
+                <p class="text-3xl font-bold text-white" id="syncStatus">
+                    <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm font-medium">Checking</span>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20">
+                    <i class="fas fa-sync text-purple-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-purple-400 flex items-center font-medium">
+                <i class="fas fa-cloud mr-1"></i>
+                <span id="syncPercentage">85%</span>
+            </span>
+            <span class="text-slate-500 ml-2">tersinkron</span>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6 shadow-lg">
+    <form id="searchForm" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <!-- Search Input -->
+        <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-300 mb-2">Cari Profil</label>
+            <div class="relative">
+                <input
+                    type="text"
+                    id="searchProfile"
+                    placeholder="Nama profil..."
+                    class="w-full h-10 pl-10 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2"
+                >
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-slate-400"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Type Filter -->
+        <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Tipe</label>
+            <select id="filterType" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                <option value="">Semua Tipe</option>
+                <option value="hotspot">Hotspot</option>
+                <option value="pppoe">PPPoE</option>
+            </select>
+        </div>
+
+        <!-- Sync Filter -->
+        <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Status Sync</label>
+            <select id="filterSync" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                <option value="">Semua Status</option>
+                <option value="1">Tersinkron</option>
+                <option value="0">Belum Tersinkron</option>
+            </select>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="flex items-end">
+            <button type="submit" class="w-full h-10 inline-flex items-center justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200">
+                <i class="fas fa-filter mr-2"></i>
+                Filter
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Profiles Management Table -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg">
+    <!-- Table Header -->
+    <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-white">Daftar Profil</h2>
+            <div class="flex items-center gap-3">
+                <select id="pageSize" class="h-9 px-3 text-sm bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <span class="text-sm text-slate-400">per halaman</span>
+                <button onclick="refreshProfiles()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Content -->
+    <div class="overflow-x-auto">
+        <table class="w-full" id="profilesTable">
+            <thead class="bg-slate-900/50 border-b border-slate-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Nama Profil</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Tipe</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Bandwidth</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Harga Jual</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Harga Modal</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Managed By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status Sync</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="profilesTableBody" class="divide-y divide-slate-700">
+                <tr>
+                    <td colspan="9" class="px-6 py-8 text-center">
+                        <div class="flex flex-col items-center space-y-3">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                            <span class="text-slate-400">Memuat data profil...</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Table Footer -->
+    <div class="px-6 py-4 border-t border-slate-700 bg-slate-900/30">
+        <!-- Pagination -->
+        <div id="paginationContainer" class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <!-- Results info -->
+            <div class="text-sm text-slate-400">
+                Menampilkan <span id="startRecord">0</span> hingga <span id="endRecord">0</span> dari <span id="totalRecords">0</span> hasil
+            </div>
+
+            <!-- Pagination controls -->
+            <div class="flex items-center space-x-2">
+                <button id="prevPage" onclick="changePage('prev')" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200" disabled>
+                    <i class="fas fa-chevron-left mr-1"></i>
+                    Sebelumnya
+                </button>
+
+                <div id="pageNumbers" class="flex items-center space-x-1">
+                    <!-- Page numbers will be inserted here -->
+                </div>
+
+                <button id="nextPage" onclick="changePage('next')" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200" disabled>
+                    Berikutnya
+                    <i class="fas fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Profile Modal -->
+<div id="profileModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-white" id="profileModalTitle">Tambah Profil</h3>
+                <button onclick="closeProfileModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <form id="profileForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Nama Profil *</label>
+                            <input type="text" id="profileName" name="name" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                            <p class="mt-1 text-xs text-slate-400">Nama ini akan digunakan sebagai nama di Mikrotik</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Tipe *</label>
+                            <select id="profileType" name="type" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                <option value="">Pilih Tipe</option>
+                                <option value="hotspot">Hotspot</option>
+                                <option value="pppoe">PPPoE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Bandwidth Upload</label>
+                            <input type="text" id="bandwidthUp" name="bandwidth_up" placeholder="Contoh: 1M" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Bandwidth Download</label>
+                            <input type="text" id="bandwidthDown" name="bandwidth_down" placeholder="Contoh: 2M" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                        </div>
+                    </div>
+
+                    <!-- Burst Limit Fields -->
+                    <div class="space-y-4">
+                        <div class="flex items-center">
+                            <input type="checkbox" id="enableBurst" name="enable_burst" class="h-4 w-4 rounded border-slate-600 bg-slate-700 text-green-600 focus:ring-green-500 focus:ring-offset-slate-900">
+                            <label for="enableBurst" class="ml-3 text-sm font-medium text-slate-300">
+                                <strong>Enable Burst Limit</strong>
+                            </label>
+                        </div>
+                        <p class="text-xs text-slate-400">Aktifkan bandwidth burst limit calculator</p>
+
+                        <div id="burstCalculatorFields" class="space-y-4 pl-7 border-l-2 border-slate-600 hidden">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Bandwidth Upload Normal</label>
+                                    <div class="flex">
+                                        <input type="number" id="normalUp" placeholder="1" min="1" class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                        <select id="normalUpUnit" class="h-10 px-3 text-sm bg-slate-900 border border-l-0 border-t border-b border-r border-slate-600 rounded-r-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                            <option value="K">Kbps</option>
+                                            <option value="M" selected>Mbps</option>
+                                            <option value="G">Gbps</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Bandwidth Download Normal</label>
+                                    <div class="flex">
+                                        <input type="number" id="normalDown" placeholder="2" min="1" class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                        <select id="normalDownUnit" class="h-10 px-3 text-sm bg-slate-900 border border-l-0 border-t border-b border-r border-slate-600 rounded-r-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                            <option value="K">Kbps</option>
+                                            <option value="M" selected>Mbps</option>
+                                            <option value="G">Gbps</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Burst Upload Limit</label>
+                                    <div class="flex">
+                                        <input type="number" id="burstUp" placeholder="5" min="1" class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                        <select id="burstUpUnit" class="h-10 px-3 text-sm bg-slate-900 border border-l-0 border-t border-b border-r border-slate-600 rounded-r-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                            <option value="K">Kbps</option>
+                                            <option value="M" selected>Mbps</option>
+                                            <option value="G">Gbps</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Burst Download Limit</label>
+                                    <div class="flex">
+                                        <input type="number" id="burstDown" placeholder="10" min="1" class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                        <select id="burstDownUnit" class="h-10 px-3 text-sm bg-slate-900 border border-l-0 border-t border-b border-r border-slate-600 rounded-r-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                            <option value="K">Kbps</option>
+                                            <option value="M" selected>Mbps</option>
+                                            <option value="G">Gbps</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Burst Threshold (%)</label>
+                                    <div class="flex">
+                                        <input type="number" id="burstThreshold" placeholder="50" min="1" max="100" class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                        <span class="h-10 px-4 text-sm bg-slate-700 border border-l-0 border-t border-b border-r border-slate-600 rounded-r-lg flex items-center text-slate-300">%</span>
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-400">Threshold untuk memulai burst (contoh: 50% dari bandwidth normal)</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Burst Time (detik)</label>
+                                    <input type="number" id="burstTime" placeholder="30" min="1" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                    <p class="mt-1 text-xs text-slate-400">Durasi burst dalam detik</p>
+                                </div>
+                            </div>
+
+                            <!-- Hidden fields for form submission -->
+                            <input type="hidden" id="burstUpHidden" name="burst_up">
+                            <input type="hidden" id="burstDownHidden" name="burst_down">
+                            <input type="hidden" id="burstThresholdHidden" name="burst_threshold">
+                            <input type="hidden" id="burstTimeHidden" name="burst_time">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Harga Jual *</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400">Rp</span>
+                                </div>
+                                <input type="number" id="priceSell" name="price_sell" required min="0" class="w-full h-10 pl-12 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Harga Modal *</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400">Rp</span>
+                                </div>
+                                <input type="number" id="priceCost" name="price_cost" required min="0" class="w-full h-10 pl-12 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Duration (Hours)</label>
+                            <input type="number" id="durationHours" name="duration_hours" min="0" placeholder="Contoh: 24, 48, 72" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                            <p class="mt-1 text-xs text-slate-400">Duration in hours (24 = 1 day, 168 = 1 week)</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Managed By</label>
+                        <select id="managedBy" name="managed_by" class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                            <option value="system" selected>System</option>
+                        </select>
+                        <p class="mt-1 text-xs text-slate-400">System-managed profiles get automatic scripts</p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-slate-700 flex justify-end space-x-3">
+                <button onclick="closeProfileModal()" class="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                    Batal
+                </button>
+                <button onclick="saveProfile()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200">
+                    <i class="fas fa-save mr-2"></i>
+                    Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700">
+                <h3 class="text-xl font-semibold text-white">Konfirmasi Hapus</h3>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6">
+                <div class="mb-4">
+                    <p class="text-slate-300 mb-2">Apakah Anda yakin ingin menghapus profil ini?</p>
+                    <div class="bg-slate-900 border border-slate-600 rounded-lg p-3">
+                        <p class="font-medium text-white" id="deleteProfileName"></p>
+                        <p class="text-sm text-slate-400" id="deleteProfileDetails"></p>
+                    </div>
+                </div>
+
+                <div class="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-orange-400 mt-0.5 mr-3"></i>
+                        <div>
+                            <h4 class="font-medium text-orange-400 mb-1">Peringatan!</h4>
+                            <p class="text-sm text-slate-400">Menghapus profil akan mempengaruhi voucher dan user yang terkait.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-slate-700 flex justify-end space-x-3">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                    Batal
+                </button>
+                <button onclick="confirmDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                    <i class="fas fa-trash mr-2"></i>
+                    Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-center space-x-4 shadow-2xl">
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-600 border-t-green-500"></div>
+        <div>
+            <span class="text-slate-200 font-medium">Memuat data...</span>
+            <p class="text-slate-400 text-sm mt-1">Mohon tunggu sebentar</p>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer', { scripts: ['/public/js/profiles.js'] }) %>

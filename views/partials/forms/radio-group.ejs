@@ -1,0 +1,104 @@
+<%-
+  /**
+   * Radio Group Component for Forms
+   * Variables:
+   * - label: Group label (string, optional)
+   * - name: Radio name attribute (string, required)
+   * - options: Array of options [{label: string, value: string, disabled: boolean}]
+   * - value: Selected value (string, optional)
+   * - required: Mark as required (boolean, default: false)
+   * - disabled: Disable all radios (boolean, default: false)
+   * - inline: Display inline (boolean, default: false)
+   * - error: Error message (string, optional)
+   * - helper: Helper text (string, optional)
+   * - size: Radio size (sm, md, lg, default: 'md')
+   * - class: Additional CSS classes (string, optional)
+   */
+
+  // Set defaults
+  const size = locals.size || 'md';
+  const required = locals.required === true;
+  const disabled = locals.disabled === true;
+  const inline = locals.inline === true;
+  const error = locals.error || '';
+  const helper = locals.helper || '';
+  const options = locals.options || [];
+  const selectedValue = locals.value || '';
+
+  // Size configurations
+  const sizeClasses = {
+    sm: {
+      input: 'w-4 h-4',
+      label: 'text-sm',
+      container: 'space-y-2'
+    },
+    md: {
+      input: 'w-5 h-5',
+      label: 'text-sm',
+      container: 'space-y-3'
+    },
+    lg: {
+      input: 'w-6 h-6',
+      label: 'text-base',
+      container: 'space-y-4'
+    }
+  };
+
+  const currentSize = sizeClasses[size];
+
+  // State classes
+  const stateClasses = {
+    default: 'border-dark-600 bg-dark-700 text-blue-500 focus:ring-blue-500 focus:ring-2',
+    error: 'border-red-500 bg-dark-700 text-red-500 focus:ring-red-500 focus:ring-2',
+    disabled: 'border-dark-600 bg-dark-800 text-dark-400 cursor-not-allowed'
+  };
+
+  const currentState = error ? 'error' : (disabled ? 'disabled' : 'default');
+
+  // Label classes
+  const labelClasses = {
+    default: 'text-dark-300',
+    error: 'text-red-400',
+    disabled: 'text-dark-500'
+  };
+%>
+
+<div class="space-y-2 <%= locals.class || '' %>">
+  <% if (locals.label) { %>
+    <label class="block <%= currentSize.label %> font-medium <%= labelClasses[currentState] %> <%= required ? 'after:content-[\"*\"] after:ml-1 after:text-red-400' : '' %>">
+      <%= locals.label %>
+    </label>
+  <% } %>
+
+  <div class="<%= inline ? 'flex flex-wrap gap-4' : currentSize.container %>">
+    <% options.forEach((option, index) => { %>
+      <div class="flex items-start">
+        <input
+          type="radio"
+          id="<%= locals.name %>_<%= index %>"
+          name="<%= locals.name %>"
+          value="<%= option.value %>"
+          <%= selectedValue === option.value ? 'checked' : '' %>
+          <%= option.disabled || disabled ? 'disabled' : '' %>
+          <%= required ? 'required' : '' %>
+          class="<%= currentSize.input %> rounded-full border transition-colors duration-200 focus:outline-none focus:ring-offset-0 focus:ring-offset-transparent <%= stateClasses[currentState] %> mt-0.5"
+        >
+        <label for="<%= locals.name %>_<%= index %>" class="ml-3 <%= currentSize.label %> <%= option.disabled || disabled ? 'text-dark-500 cursor-not-allowed' : 'text-dark-300 cursor-pointer' %>">
+          <%= option.label %>
+        </label>
+      </div>
+    <% }); %>
+  </div>
+
+  <% if (error) { %>
+    <p class="text-sm text-red-400 flex items-center">
+      <i class="fas fa-exclamation-circle mr-1"></i>
+      <%= error %>
+    </p>
+  <% } else if (helper) { %>
+    <p class="text-sm text-dark-400 flex items-center">
+      <i class="fas fa-info-circle mr-1"></i>
+      <%= helper %>
+    </p>
+  <% } %>
+</div>

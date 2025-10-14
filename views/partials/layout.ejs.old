@@ -1,0 +1,15 @@
+<%- include('./header', {
+    title: typeof title !== 'undefined' ? title : '',
+    admin: typeof admin !== 'undefined' ? admin : null,
+    settings: typeof settings !== 'undefined' ? settings : null,
+    currentUrl: typeof currentUrl !== 'undefined' ? currentUrl : '',
+    success: typeof success !== 'undefined' ? success : null,
+    error: typeof error !== 'undefined' ? error : null
+}) %>
+
+<!-- Page Content -->
+<%- yield %>
+
+<%- include('./footer', {
+    scripts: typeof scripts !== 'undefined' ? scripts : []
+}) %>

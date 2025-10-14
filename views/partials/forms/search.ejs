@@ -1,0 +1,198 @@
+<%-
+  /**
+   * Shadcn-style Search Input Component
+   * Variables:
+   * - name: Input name attribute (string, required)
+   * - id: Input ID (string, optional, defaults to name)
+   * - placeholder: Search placeholder (string, default: 'Search...')
+   * - value: Input value (string, optional)
+   * - onSearch: Search function name (string, optional, default: 'handleSearch')
+   * - debounce: Debounce delay in ms (number, default: 300)
+   * - disabled: Disable input (boolean, default: false)
+   * - error: Error message (string, optional)
+   * - helper: Helper text (string, optional)
+   * - size: Input size (sm, md, lg, default: 'md')
+   * - class: Additional CSS classes (string, optional)
+   * - showButton: Show search button (boolean, default: true)
+   * - buttonText: Search button text (string, default: 'Search')
+   * - clearButton: Show clear button (boolean, default: true)
+   */
+
+  // Set defaults
+  const size = locals.size || 'md';
+  const disabled = locals.disabled === true;
+  const inputId = locals.id || locals.name;
+  const error = locals.error || '';
+  const helper = locals.helper || '';
+  const onSearch = locals.onSearch || 'handleSearch';
+  const debounce = locals.debounce || 300;
+  const showButton = locals.showButton !== false;
+  const buttonText = locals.buttonText || 'Search';
+  const clearButton = locals.clearButton !== false;
+  const placeholder = locals.placeholder || 'Search...';
+
+  // Size configurations
+  const sizeVariants = {
+    sm: 'h-9 text-sm',
+    md: 'h-10 text-sm',
+    lg: 'h-11 text-base'
+  };
+
+  // Icon sizes
+  const iconSizes = {
+    sm: 'h-4 w-4',
+    md: 'h-5 w-5',
+    lg: 'h-6 w-6'
+  };
+
+  const currentSize = sizeVariants[size] || sizeVariants.md;
+  const currentIconSize = iconSizes[size] || iconSizes.md;
+
+  // State classes
+  const stateClasses = {
+    default: 'bg-slate-900 border-slate-700 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500',
+    error: 'bg-slate-900 border-red-500 text-white placeholder-slate-400 focus:border-red-500 focus:ring-red-500',
+    disabled: 'bg-slate-800 border-slate-600 text-slate-500 placeholder-slate-600 cursor-not-allowed'
+  };
+
+  const currentState = error ? 'error' : (disabled ? 'disabled' : 'default');
+  const inputClasses = `${currentSize} w-full rounded-lg border px-4 py-2 pl-10 pr-10 transition-colors duration-200 focus:outline-none focus:ring-2 ${stateClasses[currentState]}`;
+
+  // Label classes
+  const labelClasses = {
+    default: 'text-sm font-medium text-slate-300',
+    error: 'text-sm font-medium text-red-400',
+    disabled: 'text-sm font-medium text-slate-500'
+  };
+%>
+
+<div class="space-y-2 <%= locals.class || '' %>">
+  <div class="relative">
+    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <svg class="<%= currentIconSize %> text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+      </svg>
+    </div>
+
+    <input
+      type="text"
+      id="<%= inputId %>"
+      name="<%= locals.name %>"
+      placeholder="<%= placeholder %>"
+      value="<%= locals.value || '' %>"
+      <%= disabled ? 'disabled' : '' %>
+      class="<%= inputClasses %>"
+      autocomplete="off"
+    />
+
+    <% if (clearButton && !disabled) { %>
+      <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+        <button
+          type="button"
+          id="<%= inputId %>-clear"
+          class="text-slate-400 hover:text-slate-300 transition-colors duration-200 <%= (locals.value && locals.value.length > 0) ? '' : 'hidden' %>"
+          onclick="clearSearchInput('<%= inputId %>', '<%= onSearch %>')"
+        >
+          <svg class="<%= currentIconSize %>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    <% } %>
+  </div>
+
+  <% if (showButton && !disabled) { %>
+    <button
+      type="button"
+      onclick="triggerSearch('<%= inputId %>', '<%= onSearch %>')"
+      class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+    >
+      <svg class="mr-2 -ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+      </svg>
+      <%= buttonText %>
+    </button>
+  <% } %>
+
+  <% if (error) { %>
+    <p class="text-sm text-red-400 flex items-center gap-1">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <%= error %>
+    </p>
+  <% } else if (helper) { %>
+    <p class="text-sm text-slate-400 flex items-center gap-1">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <%= helper %>
+    </p>
+  <% } %>
+</div>
+
+<script>
+  (function() {
+    const searchInput = document.getElementById('<%= inputId %>');
+    const clearButton = document.getElementById('<%= inputId %>-clear');
+    let searchTimeout;
+
+    if (searchInput) {
+      // Debounced search
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+
+        // Show/hide clear button
+        if (clearButton) {
+          if (query.length > 0) {
+            clearButton.classList.remove('hidden');
+          } else {
+            clearButton.classList.add('hidden');
+          }
+        }
+
+        // Debounced search
+        searchTimeout = setTimeout(() => {
+          if (typeof <%= onSearch %> === 'function') {
+            <%= onSearch %>(query);
+          }
+        }, <%= debounce %>);
+      });
+
+      // Enter key search
+      searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const query = this.value.trim();
+          if (typeof <%= onSearch %> === 'function') {
+            <%= onSearch %>(query);
+          }
+        }
+      });
+    }
+  })();
+
+  function clearSearchInput(inputId, searchFunction) {
+    const input = document.getElementById(inputId);
+    const clearButton = document.getElementById(inputId + '-clear');
+
+    if (input) {
+      input.value = '';
+      if (clearButton) {
+        clearButton.classList.add('hidden');
+      }
+      if (typeof <%= onSearch %> === 'function') {
+        <%= onSearch %>('');
+      }
+    }
+  }
+
+  function triggerSearch(inputId, searchFunction) {
+    const input = document.getElementById(inputId);
+    if (input && typeof <%= onSearch %> === 'function') {
+      const query = input.value.trim();
+      <%= onSearch %>(query);
+    }
+  }
+</script>

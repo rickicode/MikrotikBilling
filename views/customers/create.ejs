@@ -1,0 +1,282 @@
+<%- include('../partials/header', { title: 'Tambah Pelanggan Baru', currentUrl: '/customers/create' }) %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-white">Tambah Pelanggan Baru</h1>
+                <p class="mt-2 text-gray-400">Registrasi pelanggan baru ke sistem billing</p>
+            </div>
+            <a href="/customers" class="inline-flex items-center px-4 py-2 border border-gray-600 rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Kembali
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Form -->
+        <div class="lg:col-span-2">
+            <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h2 class="text-xl font-semibold text-white">Informasi Pelanggan</h2>
+                </div>
+                <div class="p-6">
+                    <form id="customerForm" class="space-y-6" novalidate>
+                        <!-- Personal Information -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-medium text-gray-200 border-b border-gray-700 pb-2">
+                                <i class="fas fa-user mr-2 text-blue-400"></i>
+                                Data Pribadi
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="nama" class="block text-sm font-medium text-gray-300 mb-2">
+                                        Nama Lengkap <span class="text-red-400">*</span>
+                                    </label>
+                                    <input type="text" id="nama" name="nama" required
+                                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                                           placeholder="Masukkan nama lengkap">
+                                    <div class="invalid-feedback hidden mt-1 text-sm text-red-400"></div>
+                                </div>
+
+                                <div>
+                                    <label for="nomor_hp" class="block text-sm font-medium text-gray-300 mb-2">
+                                        Nomor HP <span class="text-red-400">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-3 text-gray-400">+62</span>
+                                        <input type="tel" id="nomor_hp" name="nomor_hp" required
+                                               class="w-full pl-16 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                                               placeholder="81234567890">
+                                    </div>
+                                    <div class="invalid-feedback hidden mt-1 text-sm text-red-400"></div>
+                                    <p class="mt-1 text-sm text-gray-400">Format: 81234567890</p>
+                                </div>
+
+                                <div>
+                                    <label for="email" class="block text-sm font-medium text-gray-300 mb-2">
+                                        Email
+                                    </label>
+                                    <input type="email" id="email" name="email"
+                                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                                           placeholder="email@example.com">
+                                    <div class="invalid-feedback hidden mt-1 text-sm text-red-400"></div>
+                                    <p class="mt-1 text-sm text-gray-400">Optional, untuk notifikasi</p>
+                                </div>
+
+                                <div>
+                                    <label for="status_aktif" class="block text-sm font-medium text-gray-300 mb-2">
+                                        Status
+                                    </label>
+                                    <select id="status_aktif" name="status_aktif"
+                                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200">
+                                        <option value="active" selected>Aktif</option>
+                                        <option value="inactive">Tidak Aktif</option>
+                                        <option value="suspended">Ditangguhkan</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="alamat" class="block text-sm font-medium text-gray-300 mb-2">
+                                    Alamat
+                                </label>
+                                <textarea id="alamat" name="alamat" rows="3"
+                                          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                                          placeholder="Masukkan alamat lengkap"></textarea>
+                                <p class="mt-1 text-sm text-gray-400">Optional</p>
+                            </div>
+                        </div>
+
+                        <!-- Financial Information -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-medium text-gray-200 border-b border-gray-700 pb-2">
+                                <i class="fas fa-wallet mr-2 text-green-400"></i>
+                                Informasi Keuangan (Optional)
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="credit_balance" class="block text-sm font-medium text-gray-300 mb-2">
+                                        Saldo Awal
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-3 text-gray-400">Rp</span>
+                                        <input type="number" id="credit_balance" name="credit_balance"
+                                               min="0" step="1000" value="0"
+                                               class="w-full pl-12 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                                               placeholder="0">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="debt_balance" class="block text-sm font-medium text-gray-300 mb-2">
+                                        Hutang Awal
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-3 text-gray-400">Rp</span>
+                                        <input type="number" id="debt_balance" name="debt_balance"
+                                               min="0" step="1000" value="0"
+                                               class="w-full pl-12 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                                               placeholder="0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- WhatsApp Settings -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-medium text-gray-200 border-b border-gray-700 pb-2">
+                                <i class="fab fa-whatsapp mr-2 text-green-400"></i>
+                                Pengaturan Notifikasi
+                            </h3>
+
+                            <div class="flex items-center">
+                                <input type="checkbox" id="send_welcome" name="send_welcome"
+                                       class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2">
+                                <label for="send_welcome" class="ml-2 text-sm text-gray-300">
+                                    Kirim pesan selamat datang via WhatsApp
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex items-center justify-between pt-6 border-t border-gray-700">
+                            <a href="/customers"
+                               class="inline-flex items-center px-6 py-3 border border-gray-600 rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                                <i class="fas fa-times mr-2"></i>
+                                Batal
+                            </a>
+                            <div class="flex space-x-4">
+                                <button type="button" id="saveAndAddServiceBtn"
+                                        class="inline-flex items-center px-6 py-3 border border-blue-500 rounded-lg text-blue-400 bg-transparent hover:bg-blue-500 hover:text-white transition-colors duration-200">
+                                    <i class="fas fa-plus mr-2"></i>
+                                    Simpan & Tambah Layanan
+                                </button>
+                                <button type="submit"
+                                        class="inline-flex items-center px-6 py-3 border border-transparent rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+                                    <i class="fas fa-check mr-2"></i>
+                                    Simpan Pelanggan
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Customer Preview Card -->
+            <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-lg font-semibold text-white">Preview Pelanggan</h3>
+                </div>
+                <div class="p-6">
+                    <div class="text-center mb-4">
+                        <div class="mx-auto mb-3 w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold" id="previewAvatar">
+                            ?
+                        </div>
+                        <h4 class="text-lg font-semibold text-white" id="previewName">Nama Pelanggan</h4>
+                        <p class="text-sm text-gray-400" id="previewContact">Kontak informasi</p>
+                    </div>
+                    <div class="border-t border-gray-700 pt-4">
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Saldo</p>
+                                <p class="text-lg font-bold text-green-400" id="previewCredit">Rp 0</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Hutang</p>
+                                <p class="text-lg font-bold text-red-400" id="previewDebt">Rp 0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-lg font-semibold text-white">Quick Actions</h3>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-3">
+                        <button type="button" id="checkDuplicateBtn"
+                                class="w-full inline-flex items-center justify-center px-4 py-3 border border-gray-600 rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                            <i class="fas fa-search mr-2"></i>
+                            Cek Duplikat
+                        </button>
+                        <button type="button" id="generateTestDataBtn"
+                                class="w-full inline-flex items-center justify-center px-4 py-3 border border-gray-600 rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                            <i class="fas fa-magic mr-2"></i>
+                            Generate Test Data
+                        </button>
+                        <button type="button" id="clearFormBtn"
+                                class="w-full inline-flex items-center justify-center px-4 py-3 border border-gray-600 rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                            <i class="fas fa-redo mr-2"></i>
+                            Reset Form
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Validation Status -->
+            <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-lg font-semibold text-white">Status Validasi</h3>
+                </div>
+                <div class="p-6">
+                    <div id="validationStatus">
+                        <div class="flex items-center text-yellow-400">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <span class="text-sm">Isi form untuk melihat status validasi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-white flex items-center">
+                    <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                    Berhasil!
+                </h3>
+                <button type="button" onclick="closeSuccessModal()"
+                        class="text-gray-400 hover:text-white transition-colors duration-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6 text-center">
+            <div class="mb-4">
+                <i class="fas fa-user-check text-green-400 text-4xl"></i>
+            </div>
+            <h4 class="text-lg font-semibold text-white mb-2">Pelanggan berhasil ditambahkan</h4>
+            <p class="text-gray-400" id="successMessage"></p>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-700 flex justify-end space-x-3">
+            <button type="button" onclick="closeSuccessModal()"
+                    class="px-4 py-2 border border-gray-600 rounded-lg text-gray-300 bg-gray-700 hover:bg-gray-600 hover:text-white transition-colors duration-200">
+                <i class="fas fa-times mr-2"></i>
+                Tutup
+            </button>
+            <button type="button" id="addServiceBtn"
+                    class="px-4 py-2 border border-transparent rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+                <i class="fas fa-plus mr-2"></i>
+                Tambah Layanan
+            </button>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer', { scripts: ['/public/js/customers-create.js'] }) %>

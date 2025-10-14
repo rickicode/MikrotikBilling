@@ -1,0 +1,1050 @@
+const { v4: uuidv4 } = require('uuid');
+const AuthMiddleware = require('../middleware/auth');
+const { db } = require('../database/DatabaseManager');
+
+async function pppoeRoutes(fastify, options) {
+  const auth = new AuthMiddleware(fastify);
+
+  // PPPoE users list
+  fastify.get('/', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = 20;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+      const customerId = request.query.customer_id || '';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (p.username LIKE ? OR p.password LIKE ? OR c.nama LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status === 'active') {
+        whereClause += ' AND p.status = "active"';
+      } else if (status === 'disabled') {
+        whereClause += ' AND p.status = "disabled"';
+      }
+
+      if (customerId) {
+        whereClause += ' AND p.customer_id = ?';
+        params.push(customerId);
+      }
+
+      db.query('
+        SELECT p.*, c.nama as customer_name, c.nomor_hp as customer_phone,
+               pr.name as profile_name, pr.time_limit as duration_hours,
+               COALESCE(p.mikrotik_synced, 0) as mikrotik_synced
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN profiles pr ON p.profile_id = pr.id
+        ${whereClause}
+        ORDER BY p.created_at DESC
+        LIMIT ? OFFSET ?
+      ', [...params, limit, offset]);
+
+      const total = fastify.db.get(`
+        SELECT COUNT(*) as count FROM pppoe_users p
+        ${whereClause}
+      `, params).count;
+
+      // Get real-time status from Mikrotik
+      let mikrotikStatus = {};
+      try {
+        const mikrotikUsers = await fastify.mikrotik.getPPPoESecrets();
+        const activeSessions = await fastify.mikrotik.getPPPoEActive();
+
+        mikrotikUsers.forEach(user => {
+          mikrotikStatus[user.name] = {
+            disabled: user.disabled === 'true',
+            uptime: user.uptime,
+            bytesIn: user['bytes-in'],
+            bytesOut: user['bytes-out'],
+            activeSession: activeSessions.find(s => s.name === user.name)
+          };
+        });
+      } catch (error) {
+        console.error('Error getting Mikrotik status:', error);
+      }
+
+      // Get profiles for filter dropdown
+      db.query('
+        SELECT id, name, price_sell, time_limit as duration_hours
+        FROM profiles
+        WHERE type = 'pppoe'
+        ORDER BY name
+      ');
+
+      return reply.view('pppoe/index', {
+        admin: request.admin,
+        users,
+        mikrotikStatus,
+        profiles,
+        pagination: {
+          current: page,
+          total: Math.ceil(total / limit),
+          from: offset + 1,
+          to: Math.min(offset + limit, total),
+          total
+        },
+        search,
+        status,
+        customerId
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Create PPPoE user form
+  fastify.get('/create', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      // Get customers
+      const customers = db.query(
+        'SELECT id, nama, nomor_hp FROM customers WHERE status_aktif = 1 ORDER BY nama'
+      );
+
+      // Get profiles from different sources with fallback
+      let profiles = [];
+      let localProfiles = [];
+
+      try {
+        // Try to get PPP profiles from Mikrotik first
+        const mikrotikProfiles = await fastify.mikrotik.getPPPProfiles();
+        console.log('Mikrotik PPP profiles:', mikrotikProfiles);
+
+        // Filter profiles with system comment
+        profiles = mikrotikProfiles.filter(p => p.comment && p.comment.includes('PPPOE_SYSTEM'));
+        console.log('Filtered system profiles:', profiles);
+      } catch (error) {
+        console.warn('Error getting Mikrotik PPP profiles:', error.message);
+      }
+
+      // Fallback to local database profiles if no Mikrotik profiles found
+      if (profiles.length === 0) {
+        try {
+          localProfiles = db.query('
+            SELECT * FROM profiles
+            WHERE type = 'pppoe'
+            ORDER BY name
+          ');
+          console.log('Local database profiles:', localProfiles);
+
+          // Convert local profiles to match template expectations
+          profiles = localProfiles.map(p => ({
+            name: p.name,
+            id: p.id,
+            price_sell: p.price_sell,
+            price_cost: p.price_cost,
+            duration_days: Math.floor((p.time_limit || 720) / 24) || 30,
+            comment: p.mikrotik_comment || `PPPOE_SYSTEM|${p.price_sell}|${p.price_cost}|${Math.floor((p.time_limit || 720) / 24) || 30}`
+          }));
+        } catch (error) {
+          console.warn('Error getting local profiles:', error.message);
+        }
+      }
+
+      console.log('Final profiles for template:', profiles);
+
+      return reply.view('pppoe/create', {
+        admin: request.admin,
+        customers,
+        profiles,
+        localProfiles,
+        formatCurrency: (amount) => {
+          return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+          }).format(amount || 0);
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.view('pppoe/create', {
+        admin: request.admin,
+        customers: [],
+        profiles: [],
+        localProfiles: [],
+        formatCurrency: (amount) => {
+          return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+          }).format(amount || 0);
+        },
+        error: 'Failed to load data'
+      });
+    }
+  });
+
+  // Create PPPoE user
+  fastify.post('/', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+
+    const { customer_id, profile_id, username, password, start_date, duration_days, custom_price_sell, custom_price_cost } = request.body;
+
+    try {
+      // Validate customer exists
+      const customer = db.getOne('customers', {'id':'customer_id'});
+
+      if (!customer) {
+        return reply.view('pppoe/create', {
+          admin: request.admin,
+          customers: [],
+          profiles: [],
+          localProfiles: [],
+          formatCurrency: (amount) => {
+            return new Intl.NumberFormat('id-ID', {
+              style: 'currency',
+              currency: 'IDR',
+              minimumFractionDigits: 0
+            }).format(amount || 0);
+          },
+          error: 'Customer not found'
+        });
+      }
+
+      // Get profile details
+      const profile = db.getOne('profiles', {'id':'profile_id'});
+
+      if (!profile) {
+        return reply.view('pppoe/create', {
+          admin: request.admin,
+          customers: [],
+          profiles: [],
+          localProfiles: [],
+          formatCurrency: (amount) => {
+            return new Intl.NumberFormat('id-ID', {
+              style: 'currency',
+              currency: 'IDR',
+              minimumFractionDigits: 0
+            }).format(amount || 0);
+          },
+          error: 'Profile not found'
+        });
+      }
+
+      // Generate username if not provided
+      const finalUsername = username || generatePPPoEUsername(customer.nama);
+      const finalPassword = password || generatePPPoEPassword();
+
+      // Calculate expiry date
+      const startDate = start_date ? new Date(start_date) : new Date();
+      const duration = duration_days || Math.floor((profile.time_limit || 720) / 24) || 30;
+      const expiryDate = new Date(startDate);
+      expiryDate.setDate(expiryDate.getDate() + duration);
+
+      // Calculate pricing
+      const priceSell = custom_price_sell || profile.price_sell;
+      const priceCost = custom_price_cost || profile.price_cost;
+
+      // Create PPPoE user in database
+      const result = fastify.db.run(`
+        INSERT INTO pppoe_users (
+          customer_id, profile_id, username, password,
+          price_sell, price_cost, start_date, expiry_date,
+          status, mikrotik_user
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+      `, [
+        customer_id, profile_id, finalUsername, finalPassword,
+        priceSell, priceCost, startDate.toISOString().split('T')[0],
+        expiryDate.toISOString().split('T')[0], finalUsername
+      ]);
+
+      // Create PPP secret in Mikrotik
+      const commentData = {
+        system: 'pppoe',
+        customer_id: customer_id,
+        price_sell: priceSell,
+        price_cost: priceCost,
+        expiry_date: expiryDate.toISOString().split('T')[0],
+        subscription_type: 'subscription',
+        created_by_system: true,
+        created_by: request.admin.username,
+        customer_name: customer.nama,
+        customer_phone: customer.nomor_hp
+      };
+
+      try {
+        const mikrotikUser = await fastify.mikrotik.createPPPoESecret({
+          username: finalUsername,
+          password: finalPassword,
+          profile: profile.mikrotik_name,
+          comment: commentData
+        });
+
+        // Update with Mikrotik reference
+        fastify.db.run(`
+          UPDATE pppoe_users
+          SET mikrotik_user = ?
+          WHERE id = ?
+        `, [mikrotikUser['ret'] || finalUsername, result.lastInsertRowid]);
+
+      } catch (error) {
+        console.error('Failed to create Mikrotik PPPoE user:', error);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_pppoe_user',
+        'pppoe_user',
+        result.lastInsertRowid,
+        {
+          username: finalUsername,
+          customer_id: customer_id,
+          profile_id: profile_id,
+          expiry_date: expiryDate.toISOString().split('T')[0]
+        },
+        request
+      );
+
+      // Send notification to customer
+      if (customer.nomor_hp) {
+        const whatsappService = fastify.whatsappService;
+        await whatsappService.sendNotification(customer_id, 'pppoe_created', {
+          customer_name: customer.nama,
+          username: finalUsername,
+          password: finalPassword,
+          expiry_date: expiryDate.toLocaleDateString('id-ID'),
+          profile: profile.name
+        });
+      }
+
+      // Log transaction
+      fastify.db.run(`
+        INSERT INTO transaction_logs (customer_id, type, description, amount)
+        VALUES (?, 'pppoe_created', ?, ?)
+      `, [customer_id, `PPPoE user created: ${finalUsername}`, priceSell]);
+
+      return reply.redirect('/pppoe?success=PPPoE user created successfully');
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.view('pppoe/create', {
+        admin: request.admin,
+        customers: [],
+        profiles: [],
+        localProfiles: [],
+        formatCurrency: (amount) => {
+          return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+          }).format(amount || 0);
+        },
+        error: 'Failed to create PPPoE user'
+      });
+    }
+  });
+
+  // Batch create PPPoE users
+  fastify.post('/batch', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { customer_id, profile_id, quantity, prefix, start_date, duration_days } = request.body;
+
+    try {
+      // Validate customer exists
+      const customer = db.getOne('customers', {'id':'customer_id'});
+
+      if (!customer) {
+        return reply.code(400).send('Customer not found');
+      }
+
+      // Get profile details
+      const profile = db.getOne('profiles', {'id':'profile_id'});
+
+      if (!profile) {
+        return reply.code(400).send('Profile not found');
+      }
+
+      // Calculate dates
+      const startDate = start_date ? new Date(start_date) : new Date();
+      const duration = duration_days || Math.floor((profile.time_limit || 720) / 24) || 30;
+      const expiryDate = new Date(startDate);
+      expiryDate.setDate(expiryDate.getDate() + duration);
+
+      const createdUsers = [];
+
+      for (let i = 0; i < quantity; i++) {
+        const username = prefix ? `${prefix}${i + 1}` : generatePPPoEUsername(customer.nama, i + 1);
+        const password = generatePPPoEPassword();
+
+        // Create in database
+        const result = fastify.db.run(`
+          INSERT INTO pppoe_users (
+            customer_id, profile_id, username, password,
+            price_sell, price_cost, start_date, expiry_date,
+            status, mikrotik_user
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+        `, [
+          customer_id, profile_id, username, password,
+          profile.price_sell, profile.price_cost,
+          startDate.toISOString().split('T')[0],
+          expiryDate.toISOString().split('T')[0], username
+        ]);
+
+        // Create in Mikrotik
+        const commentData = {
+          system: 'pppoe',
+          customer_id: customer_id,
+          price_sell: profile.price_sell,
+          price_cost: profile.price_cost,
+          expiry_date: expiryDate.toISOString().split('T')[0],
+          subscription_type: 'subscription',
+          created_by_system: true,
+          created_by: request.admin.username,
+          batch_index: i + 1
+        };
+
+        try {
+          await fastify.mikrotik.createPPPoESecret({
+            username: username,
+            password: password,
+            profile: profile.mikrotik_name,
+            comment: commentData
+          });
+        } catch (error) {
+          console.error(`Failed to create Mikrotik user ${username}:`, error);
+        }
+
+        createdUsers.push({
+          username,
+          password,
+          expiry_date: expiryDate.toISOString().split('T')[0]
+        });
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_pppoe_batch',
+        'pppoe_batch',
+        null,
+        {
+          customer_id: customer_id,
+          profile_id: profile_id,
+          quantity,
+          created_users: createdUsers.length
+        },
+        request
+      );
+
+      return reply.send({
+        success: true,
+        created_users: createdUsers,
+        total_cost: profile.price_cost * quantity,
+        total_revenue: profile.price_sell * quantity
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // PPPoE user details
+  fastify.get('/:id', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const user = fastify.db.get(`
+        SELECT p.*, c.nama as customer_name, c.nomor_hp as customer_phone,
+               pr.name as profile_name, pr.time_limit as duration_hours
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN profiles pr ON p.profile_id = pr.id
+        WHERE p.id = ?
+      `, [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send('PPPoE user not found');
+      }
+
+      // Get Mikrotik user info
+      let mikrotikUser = null;
+      let activeSession = null;
+      try {
+        const mikrotikUsers = await fastify.mikrotik.getPPPoESecrets();
+        mikrotikUser = mikrotikUsers.find(u => u.name === user.username);
+
+        if (mikrotikUser) {
+          const activeSessions = await fastify.mikrotik.getPPPoEActive();
+          activeSession = activeSessions.find(s => s.name === user.username);
+        }
+      } catch (error) {
+        console.error('Error getting Mikrotik user info:', error);
+      }
+
+      // Get usage statistics
+      const stats = {
+        totalSessions: db.query('SELECT COUNT(*) as count FROM pppoe_usage_logs WHERE pppoe_user_id = ?', [request.params.id]).count,
+        totalDataUsed: db.query('SELECT COALESCE(SUM(bytes_in + bytes_out), 0) as total FROM pppoe_usage_logs WHERE pppoe_user_id = ?', [request.params.id]).total,
+        lastSession: fastify.db.get(`
+          SELECT * FROM pppoe_usage_logs
+          WHERE pppoe_user_id = ?
+          ORDER BY session_end DESC
+          LIMIT 1
+        `, [request.params.id])
+      };
+
+      return reply.view('pppoe/show', {
+        admin: request.admin,
+        user,
+        mikrotikUser,
+        activeSession,
+        stats
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Update PPPoE user
+  fastify.post('/:id', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { status, expiry_date, profile_id } = request.body;
+
+    try {
+      const user = db.getOne('pppoe_users', {'id':'request.params.id'});
+
+      if (!user) {
+        return reply.code(404).send('PPPoE user not found');
+      }
+
+      // Update in database
+      await db.update('pppoe_users', {'status':'status'}, {});
+
+      // Update in Mikrotik
+      try {
+        const updates = {};
+        if (status === 'disabled') {
+          updates.disabled = 'yes';
+        } else if (status === 'active') {
+          updates.disabled = 'no';
+        }
+
+        if (profile_id && profile_id !== user.profile_id) {
+          const newProfile = db.query('SELECT mikrotik_name FROM profiles WHERE id = ?', [profile_id]);
+          if (newProfile) {
+            updates.profile = newProfile.mikrotik_name;
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await fastify.mikrotik.updatePPPoESecret(user.username, updates);
+        }
+      } catch (error) {
+        console.error('Error updating Mikrotik user:', error);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_pppoe_user',
+        'pppoe_user',
+        request.params.id,
+        { old_status: user.status, new_status: status, expiry_date },
+        request
+      );
+
+      return reply.redirect(`/pppoe/${request.params.id}?success=PPPoE user updated successfully`);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect(`/pppoe/${request.params.id}?error=Failed to update PPPoE user`);
+    }
+  });
+
+  // Renew PPPoE user
+  fastify.post('/:id/renew', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { additional_days, payment_method, amount } = request.body;
+
+    try {
+      const user = fastify.db.get(`
+        SELECT p.*, c.nama as customer_name, c.nomor_hp
+        FROM pppoe_users p
+        JOIN customers c ON p.customer_id = c.id
+        WHERE p.id = ?
+      `, [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send('PPPoE user not found');
+      }
+
+      // Calculate new expiry date
+      const currentExpiry = new Date(user.expiry_date);
+      const newExpiry = new Date(currentExpiry);
+      newExpiry.setDate(newExpiry.getDate() + parseInt(additional_days));
+
+      // Update in database
+      fastify.db.run(`
+        UPDATE pppoe_users
+        SET expiry_date = ?, status = 'active', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [newExpiry.toISOString().split('T')[0], request.params.id]);
+
+      // Update in Mikrotik
+      try {
+        const mikrotikUsers = await fastify.mikrotik.getPPPoESecrets();
+        const mikrotikUser = mikrotikUsers.find(u => u.name === user.username);
+
+        if (mikrotikUser) {
+          const commentData = fastify.mikrotik.parseComment(mikrotikUser.comment) || {};
+          commentData.expiry_date = newExpiry.toISOString().split('T')[0];
+          commentData.renewed_by = request.admin.username;
+          commentData.renewed_date = new Date().toISOString().split('T')[0];
+
+          await fastify.mikrotik.updatePPPoESecret(user.username, {
+            comment: fastify.mikrotik.formatComment(commentData),
+            disabled: 'no'
+          });
+        }
+      } catch (error) {
+        console.error('Error updating Mikrotik user:', error);
+      }
+
+      // Record payment
+      if (amount && payment_method) {
+        fastify.db.run(`
+          INSERT INTO payments (customer_id, amount, payment_method, payment_status, description)
+          VALUES (?, ?, ?, 'paid', ?)
+        `, [user.customer_id, amount, payment_method, `PPPoE renewal: ${user.username}`]);
+
+        // Log transaction
+        fastify.db.run(`
+          INSERT INTO transaction_logs (customer_id, type, description, amount)
+          VALUES (?, 'payment', ?, ?)
+        `, [user.customer_id, `PPPoE renewal payment: ${user.username}`, amount]);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'renew_pppoe_user',
+        'pppoe_user',
+        request.params.id,
+        {
+          username: user.username,
+          additional_days,
+          new_expiry_date: newExpiry.toISOString().split('T')[0],
+          payment_method,
+          amount
+        },
+        request
+      );
+
+      // Send notification
+      if (user.nomor_hp) {
+        const whatsappService = fastify.whatsappService;
+        await whatsappService.sendNotification(user.customer_id, 'pppoe_renewed', {
+          customer_name: user.customer_name,
+          username: user.username,
+          new_expiry_date: newExpiry.toLocaleDateString('id-ID'),
+          additional_days
+        });
+      }
+
+      return reply.redirect(`/pppoe/${request.params.id}?success=PPPoE user renewed successfully`);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect(`/pppoe/${request.params.id}?error=Failed to renew PPPoE user`);
+    }
+  });
+
+  // Reset PPPoE user password
+  fastify.post('/:id/reset-password', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const user = fastify.db.get(`
+        SELECT p.*, c.nama as customer_name, c.nomor_hp
+        FROM pppoe_users p
+        JOIN customers c ON p.customer_id = c.id
+        WHERE p.id = ?
+      `, [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send('PPPoE user not found');
+      }
+
+      const newPassword = generatePPPoEPassword();
+
+      // Update in database
+      await db.update('pppoe_users', {'pass':'newPassword'}, {});
+
+      // Update in Mikrotik
+      try {
+        await fastify.mikrotik.updatePPPoESecret(user.username, {
+          password: newPassword
+        });
+      } catch (error) {
+        console.error('Error updating Mikrotik password:', error);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'reset_pppoe_password',
+        'pppoe_user',
+        request.params.id,
+        { username: user.username },
+        request
+      );
+
+      // Send notification with new password
+      if (user.nomor_hp) {
+        const whatsappService = fastify.whatsappService;
+        await whatsappService.sendNotification(user.customer_id, 'pppoe_password_reset', {
+          customer_name: user.customer_name,
+          username: user.username,
+          new_password: newPassword
+        });
+      }
+
+      return reply.redirect(`/pppoe/${request.params.id}?success=Password reset successfully`);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect(`/pppoe/${request.params.id}?error=Failed to reset password`);
+    }
+  });
+
+  // Delete PPPoE user
+  fastify.delete('/:id', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const user = db.getOne('pppoe_users', {'id':'request.params.id'});
+
+      if (!user) {
+        return reply.code(404).send('PPPoE user not found');
+      }
+
+      // Delete from Mikrotik
+      try {
+        await fastify.mikrotik.deletePPPoESecret(user.username);
+      } catch (error) {
+        console.error('Error deleting from Mikrotik:', error);
+      }
+
+      // Delete from database
+      await db.delete('pppoe_users', {'id':'request.params.id'});
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'delete_pppoe_user',
+        'pppoe_user',
+        request.params.id,
+        { username: user.username },
+        request
+      );
+
+      return reply.send({ success: true });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // API endpoint for getting PPPoE users
+  fastify.get('/api/pppoe', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = parseInt(request.query.page_size) || 20;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+      const customerId = request.query.customer_id || '';
+      const sync = request.query.sync === 'true';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (p.username LIKE ? OR p.password LIKE ? OR c.nama LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status === 'active') {
+        whereClause += ' AND p.status = "active"';
+      } else if (status === 'disabled') {
+        whereClause += ' AND p.status = "disabled"';
+      } else if (status === 'expired') {
+        whereClause += ' AND p.status = "expired"';
+      }
+
+      if (customerId) {
+        whereClause += ' AND p.customer_id = ?';
+        params.push(customerId);
+      }
+
+      db.query('
+        SELECT p.*, c.nama as customer_nama, c.nomor_hp as customer_nomor_hp, c.email as customer_email,
+               pr.name as profile_name, pr.time_limit as duration_hours,
+               COALESCE(p.mikrotik_synced, 0) as mikrotik_synced
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN profiles pr ON p.profile_id = pr.id
+        ${whereClause}
+        ORDER BY p.created_at DESC
+        LIMIT ? OFFSET ?
+      ', [...params, limit, offset]);
+
+      const total = fastify.db.get(`
+        SELECT COUNT(*) as count FROM pppoe_users p
+        ${whereClause}
+      `, params).count;
+
+      // Get real-time status from Mikrotik if sync is requested
+      let mikrotikStatus = {};
+      if (sync) {
+        try {
+          const mikrotikUsers = await fastify.mikrotik.getPPPoESecrets();
+          const activeSessions = await fastify.mikrotik.getPPPoEActive();
+
+          mikrotikUsers.forEach(user => {
+            mikrotikStatus[user.name] = {
+              disabled: user.disabled === 'true',
+              uptime: user.uptime,
+              bytesIn: user['bytes-in'],
+              bytesOut: user['bytes-out'],
+              activeSession: activeSessions.find(s => s.name === user.name)
+            };
+          });
+        } catch (error) {
+          console.error('Error getting Mikrotik status:', error);
+        }
+      }
+
+      // Calculate statistics
+      const stats = fastify.db.get(`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+          COUNT(CASE WHEN status = 'expired' THEN 1 END) as expired,
+          COUNT(CASE WHEN COALESCE(mikrotik_synced, 0) = 1 THEN 1 END) as synced
+        FROM pppoe_users
+      `);
+
+      // Update sync status if Mikrotik status available
+      if (sync && Object.keys(mikrotikStatus).length > 0) {
+        for (const user of users) {
+          const mikrotikInfo = mikrotikStatus[user.username];
+          if (mikrotikInfo) {
+            // Update sync status in database
+            await db.update('pppoe_users', {'mik':'mikrotikInfo.disabled === 'true' ? 'disabled' : 'active''}, {});
+            
+            user.mikrotik_synced = 1;
+            user.is_online = !!mikrotikInfo.activeSession;
+          } else {
+            user.mikrotik_synced = 0;
+            user.is_online = false;
+          }
+        }
+      }
+
+      const pppoe_users = users.map(user => ({
+        ...user,
+        mikrotik_synced: Boolean(user.mikrotik_synced),
+        is_online: Boolean(user.is_online)
+      }));
+
+      // Get profiles for filter dropdown
+      db.query('
+        SELECT id, name, price_sell, time_limit as duration_hours
+        FROM profiles
+        WHERE type = 'pppoe'
+        ORDER BY name
+      ');
+
+      const pagination = {
+        page,
+        total_pages: Math.ceil(total / limit),
+        from: offset + 1,
+        to: Math.min(offset + limit, total),
+        total
+      };
+
+      return reply.send({
+        success: true,
+        pppoe_users,
+        pagination,
+        statistics: {
+          total: stats.total,
+          active: stats.active,
+          expired: stats.expired,
+          online: pppoe_users.filter(u => u.is_online).length,
+          synced: stats.synced
+        },
+        mikrotikStatus,
+        profiles
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        success: false,
+        error: 'Internal Server Error'
+      });
+    }
+  });
+
+  // API endpoint for creating PPPoE users
+  fastify.post('/api/pppoe', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { customer_id, profile_id, username, password, start_date, duration, price_sell, price_cost, notes } = request.body;
+
+    try {
+      // Validate required fields
+      if (!customer_id || !profile_id || !username || !password) {
+        return reply.code(400).send({
+          error: 'Customer, profile, username, and password are required'
+        });
+      }
+
+      // Validate customer exists
+      const customer = db.getOne('customers', {'id':'customer_id'});
+      if (!customer) {
+        return reply.code(404).send({
+          error: 'Customer not found'
+        });
+      }
+
+      // Get profile details
+      const profile = db.getOne('profiles', {'id':'profile_id'});
+      if (!profile) {
+        return reply.code(404).send({
+          error: 'Profile not found'
+        });
+      }
+
+      // Check if username already exists
+      const existingUser = db.getOne('pppoe_users', {'username':'username'});
+      if (existingUser) {
+        return reply.code(400).send({
+          error: 'Username already exists'
+        });
+      }
+
+      // Calculate dates
+      const startDate = start_date ? new Date(start_date) : new Date();
+      const duration_days = duration || Math.floor((profile.duration_hours || 720) / 24) || 30;
+      const expiryDate = new Date(startDate);
+      expiryDate.setDate(expiryDate.getDate() + parseInt(duration_days));
+
+      // Create in database
+      const result = fastify.db.run(`
+        INSERT INTO pppoe_users (
+          customer_id, profile_id, username, password,
+          price_sell, price_cost, start_date, expiry_date,
+          status, mikrotik_user
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+      `, [
+        customer_id, profile_id, username, password,
+        price_sell || profile.price_sell, price_cost || profile.price_cost,
+        startDate.toISOString().split('T')[0], expiryDate.toISOString().split('T')[0],
+        username
+      ]);
+
+      // Create in Mikrotik
+      try {
+        const mikrotikProfile = profile.mikrotik_name || profile.name;
+        const commentData = {
+          system: 'pppoe',
+          customer_id: customer_id,
+          customer_name: customer.nama,
+          price_sell: price_sell || profile.price_sell,
+          price_cost: price_cost || profile.price_cost,
+          expiry_date: expiryDate.toISOString().split('T')[0],
+          created_by: request.admin.username,
+          created_date: new Date().toISOString()
+        };
+
+        await fastify.mikrotik.createPPPoESecret({
+          username: username,
+          password: password,
+          profile: mikrotikProfile,
+          comment: commentData
+        });
+      } catch (error) {
+        console.error('Error creating Mikrotik PPPoE secret:', error);
+        // Continue even if Mikrotik creation fails
+      }
+
+      // Get created user
+      const createdUser = fastify.db.get(`
+        SELECT p.*, c.nama as customer_name
+        FROM pppoe_users p
+        JOIN customers c ON p.customer_id = c.id
+        WHERE p.id = ?
+      `, [result.lastInsertRowid]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_pppoe_user',
+        'pppoe_user',
+        result.lastInsertRowid,
+        {
+          username,
+          customer_id,
+          profile_id,
+          price_sell: price_sell || profile.price_sell,
+          price_cost: price_cost || profile.price_cost
+        },
+        request
+      );
+
+      return reply.code(201).send({
+        success: true,
+        username: createdUser.username,
+        password: createdUser.password,
+        customer_name: createdUser.customer_name,
+        expiry_date: createdUser.expiry_date,
+        message: 'PPPoE user created successfully'
+      });
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        error: 'Failed to create PPPoE user'
+      });
+    }
+  });
+}
+
+// Helper functions
+function generatePPPoEUsername(customerName, index = 1) {
+  const cleanName = customerName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const timestamp = Date.now().toString().slice(-4);
+  return `${cleanName}${timestamp}${index}`;
+}
+
+function generatePPPoEPassword() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let password = '';
+  for (let i = 0; i < 8; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+module.exports = pppoeRoutes;

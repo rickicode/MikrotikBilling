@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Print Voucher</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        /* A4 Template Styles - Based on your example structure */
+        .a4-template {
+            font-family: 'Courier New', monospace;
+            margin: 2px;
+            background: #ffffff;
+            font-size: 9px;
+        }
+        .a4-template .voucher-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            max-width: 210mm;
+            margin: 0 auto;
+        }
+        .a4-template .voucher {
+            width: 145px;
+            border: 1px solid #000;
+            page-break-inside: avoid;
+            background: #ffffff;
+        }
+        .a4-template .voucher table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .a4-template .voucher td {
+            padding: 1px;
+            border: none;
+            line-height: 1.1;
+        }
+        .a4-template .rotate {
+            font-weight: bold;
+            border-right: 1px solid black;
+            background-color: #ffea8f;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            width: 20px;
+            height: 80px;
+        }
+        .a4-template .rotate span {
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            display: block;
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.2;
+            padding: 5px 2px;
+        }
+        .a4-template .company-header {
+            font-weight: bold;
+            font-size: 12px;
+            padding-left: 5px;
+            background: #FBA1B7;
+            color: white;
+            text-align: center;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .a4-template .company-name {
+            text-align: left;
+        }
+        .a4-template .voucher-number {
+            text-align: right;
+            font-size: 9px;
+        }
+        .a4-template .voucher-code {
+            width: 100%;
+            font-weight: 600;
+            font-size: 18px;
+            text-align: center;
+        }
+        .a4-template .duration {
+            font-size: 11px;
+            padding-right: 5px;
+            text-align: end;
+            background: #FFECAF;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .a4-template .validity {
+            font-size: 11px;
+            padding-right: 5px;
+            text-align: end;
+            background: #FFECAF;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* Thermal Template Styles */
+        .thermal-template {
+            font-family: 'Courier New', monospace;
+            margin: 5px;
+            padding: 5px;
+            width: 80mm;
+            background: white;
+        }
+        .thermal-template .voucher {
+            border-bottom: 1px dashed #000;
+            padding: 10px 0;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .thermal-template .header {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .thermal-template .code {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 5px;
+            margin: 8px 0;
+            letter-spacing: 2px;
+        }
+        .thermal-template .info {
+            font-size: 10px;
+            margin: 3px 0;
+        }
+        .thermal-template .price {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .thermal-template .separator {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+
+        /* Print Styles - Optimized for maximum voucher density */
+        @media print {
+            @page {
+                size: A4;
+                margin: 5mm 3mm 5mm 3mm;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+                background: white;
+            }
+            .a4-template {
+                margin: 0;
+                padding: 0;
+            }
+            .a4-template .voucher-container {
+                gap: 1px;
+            }
+            .a4-template .voucher {
+                height: 62px;
+                overflow: hidden;
+                border-collapse: collapse;
+            }
+            .no-print {
+                display: none !important;
+            }
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+
+        /* Screen Only Styles */
+        @media screen {
+            .print-controls {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                z-index: 1000;
+                background: white;
+                padding: 10px;
+                border-radius: 5px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <% if (templateType === 'a4') { %>
+        <!-- A4 Template -->
+        <div class="a4-template">
+            <div class="voucher-container">
+                <% vouchers.forEach((voucher, index) => { %>
+                    <div class="voucher">
+                        <table>
+                            <tr>
+                                <td class="rotate" rowspan="4"><span>Rp <%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %></span></td>
+                                <td class="company-header" colspan="2">
+                                    <span class="company-name"><%= settings.company_name || 'WiFi Hotspot' %></span>
+                                    <span class="voucher-number">[<%= index + 1 %>]</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="voucher-code" colspan="2"><%= voucher.voucher_code %></td>
+                            </tr>
+                            <tr>
+                                <td class="duration" colspan="2">Durasi: <%= Math.floor(voucher.duration_hours / 24) %> Hari</td>
+                            </tr>
+                            <tr>
+                                <td class="validity" colspan="2">Valid: <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %></td>
+                            </tr>
+                        </table>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    <% } else if (templateType === 'thermal') { %>
+        <!-- Thermal Template -->
+        <div class="thermal-template">
+            <% vouchers.forEach((voucher, index) => { %>
+                <div class="voucher">
+                    <div class="header"><%= settings.company_name || 'WiFi Hotspot' %></div>
+                    <div class="code"><%= voucher.voucher_code %></div>
+                    <div class="info">Profile: <%= voucher.profile_name %></div>
+                    <div class="info">Duration: <%= Math.floor(voucher.duration_hours / 24) %> Hari</div>
+                    <div class="info">Created: <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %></div>
+                    <div class="price">Price: <%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %></div>
+                    <% if (index < vouchers.length - 1) { %>
+                        <div class="separator"></div>
+                    <% } %>
+                </div>
+            <% }); %>
+        </div>
+    <% } %>
+
+    <!-- Print Controls (Screen Only) -->
+    <div class="print-controls no-print">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.close()">
+                <i class="bi bi-x"></i> Close
+            </button>
+        </div>
+        <div class="mt-2">
+            <small class="text-muted">
+                <%= vouchers.length %> Voucher(s) | Total: <%= formatCurrency(totalRevenue) %> |
+                Template: <%= templateType.toUpperCase() %>
+            </small>
+        </div>
+    </div>
+
+    <% if (auto_print) { %>
+        <script>
+            // Auto print when page loads
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            });
+        </script>
+    <% } %>
+</body>
+</html>

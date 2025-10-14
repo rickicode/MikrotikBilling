@@ -1,0 +1,1133 @@
+const { v4: uuidv4 } = require('uuid');
+const AuthMiddleware = require('../middleware/auth');
+const { db } = require('../database/DatabaseManager');
+
+async function customerRoutes(fastify, options) {
+  const auth = new AuthMiddleware(fastify);
+
+  // Customer list
+  fastify.get('/', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = 20;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (nama ILIKE $1 OR nomor_hp ILIKE $1 OR email ILIKE $1)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status === 'active') {
+        whereClause += ' AND status_aktif = true';
+      } else if (status === 'inactive') {
+        whereClause += ' AND status_aktif = false';
+      }
+
+      const customers = await db.query(`
+        SELECT c.*,
+               COUNT(DISTINCT s.id) as subscription_count,
+               COALESCE(SUM(p.amount), 0) as total_payments
+        FROM customers c
+        LEFT JOIN subscriptions s ON c.id = s.customer_id
+        LEFT JOIN payments p ON c.id = p.customer_id AND p.payment_status = 'paid'
+        ${whereClause}
+        GROUP BY c.id
+        ORDER BY c.created_at DESC
+        LIMIT $1 OFFSET $2
+      `, [...params, limit, offset]);
+
+      const totalQuery = await db.query(`
+        SELECT COUNT(*) as count FROM customers c
+        ${whereClause}
+      `, params);
+      const total = parseInt(totalQuery[0].count);
+
+      return reply.view('customers/index', {
+        admin: request.admin,
+        customers,
+        pagination: {
+          current: page,
+          total: Math.ceil(total / limit),
+          from: offset + 1,
+          to: Math.min(offset + limit, total),
+          total
+        },
+        search,
+        status
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Create customer form
+  fastify.get('/create', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    return reply.view('customers/create', {
+      admin: request.admin,
+      customer: {}
+    });
+  });
+
+  // Create customer
+  fastify.post('/', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { nama, nomor_hp, email, status_aktif = true } = request.body;
+
+    try {
+      // Validate phone number format - more permissive for international formats
+      if (!nomor_hp || !/^\+?[\d\s\-\(\)]{6,}$/.test(nomor_hp)) {
+        return reply.view('customers/create', {
+          admin: request.admin,
+          customer: { nama, nomor_hp, email, status_aktif },
+          error: 'Format nomor HP tidak valid'
+        });
+      }
+
+      // Check if phone number already exists
+      const existing = await db.getOne(
+        'SELECT id FROM customers WHERE nomor_hp = $1',
+        [nomor_hp]
+      );
+
+      if (existing) {
+        return reply.view('customers/create', {
+          admin: request.admin,
+          customer: { nama, nomor_hp, email, status_aktif },
+          error: 'Phone number already registered'
+        });
+      }
+
+      // Create customer
+      const result = await db.insert('customers', {
+        nama,
+        nomor_hp,
+        email,
+        status_aktif
+      });
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_customer',
+        'customer',
+        result[0].id,
+        { nama, nomor_hp, email },
+        request
+      );
+
+      return reply.redirect('/customers?success=Customer created successfully');
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.view('customers/create', {
+        admin: request.admin,
+        customer: { nama, nomor_hp, email, status_aktif },
+        error: 'Failed to create customer'
+      });
+    }
+  });
+
+  // Edit customer form
+  fastify.get('/:id/edit', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [request.params.id]
+      );
+
+      if (!customer) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      return reply.view('customers/edit', {
+        admin: request.admin,
+        customer
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Update customer
+  fastify.post('/:id', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { nama, nomor_hp, email, status_aktif } = request.body;
+    const customerId = request.params.id;
+
+    try {
+      // Check if customer exists
+      const existing = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [customerId]
+      );
+
+      if (!existing) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      // Check if phone number already exists (excluding current customer)
+      const phoneExists = fastify.db.get(
+        'SELECT id FROM customers WHERE nomor_hp = ? AND id != ?',
+        [nomor_hp, customerId]
+      );
+
+      if (phoneExists) {
+        return reply.view('customers/edit', {
+          admin: request.admin,
+          customer: { id: customerId, nama, nomor_hp, email, status_aktif },
+          error: 'Phone number already registered'
+        });
+      }
+
+      // Update customer
+      await db.update('customers', {
+        nama,
+        nomor_hp,
+        email,
+        status_aktif,
+        updated_at: new Date()
+      }, { id: customerId });
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_customer',
+        'customer',
+        customerId,
+        { old_data: existing, new_data: { nama, nomor_hp, email, status_aktif } },
+        request
+      );
+
+      return reply.redirect('/customers?success=Customer updated successfully');
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.view('customers/edit', {
+        admin: request.admin,
+        customer: { id: customerId, nama, nomor_hp, email, status_aktif },
+        error: 'Failed to update customer'
+      });
+    }
+  });
+
+  // Customer details
+  fastify.get('/:id', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [request.params.id]
+      );
+
+      if (!customer) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      // Get subscriptions
+      const subscriptions = await db.query(`
+        SELECT s.*,
+               (SELECT COUNT(*) FROM payments WHERE customer_id = ? AND payment_status = 'paid') as payment_count,
+               (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE customer_id = ? AND payment_status = 'paid') as total_paid
+        FROM subscriptions s
+        WHERE s.customer_id = ?
+        ORDER BY s.created_at DESC
+      `, [request.params.id, request.params.id, request.params.id]);
+
+      // Get payment history
+      const payments = await db.query(`
+        SELECT p.*,
+               (SELECT service_type FROM subscriptions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1) as service_type,
+               (SELECT billing_cycle FROM subscriptions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1) as billing_cycle
+        FROM payments p
+        WHERE p.customer_id = ?
+        ORDER BY p.created_at DESC
+        LIMIT 20
+      `, [request.params.id, request.params.id, request.params.id]);
+
+      // Get transaction logs
+      const transactions = await db.query(`
+        SELECT * FROM transaction_logs
+        WHERE customer_id = ?
+        ORDER BY created_at DESC
+        LIMIT 10
+      `, [request.params.id]);
+
+      return reply.view('customers/show', {
+        admin: request.admin,
+        customer,
+        subscriptions,
+        payments,
+        transactions
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Service creation form
+  fastify.get('/:id/services/create', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [request.params.id]
+      );
+
+      if (!customer) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      // Get hotspot profiles
+      const profiles = await db.query(`
+        SELECT * FROM profiles
+        WHERE type = 'hotspot' AND mikrotik_synced = 1
+        ORDER BY name
+      `);
+
+      // Get PPP profiles
+      const pppProfiles = await db.query(`
+        SELECT * FROM profiles
+        WHERE type = 'pppoe' AND mikrotik_synced = 1
+        ORDER BY name
+      `);
+
+      return reply.view('customers/service-create', {
+        admin: request.admin,
+        customer,
+        profiles: profiles || [],
+        pppProfiles: pppProfiles || []
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Create service for customer
+  fastify.post('/:id/services', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const customerId = request.params.id;
+    const { service_type, profile_name, username, password, billing_cycle, auto_renew, price_sell, price_cost } = request.body;
+
+    try {
+      // Check if customer exists
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [customerId]
+      );
+
+      if (!customer) {
+        return reply.code(404).send({ success: false, message: 'Customer not found' });
+      }
+
+      // Get profile information
+      const profile = await db.getOne(
+        'SELECT * FROM profiles WHERE name = ? AND type = ?',
+        [profile_name, service_type]
+      );
+
+      if (!profile) {
+        return reply.code(400).send({ success: false, message: 'Profile not found' });
+      }
+
+      // Calculate expiry date
+      const expiryDate = new Date();
+      if (service_type === 'hotspot') {
+        const duration = parseInt(request.body.duration) || 30;
+        expiryDate.setDate(expiryDate.getDate() + duration);
+      } else {
+        switch (billing_cycle) {
+          case 'weekly':
+            expiryDate.setDate(expiryDate.getDate() + 7);
+            break;
+          case 'monthly':
+            expiryDate.setMonth(expiryDate.getMonth() + 1);
+            break;
+          case 'quarterly':
+            expiryDate.setMonth(expiryDate.getMonth() + 3);
+            break;
+          case 'semiannual':
+            expiryDate.setMonth(expiryDate.getMonth() + 6);
+            break;
+          case 'yearly':
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+            break;
+          default:
+            expiryDate.setMonth(expiryDate.getMonth() + 1);
+        }
+      }
+
+      // Create subscription
+      const subscriptionResult = await db.query(`
+        INSERT INTO subscriptions (
+          customer_id, service_type, profile_name, billing_cycle,
+          auto_renew, price_sell, price_cost, status, expiry_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
+      `, [
+        customerId, service_type, profile_name, billing_cycle || 'onetime',
+        auto_renew ? 1 : 0, price_sell, price_cost,
+        expiryDate.toISOString().split('T')[0]
+      ]);
+
+      // Create user in Mikrotik based on service type
+      if (service_type === 'hotspot') {
+        // Create hotspot user
+        const hotspotUsername = `HS${customerId}${Date.now().toString().slice(-4)}`;
+        const hotspotPassword = Math.random().toString(36).substring(2, 10);
+
+        // TODO: Implement Mikrotik API call to create hotspot user
+        fastify.log.info(`Would create hotspot user: ${hotspotUsername}`);
+      } else if (service_type === 'pppoe') {
+        // Create PPPoE secret
+        // TODO: Implement Mikrotik API call to create PPPoE secret
+        fastify.log.info(`Would create PPPoE user: ${username}/${password}`);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_service',
+        'subscription',
+        subscriptionResult[0].id,
+        {
+          customer_id: customerId,
+          service_type,
+          profile_name,
+          price_sell,
+          expiry_date: expiryDate.toISOString().split('T')[0]
+        },
+        request
+      );
+
+      // Log transaction
+      await db.query(`
+        INSERT INTO transaction_logs (customer_id, type, description, amount)
+        VALUES (?, 'service_creation', ?, ?)
+      `, [customerId, `${service_type.toUpperCase()} service created`, price_sell]);
+
+      return reply.send({
+        success: true,
+        message: 'Layanan berhasil dibuat',
+        subscription_id: subscriptionResult[0].id
+      });
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Gagal membuat layanan'
+      });
+    }
+  });
+
+  // Adjust customer balance
+  fastify.post('/:id/adjust-balance', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const customerId = request.params.id;
+    const { adjust_type, adjust_amount, adjust_note } = request.body;
+
+    try {
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [customerId]
+      );
+
+      if (!customer) {
+        return reply.code(404).send({ success: false, message: 'Customer not found' });
+      }
+
+      const amount = parseFloat(adjust_amount);
+      if (isNaN(amount) || amount <= 0) {
+        return reply.code(400).send({ success: false, message: 'Invalid amount' });
+      }
+
+      // Update balance based on type
+      switch (adjust_type) {
+        case 'credit':
+          await db.query(`
+            UPDATE customers
+            SET credit_balance = credit_balance + ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `, [amount, customerId]);
+          break;
+        case 'debit':
+          if (customer.credit_balance < amount) {
+            return reply.code(400).send({ success: false, message: 'Insufficient credit balance' });
+          }
+          await db.query(`
+            UPDATE customers
+            SET credit_balance = credit_balance - ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `, [amount, customerId]);
+          break;
+        case 'debt':
+          await db.query(`
+            UPDATE customers
+            SET debt_balance = debt_balance + ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `, [amount, customerId]);
+          break;
+        case 'reduce_debt':
+          if (customer.debt_balance < amount) {
+            return reply.code(400).send({ success: false, message: 'Debt amount exceeds current debt' });
+          }
+          await db.query(`
+            UPDATE customers
+            SET debt_balance = debt_balance - ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `, [amount, customerId]);
+          break;
+      }
+
+      // Log transaction
+      await db.query(`
+        INSERT INTO transaction_logs (customer_id, type, description, amount)
+        VALUES (?, 'balance_adjust', ?, ?)
+      `, [customerId, `${adjust_type}: ${adjust_note || 'No note'}`, amount]);
+
+      return reply.send({
+        success: true,
+        message: 'Balance adjusted successfully'
+      });
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Failed to adjust balance'
+      });
+    }
+  });
+
+  // Create subscription for customer
+  fastify.post('/:id/subscription', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const customerId = request.params.id;
+    const { service_type, billing_cycle, auto_renew = 0 } = request.body;
+
+    try {
+      // Check if customer exists
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [customerId]
+      );
+
+      if (!customer) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      // Calculate next billing date
+      const nextBillingDate = new Date();
+      switch (billing_cycle) {
+        case 'daily':
+          nextBillingDate.setDate(nextBillingDate.getDate() + 1);
+          break;
+        case 'weekly':
+          nextBillingDate.setDate(nextBillingDate.getDate() + 7);
+          break;
+        case 'monthly':
+          nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+          break;
+        case 'yearly':
+          nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+          break;
+      }
+
+      // Create subscription
+      const result = await db.query(`
+        INSERT INTO subscriptions (customer_id, service_type, billing_cycle, next_billing_date, auto_renew)
+        VALUES (?, ?, ?, ?, ?)
+      `, [customerId, service_type, billing_cycle, nextBillingDate.toISOString().split('T')[0], auto_renew]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_subscription',
+        'subscription',
+        result[0].id,
+        { customer_id: customerId, service_type, billing_cycle },
+        request
+      );
+
+      // Send notification if customer has phone number
+      if (customer.nomor_hp) {
+        const notificationService = require('../services/NotificationService');
+        await notificationService.sendNotification(customer.id, 'subscription_created', {
+          customer_name: customer.nama,
+          service_type,
+          billing_cycle
+        });
+      }
+
+      return reply.redirect(`/customers/${customerId}?success=Subscription created successfully`);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect(`/customers/${customerId}?error=Failed to create subscription`);
+    }
+  });
+
+  // Update subscription status
+  fastify.post('/subscription/:id/status', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const subscriptionId = request.params.id;
+    const { status } = request.body;
+
+    try {
+      // Check if subscription exists
+      const subscription = await db.getOne(
+        'SELECT * FROM subscriptions WHERE id = ?',
+        [subscriptionId]
+      );
+
+      if (!subscription) {
+        return reply.code(404).send('Subscription not found');
+      }
+
+      // Update subscription status
+      await db.query(`
+        UPDATE subscriptions
+        SET status = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [status, subscriptionId]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_subscription_status',
+        'subscription',
+        subscriptionId,
+        { old_status: subscription.status, new_status: status },
+        request
+      );
+
+      return reply.redirect(`/customers/${subscription.customer_id}?success=Subscription status updated`);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Customer payments
+  fastify.get('/:id/payments', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [request.params.id]
+      );
+
+      if (!customer) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      const payments = await db.query(`
+        SELECT p.*, s.service_type, s.billing_cycle
+        FROM payments p
+        LEFT JOIN subscriptions s ON p.subscription_id = s.id
+        WHERE p.customer_id = ?
+        ORDER BY p.created_at DESC
+      `, [request.params.id]);
+
+      return reply.view('customers/payments', {
+        admin: request.admin,
+        customer,
+        payments
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // Add payment
+  fastify.post('/:id/payment', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const customerId = request.params.id;
+    const { amount, payment_method, description } = request.body;
+
+    try {
+      // Check if customer exists
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [customerId]
+      );
+
+      if (!customer) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      // Create payment
+      const result = await db.query(`
+        INSERT INTO payments (customer_id, amount, payment_method, payment_status, description)
+        VALUES (?, ?, ?, 'paid', ?)
+      `, [customerId, amount, payment_method, description]);
+
+      // Update customer balance
+      if (payment_method === 'credit') {
+        await db.query(`
+          UPDATE customers
+          SET credit_balance = credit_balance + ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `, [amount, customerId]);
+      } else if (payment_method === 'cash' && customer.debt_balance > 0) {
+        // Reduce debt if customer has debt
+        const debtReduction = Math.min(amount, customer.debt_balance);
+        await db.query(`
+          UPDATE customers
+          SET debt_balance = debt_balance - ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `, [debtReduction, customerId]);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'add_payment',
+        'payment',
+        result[0].id,
+        { customer_id: customerId, amount, payment_method },
+        request
+      );
+
+      // Log transaction
+      await db.query(`
+        INSERT INTO transaction_logs (customer_id, type, description, amount)
+        VALUES (?, 'payment', ?, ?)
+      `, [customerId, `Payment received - ${payment_method}`, amount]);
+
+      return reply.redirect(`/customers/${customerId}?success=Payment added successfully`);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.redirect(`/customers/${customerId}?error=Failed to add payment`);
+    }
+  });
+
+  // Delete customer
+  fastify.delete('/:id', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const customerId = request.params.id;
+
+      // Check if customer exists
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [customerId]
+      );
+
+      if (!customer) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      // Check if customer has active subscriptions
+      const activeSubscriptionsResult = await db.getOne(
+        'SELECT COUNT(*) as count FROM subscriptions WHERE customer_id = $1 AND status = $2',
+        [customerId]
+      );
+
+      if (activeSubscriptionsResult && activeSubscriptionsResult.count > 0) {
+        return reply.code(400).send('Cannot delete customer with active subscriptions');
+      }
+
+      // Delete customer (cascade will handle related records)
+      await db.query('DELETE FROM customers WHERE id = $1', [customerId]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'delete_customer',
+        'customer',
+        customerId,
+        { customer_data: customer },
+        request
+      );
+
+      return reply.send({ success: true });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send('Internal Server Error');
+    }
+  });
+
+  // API Routes for customer management
+  // Check duplicate customer API endpoint
+  fastify.get('/api/customers/check-duplicate', {}, async (request, reply) => {
+    try {
+      const { phone, email } = request.query;
+
+      if (!phone && !email) {
+        return reply.code(400).send({
+          success: false,
+          message: 'Masukkan nomor HP atau email untuk mengecek duplikat'
+        });
+      }
+
+      let duplicate = false;
+      let field = '';
+      let customer = null;
+
+      if (phone) {
+        const existingPhone = fastify.db.get(
+          'SELECT id, nama FROM customers WHERE nomor_hp = ?',
+          [phone]
+        );
+        if (existingPhone) {
+          duplicate = true;
+          field = 'nomor HP';
+          customer = existingPhone;
+        }
+      }
+
+      if (!duplicate && email) {
+        const existingEmail = fastify.db.get(
+          'SELECT id, nama FROM customers WHERE email = ?',
+          [email]
+        );
+        if (existingEmail) {
+          duplicate = true;
+          field = 'email';
+          customer = existingEmail;
+        }
+      }
+
+      return reply.send({
+        duplicate,
+        field,
+        customer
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Gagal mengecek duplikat'
+      });
+    }
+  });
+
+  // Create customer via API
+  fastify.post('/api/customers', {}, async (request, reply) => {
+    console.log('DEBUG: Received customer creation request:', request.body);
+    const { nama, nomor_hp, email, status_aktif = true, credit_balance = 0, debt_balance = 0, alamat } = request.body;
+
+    try {
+      // Validate required fields
+      if (!nama || !nomor_hp) {
+        console.log('DEBUG: Missing required fields - nama:', nama, 'nomor_hp:', nomor_hp);
+        return reply.code(400).send({
+          success: false,
+          message: 'Nama dan nomor HP wajib diisi'
+        });
+      }
+
+      // Validate phone number format - more permissive for international formats
+      if (!/^\+?[\d\s\-\(\)]{6,}$/.test(nomor_hp)) {
+        console.log('DEBUG: Invalid phone format:', nomor_hp);
+        return reply.code(400).send({
+          success: false,
+          message: 'Format nomor HP tidak valid'
+        });
+      }
+
+      // Check if phone number already exists
+      const existing = await db.getOne(
+        'SELECT id FROM customers WHERE nomor_hp = $1',
+        [nomor_hp]
+      );
+
+      if (existing) {
+        return reply.code(400).send({
+          success: false,
+          message: 'Nomor HP sudah terdaftar'
+        });
+      }
+
+      // Create customer with all fields
+      const result = await db.insert('customers', {
+        nama,
+        nomor_hp,
+        email,
+        status_aktif,
+        credit_balance,
+        debt_balance
+      });
+
+      const newCustomer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [result[0].id]
+      );
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_customer',
+        'customer',
+        result[0].id,
+        { nama, nomor_hp, email, status_aktif },
+        request
+      );
+
+      return reply.code(201).send({
+        success: true,
+        customer: newCustomer,
+        message: 'Pelanggan berhasil ditambahkan'
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Gagal menyimpan pelanggan'
+      });
+    }
+  });
+
+  // Get customers with pagination and filtering
+  fastify.get('/api/customers', {}, async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const pageSize = parseInt(request.query.page_size) || 10;
+      const offset = (page - 1) * pageSize;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+      const service = request.query.service || '';
+      const sortBy = request.query.sort_by || 'created_at';
+      const sortOrder = request.query.sort_order || 'desc';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (c.nama ILIKE $1 OR c.nomor_hp ILIKE $1 OR c.email ILIKE $1)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status === 'active') {
+        whereClause += ' AND c.status_aktif = true';
+      } else if (status === 'inactive') {
+        whereClause += ' AND c.status_aktif = false';
+      } else if (status === 'suspended') {
+        whereClause += " AND c.status_aktif = 'suspended'";
+      }
+
+      // Build query based on service filter
+      let serviceJoin = '';
+      if (service) {
+        if (service === 'hotspot') {
+          serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = "hotspot"';
+        } else if (service === 'pppoe') {
+          serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = "pppoe"';
+        } else if (service === 'both') {
+          serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id';
+          whereClause += ' AND (SELECT COUNT(DISTINCT service_type) FROM subscriptions WHERE customer_id = c.id) = 2';
+        }
+      } else {
+        serviceJoin = 'LEFT JOIN subscriptions s ON c.id = s.customer_id';
+      }
+
+      const customers = await db.query(`
+        SELECT c.*,
+               COUNT(DISTINCT s.id) as subscription_count,
+               COALESCE(SUM(p.amount), 0) as total_payments,
+               c.credit_balance,
+               c.debt_balance,
+               STRING_AGG(DISTINCT s.service_type, ',') as services
+        FROM customers c
+        ${serviceJoin}
+        LEFT JOIN payments p ON c.id = p.customer_id AND p.payment_status = 'paid'
+        ${whereClause}
+        GROUP BY c.id
+        ORDER BY c.${sortBy} ${sortOrder}
+        LIMIT $1 OFFSET $2
+      `, [...params, pageSize, offset]);
+
+      const totalQuery = await db.query(`
+        SELECT COUNT(DISTINCT c.id) as count
+        FROM customers c
+        ${serviceJoin}
+        ${whereClause}
+      `, params);
+      const total = parseInt(totalQuery[0].count);
+
+      // Calculate statistics
+      const statistics = {
+        total: total,
+        active: (await db.getOne('SELECT COUNT(*) as count FROM customers WHERE status_aktif = true')).count,
+        hotspot: (await db.getOne(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = 'hotspot'`)).count,
+        pppoe: (await db.getOne(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = 'pppoe'`)).count
+      };
+
+      // Process services for each customer
+      const processedCustomers = customers.map(customer => ({
+        ...customer,
+        services: customer.services ? customer.services.split(',') : []
+      }));
+
+      return reply.send({
+        customers: processedCustomers,
+        pagination: {
+          page: page,
+          page_size: pageSize,
+          total: total,
+          total_pages: Math.ceil(total / pageSize),
+          from: offset + 1,
+          to: Math.min(offset + pageSize, total)
+        },
+        statistics
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get customer statistics
+  fastify.get('/api/customers/statistics', {}, async (request, reply) => {
+    try {
+      const statistics = {
+        total: (await db.getOne('SELECT COUNT(*) as count FROM customers')).count,
+        active: (await db.getOne('SELECT COUNT(*) as count FROM customers WHERE status_aktif = true')).count,
+        inactive: (await db.getOne('SELECT COUNT(*) as count FROM customers WHERE status_aktif = false')).count,
+        suspended: (await db.getOne('SELECT COUNT(*) as count FROM customers WHERE status_aktif = \'suspended\'')).count,
+        hotspot: (await db.getOne(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = 'hotspot'`)).count,
+        pppoe: (await db.getOne(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = 'pppoe'`)).count,
+        total_revenue: 0, // TODO: Fix this query
+        total_debt: (await db.getOne('SELECT COALESCE(SUM(debt_balance), 0) as total FROM customers')).total,
+        total_credit: (await db.getOne('SELECT COALESCE(SUM(credit_balance), 0) as total FROM customers')).total
+      };
+
+      return reply.send(statistics);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get single customer by ID
+  fastify.get('/api/customers/:id', {}, async (request, reply) => {
+    try {
+      const customer = await db.getOne(
+        'SELECT * FROM customers WHERE id = $1',
+        [request.params.id]
+      );
+
+      if (!customer) {
+        return reply.code(404).send({ error: 'Customer not found' });
+      }
+
+      // Get subscriptions
+      const subscriptions = await db.query(`
+        SELECT s.*,
+               (SELECT COUNT(*) FROM payments WHERE customer_id = ? AND payment_status = 'paid') as payment_count,
+               (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE customer_id = ? AND payment_status = 'paid') as total_paid
+        FROM subscriptions s
+        WHERE s.customer_id = ?
+        ORDER BY s.created_at DESC
+      `, [request.params.id, request.params.id, request.params.id]);
+
+      // Get payment history
+      const payments = await db.query(`
+        SELECT p.*
+        FROM payments p
+        WHERE p.customer_id = ?
+        ORDER BY p.created_at DESC
+        LIMIT 20
+      `, [request.params.id]);
+
+      // Activities table doesn't exist in current schema
+      const activities = [];
+
+      return reply.send({
+        ...customer,
+        subscriptions,
+        payments,
+        activities,
+        services: subscriptions.map(s => s.service_type)
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Export customers
+  fastify.get('/api/customers/export', {}, async (request, reply) => {
+    try {
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+      const service = request.query.service || '';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (nama ILIKE $1 OR nomor_hp ILIKE $1 OR email ILIKE $1)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status) {
+        whereClause += ` AND status_aktif = ${status === 'active' ? 1 : 0}`;
+      }
+
+      if (service) {
+        whereClause += ` AND id IN (SELECT customer_id FROM subscriptions WHERE service_type = '${service}')`;
+      }
+
+      const customers = await db.query(`
+        SELECT
+          id, nama, nomor_hp, email, status_aktif,
+          credit_balance, debt_balance, created_at, updated_at
+        FROM customers
+        ${whereClause}
+        ORDER BY created_at DESC
+      `, params);
+
+      // Generate CSV
+      const headers = ['ID', 'Nama', 'Nomor HP', 'Email', 'Status', 'Saldo', 'Hutang', 'Terdaftar'];
+      const csvContent = [
+        headers.join(','),
+        ...customers.map(c => [
+          c.id,
+          `"${c.nama || ''}"`,
+          c.nomor_hp || '',
+          `"${c.email || ''}"`,
+          c.status_aktif === 1 ? 'Aktif' : c.status_aktif === 2 ? 'Ditangguhkan' : 'Tidak Aktif',
+          c.credit_balance || 0,
+          c.debt_balance || 0,
+          c.created_at
+        ].join(','))
+      ].join('\n');
+
+      reply.header('Content-Type', 'text/csv');
+      reply.header('Content-Disposition', 'attachment; filename="customers.csv"');
+      return reply.send(csvContent);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+}
+
+module.exports = customerRoutes;

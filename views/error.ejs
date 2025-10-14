@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= error.status || 500 %> - <%= error.message || 'Error Server' %></title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    animation: {
+                        'float': 'float 8s ease-in-out infinite',
+                        'bounce-slow': 'bounce 2s ease-in-out infinite',
+                        'pulse-slow': 'pulse 2s ease-in-out infinite',
+                        'slide-up': 'slideUp 0.8s ease-out',
+                        'bg-move': 'bgMove 15s ease-in-out infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="min-h-screen bg-gradient-to-br from-red-900 via-orange-900 to-red-900 flex items-center justify-center overflow-hidden relative">
+
+    <!-- Animated Background -->
+    <div class="absolute inset-0 overflow-hidden animate-bg-move">
+        <div class="absolute top-0 left-0 w-full h-full opacity-30">
+            <div class="absolute top-20 left-20 w-80 h-80 bg-red-500 rounded-full filter blur-3xl animate-pulse"></div>
+            <div class="absolute bottom-20 right-20 w-80 h-80 bg-orange-500 rounded-full filter blur-3xl animate-pulse" style="animation-delay: 2s;"></div>
+            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-yellow-500 rounded-full filter blur-3xl animate-pulse" style="animation-delay: 4s;"></div>
+        </div>
+    </div>
+
+    <!-- Floating Shapes -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-32 left-32 w-24 w-24 bg-white/15 rounded-full animate-float"></div>
+        <div class="absolute top-1/3 right-40 w-36 h-36 bg-white/10 rounded-full animate-float" style="animation-delay: 3s;"></div>
+        <div class="absolute top-1/2 left-1/3 w-20 h-20 bg-white/12 rounded-full animate-float" style="animation-delay: 1.5s;"></div>
+        <div class="absolute bottom-32 right-32 w-28 w-28 bg-white/8 rounded-full animate-float" style="animation-delay: 2.5s;"></div>
+    </div>
+
+    <!-- Error Container -->
+    <div class="relative z-10 bg-slate-800/90 backdrop-blur-xl border border-slate-700 rounded-3xl p-12 max-w-3xl w-full mx-4 shadow-2xl animate-slide-up">
+
+        <!-- Error Icon -->
+        <div class="flex justify-center mb-6">
+            <div class="text-6xl text-red-400 animate-bounce-slow">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+        </div>
+
+        <!-- Error Code -->
+        <div class="text-center mb-6">
+            <div class="text-8xl font-black bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent animate-pulse-slow">
+                <%= error.status || 500 %>
+            </div>
+        </div>
+
+        <!-- Error Title -->
+        <h1 class="text-4xl font-bold text-white text-center mb-4">
+            <%= error.message || 'Terjadi Kesalahan Server' %>
+        </h1>
+
+        <!-- Error Description -->
+        <p class="text-lg text-slate-300 text-center mb-8 leading-relaxed">
+            Mohon maaf atas ketidaknyamanan ini. Sistem kami mengalami kesalahan teknis.<br>
+            Tim kami sedang bekerja untuk memperbaikinya sesegera mungkin.
+        </p>
+
+        <!-- Error Details (if in development) -->
+        <% if (process.env.NODE_ENV === 'development' && error.stack) { %>
+            <div class="bg-slate-900/50 border border-red-500/30 rounded-xl p-4 mb-8">
+                <p class="text-sm text-red-400 mb-2 font-mono">Error Details:</p>
+                <pre class="text-xs text-slate-400 font-mono overflow-x-auto whitespace-pre-wrap break-all"><%= error.stack %></pre>
+            </div>
+        <% } %>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+            <button onclick="location.reload()" class="inline-flex items-center justify-center px-8 py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-red-500/25">
+                <i class="fas fa-sync-alt mr-3"></i>
+                Refresh Halaman
+            </button>
+            <a href="/login" class="inline-flex items-center justify-center px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all duration-300">
+                <i class="fas fa-home mr-3"></i>
+                Kembali ke Login
+            </a>
+            <button onclick="history.back()" class="inline-flex items-center justify-center px-8 py-3 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-xl transition-all duration-300">
+                <i class="fas fa-arrow-left mr-3"></i>
+                Kembali
+            </button>
+        </div>
+
+        <!-- Additional Options -->
+        <div class="border-t border-slate-700 pt-8">
+            <p class="text-center text-slate-400 mb-6">Masih mengalami masalah? Coba opsi berikut:</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button onclick="clearCacheAndReload()" class="bg-slate-900/30 hover:bg-slate-900/50 rounded-xl p-4 transition-all duration-300 group">
+                    <i class="fas fa-broom text-2xl text-blue-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                    <p class="text-sm text-slate-300">Clear Cache</p>
+                </button>
+                <button onclick="copyErrorDetails()" class="bg-slate-900/30 hover:bg-slate-900/50 rounded-xl p-4 transition-all duration-300 group">
+                    <i class="fas fa-copy text-2xl text-green-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                    <p class="text-sm text-slate-300">Salin Error</p>
+                </button>
+                <a href="mailto:admin@example.com?subject=Error Report&body=Error: <%= error.status || 500 %>" class="bg-slate-900/30 hover:bg-slate-900/50 rounded-xl p-4 transition-all duration-300 group">
+                    <i class="fas fa-envelope text-2xl text-purple-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                    <p class="text-sm text-slate-300">Laporkan</p>
+                </a>
+                <a href="/status" class="bg-slate-900/30 hover:bg-slate-900/50 rounded-xl p-4 transition-all duration-300 group">
+                    <i class="fas fa-heartbeat text-2xl text-yellow-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                    <p class="text-sm text-slate-300">Cek Status</p>
+                </a>
+            </div>
+        </div>
+
+        <!-- Timestamp -->
+        <div class="mt-8 text-center">
+            <p class="text-xs text-slate-500">
+                Error ID: <code class="bg-slate-900/50 px-2 py-1 rounded"><%= Math.random().toString(36).substr(2, 9).toUpperCase() %></code> |
+                Waktu: <span id="errorTime"></span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="errorToast" class="hidden fixed top-4 right-4 z-50 bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-xl max-w-sm">
+        <div class="flex items-start">
+            <i class="fas fa-info-circle text-blue-400 mt-0.5 mr-3"></i>
+            <div class="flex-1">
+                <p class="text-sm text-white font-medium">Error details copied!</p>
+                <p class="text-xs text-slate-400 mt-1">You can paste this when reporting the issue.</p>
+            </div>
+            <button onclick="hideToast()" class="ml-3 text-slate-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Set current time
+        document.getElementById('errorTime').textContent = new Date().toLocaleString('id-ID');
+
+        // Clear cache and reload
+        function clearCacheAndReload() {
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    names.forEach(function(name) {
+                        caches.delete(name);
+                    });
+                });
+            }
+            localStorage.clear();
+            sessionStorage.clear();
+            location.reload(true);
+        }
+
+        // Copy error details
+        function copyErrorDetails() {
+            const errorDetails = {
+                status: <%= error.status || 500 %>,
+                message: '<%= error.message || "Internal Server Error" %>',
+                url: window.location.href,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                userId: '<%= (typeof admin !== "undefined" && admin?.id) ? admin.id : "anonymous" %>'
+            };
+
+            navigator.clipboard.writeText(JSON.stringify(errorDetails, null, 2)).then(() => {
+                showToast();
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = JSON.stringify(errorDetails, null, 2);
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast();
+            });
+        }
+
+        // Show toast notification
+        function showToast() {
+            const toast = document.getElementById('errorToast');
+            toast.classList.remove('hidden');
+            toast.classList.add('animate-slide-up');
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                    toast.style.opacity = '1';
+                }, 300);
+            }, 3000);
+        }
+
+        // Hide toast
+        function hideToast() {
+            const toast = document.getElementById('errorToast');
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.style.opacity = '1';
+            }, 300);
+        }
+
+        // Auto-reload after 30 seconds
+        let countdown = 30;
+        const reloadInterval = setInterval(() => {
+            countdown--;
+            if (countdown <= 0) {
+                clearInterval(reloadInterval);
+                location.reload();
+            }
+        }, 1000);
+
+        // Add custom animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes float {
+                0%, 100% { transform: translateY(0px) rotate(0deg); }
+                50% { transform: translateY(-30px) rotate(180deg); }
+            }
+
+            @keyframes slideUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(50px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            @keyframes bgMove {
+                0%, 100% { transform: translateX(0) translateY(0) scale(1); }
+                50% { transform: translateX(-15px) translateY(-15px) scale(1.1); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Cancel auto-reload on user interaction
+        document.addEventListener('click', () => {
+            clearInterval(reloadInterval);
+        }, { once: true });
+    </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="Login - <%= settings?.company_name || 'Mikrotik Billing System' %>">
+    <meta name="author" content="<%= settings?.company_name || 'Mikrotik Billing System' %>">
+    <title>Login - <%= settings?.company_name || 'Mikrotik Billing System' %></title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/public/images/favicon.ico">
+</head>
+<body class="dark bg-dark-900 text-dark-50 min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        Skip to main content
+    </a>
+
+    <!-- Animated background -->
+    <div class="absolute inset-0 overflow-hidden">
+        <!-- Gradient orbs -->
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-float"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-float" style="animation-delay: 2s;"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
+
+        <!-- Grid pattern -->
+        <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23334155" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
+    </div>
+
+    <!-- Login container -->
+    <main id="main-content" class="relative z-10 w-full max-w-md">
+        <!-- Logo and branding -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl mb-4 transform hover:scale-105 transition-transform duration-200">
+                <i class="fas fa-wifi text-3xl text-white"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">
+                <%= settings?.company_name || 'Mikrotik Billing' %>
+            </h1>
+            <p class="text-dark-400 text-sm">
+                Sistem Manajemen Voucher & PPPoE
+            </p>
+        </div>
+
+        <!-- Login form -->
+        <div class="bg-dark-800/90 backdrop-blur-xl border border-dark-700 rounded-2xl shadow-2xl p-8">
+            <% if (error) { %>
+                <div class="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-6 flex items-center space-x-3 animate-pulse">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span><%= error %></span>
+                </div>
+            <% } %>
+
+            <form method="POST" action="/login" class="space-y-6">
+                <!-- Username field -->
+                <div>
+                    <label for="username" class="block text-sm font-medium text-dark-300 mb-2">
+                        Username
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-user text-dark-500"></i>
+                        </div>
+                        <input
+                            type="text"
+                            id="username"
+                            name="username"
+                            class="w-full pl-10 pr-3 py-3 bg-dark-700/50 border border-dark-600 rounded-lg text-white placeholder-dark-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Masukkan username"
+                            value="<%= username || '' %>"
+                            required
+                            autofocus
+                            autocomplete="username">
+                    </div>
+                </div>
+
+                <!-- Password field -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-dark-300 mb-2">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-dark-500"></i>
+                        </div>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            class="w-full pl-10 pr-10 py-3 bg-dark-700/50 border border-dark-600 rounded-lg text-white placeholder-dark-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Masukkan password"
+                            required
+                            autocomplete="current-password">
+                        <button
+                            type="button"
+                            id="passwordToggle"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-dark-500 hover:text-dark-300 transition-colors">
+                            <i class="fas fa-eye" id="toggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Remember me & forgot password -->
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="w-4 h-4 bg-dark-700 border-dark-600 rounded text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0">
+                        <span class="text-sm text-dark-400">Ingat saya</span>
+                    </label>
+                    <a href="#" class="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+                        Lupa password?
+                    </a>
+                </div>
+
+                <!-- Submit button -->
+                <button
+                    type="submit"
+                    class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center space-x-2">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Masuk</span>
+                </button>
+            </form>
+
+            <!-- Default credentials info -->
+            <div class="mt-6 p-4 bg-dark-700/30 border border-dark-600 rounded-lg">
+                <div class="flex items-center space-x-2 text-yellow-400 text-sm mb-2">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Informasi Login Default</span>
+                </div>
+                <div class="text-xs text-dark-400 space-y-1">
+                    <p>Username: <code class="text-blue-400">admin</code></p>
+                    <p>Password: <code class="text-blue-400">admin123</code></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-xs text-dark-500">
+            <p>&copy; 2025 <%= settings?.company_name || 'Mikrotik Billing System' %>. Version 1.0.0</p>
+        </div>
+    </main>
+
+    <script>
+        // Password toggle
+        const passwordToggle = document.getElementById('passwordToggle');
+        const passwordInput = document.getElementById('password');
+        const toggleIcon = document.getElementById('toggleIcon');
+
+        passwordToggle.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+
+            if (type === 'text') {
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        });
+
+        // Form validation
+        const form = document.querySelector('form');
+        const submitBtn = form.querySelector('button[type="submit"]');
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Memproses...</span>';
+
+            // Simulate processing delay for better UX
+            setTimeout(() => {
+                form.submit();
+            }, 500);
+        });
+
+        // Input animations
+        const inputs = document.querySelectorAll('input[type="text"], input[type="password"]');
+        inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.parentElement.classList.add('scale-[1.02]');
+                this.parentElement.parentElement.style.transition = 'transform 0.2s';
+            });
+
+            input.addEventListener('blur', function() {
+                this.parentElement.parentElement.classList.remove('scale-[1.02]');
+            });
+        });
+
+        // Auto-focus username field
+        document.getElementById('username').focus();
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + Enter to submit form
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                form.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Particle animation on background
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.className = 'absolute w-1 h-1 bg-blue-400 rounded-full opacity-50';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = '100%';
+            particle.style.animation = 'float 10s linear';
+            document.body.appendChild(particle);
+
+            setTimeout(() => {
+                particle.remove();
+            }, 10000);
+        }
+
+        // Create particles periodically
+        setInterval(createParticle, 500);
+    </script>
+</body>
+</html>

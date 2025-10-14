@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Offline - Mikrotik Billing System">
+    <title>Offline - Mikrotik Billing System</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617'
+                        },
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                            950: '#172554'
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'spin-slow': 'spin 3s linear infinite',
+                        'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite'
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom styles */
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+
+        .glass-effect {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+        }
+
+        .offline-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .pulse-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="bg-dark-900 text-dark-100 font-sans antialiased">
+    <div class="min-h-screen flex items-center justify-center px-4 py-12">
+        <div class="max-w-md w-full">
+            <!-- Main Offline Message -->
+            <div class="text-center mb-8">
+                <div class="offline-animation inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full mb-6 mx-auto">
+                    <i class="fas fa-wifi-slash text-4xl text-white"></i>
+                </div>
+
+                <h1 class="text-3xl font-bold text-white mb-3">Anda Offline</h1>
+                <p class="text-dark-300 text-lg mb-2">
+                    Tidak ada koneksi internet yang tersedia
+                </p>
+                <p class="text-dark-400 text-sm">
+                    Beberapa fitur mungkin tidak berfungsi sampai Anda kembali online
+                </p>
+            </div>
+
+            <!-- Status Card -->
+            <div class="glass-effect rounded-2xl p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-dark-300 text-sm font-medium">Status Koneksi</span>
+                    <div class="flex items-center">
+                        <div class="w-2 h-2 bg-red-500 rounded-full pulse-dot mr-2"></div>
+                        <span class="text-red-400 text-sm font-medium">Offline</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-database text-dark-400 w-5"></i>
+                        <span class="text-dark-300 ml-3">Cache Data:</span>
+                        <span class="text-dark-100 ml-auto font-medium">Tersedia</span>
+                    </div>
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-history text-dark-400 w-5"></i>
+                        <span class="text-dark-300 ml-3">Sinkronisasi:</span>
+                        <span class="text-orange-400 ml-auto font-medium">Menunggu</span>
+                    </div>
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-clock text-dark-400 w-5"></i>
+                        <span class="text-dark-300 ml-3">Terakhir online:</span>
+                        <span class="text-dark-100 ml-auto font-medium" id="lastOnline">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Actions -->
+            <div class="glass-effect rounded-2xl p-6 mb-6">
+                <h3 class="text-white font-semibold mb-4 flex items-center">
+                    <i class="fas fa-tools text-primary-400 mr-2"></i>
+                    Fitur Tersedia Offline
+                </h3>
+
+                <div class="space-y-2">
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                        <span class="text-dark-200">Lihat data yang tersimpan</span>
+                    </div>
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                        <span class="text-dark-200">Akses halaman yang sudah dibuka</span>
+                    </div>
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                        <span class="text-dark-200">Antrikan aksi untuk sinkronisasi</span>
+                    </div>
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-times-circle text-dark-400 mr-3"></i>
+                        <span class="text-dark-400">Buat voucher baru</span>
+                    </div>
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-times-circle text-dark-400 mr-3"></i>
+                        <span class="text-dark-400">Koneksi ke Mikrotik</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="space-y-3">
+                <button onclick="retryConnection()"
+                        class="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg flex items-center justify-center">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Coba Lagi
+                </button>
+
+                <button onclick="goToHomePage()"
+                        class="w-full glass-effect hover:bg-dark-700/50 text-dark-200 font-medium py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center">
+                    <i class="fas fa-home mr-2"></i>
+                    Beranda
+                </button>
+            </div>
+
+            <!-- Tips -->
+            <div class="mt-8 text-center">
+                <div class="inline-flex items-center text-dark-400 text-sm">
+                    <i class="fas fa-lightbulb text-yellow-400 mr-2"></i>
+                    <span>Periksa koneksi internet Anda dan coba lagi</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network Status Script -->
+    <script>
+        // Update last online time
+        function updateLastOnline() {
+            const lastOnline = localStorage.getItem('lastOnline');
+            if (lastOnline) {
+                const date = new Date(parseInt(lastOnline));
+                document.getElementById('lastOnline').textContent = date.toLocaleString('id-ID');
+            }
+        }
+
+        // Retry connection
+        async function retryConnection() {
+            const button = event.target;
+            const originalText = button.innerHTML;
+
+            // Show loading state
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Mencoba...';
+            button.disabled = true;
+
+            try {
+                // Try to fetch a small resource to check connectivity
+                const response = await fetch('/api/public/system/status', {
+                    method: 'HEAD',
+                    cache: 'no-cache'
+                });
+
+                if (response.ok) {
+                    // Connection restored
+                    button.innerHTML = '<i class="fas fa-check mr-2"></i> Tersedia!';
+                    button.classList.remove('bg-primary-600', 'hover:bg-primary-700');
+                    button.classList.add('bg-green-600');
+
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    throw new Error('Network not available');
+                }
+            } catch (error) {
+                // Still offline
+                button.innerHTML = '<i class="fas fa-times mr-2"></i> Masih Offline';
+                button.classList.remove('bg-primary-600', 'hover:bg-primary-700');
+                button.classList.add('bg-red-600');
+
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                    button.classList.remove('bg-red-600');
+                    button.classList.add('bg-primary-600', 'hover:bg-primary-700');
+                }, 2000);
+            }
+        }
+
+        // Go to home page (will use cached version if available)
+        function goToHomePage() {
+            window.location.href = '/';
+        }
+
+        // Monitor network status
+        function updateNetworkStatus() {
+            const statusDot = document.querySelector('.pulse-dot');
+            const statusText = document.querySelector('.text-red-400');
+
+            if (navigator.onLine) {
+                statusDot.classList.remove('bg-red-500');
+                statusDot.classList.add('bg-green-500');
+                statusText.classList.remove('text-red-400');
+                statusText.classList.add('text-green-400');
+                statusText.textContent = 'Online';
+
+                // Redirect to home after a short delay
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                statusDot.classList.remove('bg-green-500');
+                statusDot.classList.add('bg-red-500');
+                statusText.classList.remove('text-green-400');
+                statusText.classList.add('text-red-400');
+                statusText.textContent = 'Offline';
+            }
+        }
+
+        // Save last online time
+        function saveLastOnline() {
+            localStorage.setItem('lastOnline', Date.now().toString());
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateLastOnline();
+            updateNetworkStatus();
+
+            // Listen for network changes
+            window.addEventListener('online', updateNetworkStatus);
+            window.addEventListener('offline', updateNetworkStatus);
+
+            // Save last online time periodically
+            setInterval(saveLastOnline, 30000);
+
+            // Save current time as last online
+            saveLastOnline();
+        });
+
+        // Service Worker messaging
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data && event.data.type === 'BACKGROUND_SYNC_COMPLETED') {
+                    console.log('Background sync completed');
+                    // You could show a notification here
+                }
+            });
+        }
+    </script>
+</body>
+</html>

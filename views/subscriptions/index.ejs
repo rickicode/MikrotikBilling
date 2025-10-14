@@ -1,0 +1,390 @@
+<%- include('../partials/header', { title: 'Manajemen Berlangganan', currentUrl: '/subscriptions' }) %>
+
+<div class="mb-4 row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0 h3">Manajemen Berlangganan</h1>
+            <div>
+                <button class="btn btn-outline-primary btn-sm me-2" id="exportBtn">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <button class="btn btn-outline-success btn-sm me-2" id="bulkRenewBtn">
+                    <i class="bi bi-arrow-repeat"></i> Perpanjang Massal
+                </button>
+                <a href="/subscriptions/create" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Tambah Berlangganan
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Overview -->
+<div class="mb-4 row">
+    <div class="col-md-3">
+        <div class="text-white card bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Berlangganan</h6>
+                        <h3 class="mb-0" id="totalSubscriptions">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-card-list fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Aktif</h6>
+                        <h3 class="mb-0" id="activeSubscriptions">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-check-circle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Kadaluarsa</h6>
+                        <h3 class="mb-0" id="expiredSubscriptions">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-clock-history fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Revenue Bulanan</h6>
+                        <h3 class="mb-0" id="monthlyRevenue">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-cash-stack fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter -->
+<div class="mb-4 card">
+    <div class="card-body">
+        <form id="searchForm" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Cari Berlangganan</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Nama, Username, atau ID...">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">Semua Status</option>
+                    <option value="active">Aktif</option>
+                    <option value="disabled">Dinonaktifkan</option>
+                    <option value="expired">Kadaluarsa</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Layanan</label>
+                <select class="form-select" id="serviceFilter">
+                    <option value="">Semua Layanan</option>
+                    <option value="hotspot">Hotspot</option>
+                    <option value="pppoe">PPPoE</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Masa Kadaluarsa</label>
+                <select class="form-select" id="expiryFilter">
+                    <option value="">Semua</option>
+                    <option value="3">Kadaluarsa 3 Hari</option>
+                    <option value="7">Kadaluarsa 7 Hari</option>
+                    <option value="30">Kadaluarsa 30 Hari</option>
+                    <option value="expired">Sudah Kadaluarsa</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="resetFilterBtn">
+                        <i class="bi bi-x-circle"></i> Reset
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Subscriptions Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Daftar Berlangganan</h6>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-primary me-2" id="resultCount">0 Hasil</span>
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary" id="refreshBtn">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <button type="button" class="btn btn-outline-info" id="syncMikrotikBtn">
+                    <i class="bi bi-cloud-download"></i> Sync Mikrotik
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="subscriptionsTable">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                        </th>
+                        <th>ID</th>
+                        <th>Pelanggan</th>
+                        <th>Layanan</th>
+                        <th>Paket</th>
+                        <th>Status</th>
+                        <th>Siklus</th>
+                        <th>Kadaluarsa</th>
+                        <th>Auto-Renew</th>
+                        <th>Harga</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="subscriptionsTableBody">
+                    <tr>
+                        <td colspan="11" class="py-4 text-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Memuat data...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Enhanced Pagination -->
+        <%- include('../partials/pagination') %>
+    </div>
+</div>
+
+<!-- Bulk Actions Bar -->
+<div class="card mt-3" id="bulkActionsBar" style="display: none;">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="me-3">
+                    <i class="bi bi-check-square me-1"></i>
+                    <span id="selectedCount">0</span> dipilih
+                </span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-success" id="bulkRenewSelected">
+                        <i class="bi bi-arrow-repeat"></i> Perpanjang
+                    </button>
+                    <button type="button" class="btn btn-outline-warning" id="bulkDisableSelected">
+                        <i class="bi bi-pause-circle"></i> Nonaktifkan
+                    </button>
+                    <button type="button" class="btn btn-outline-info" id="bulkReminderSelected">
+                        <i class="bi bi-bell"></i> Kirim Reminder
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" id="bulkDeleteSelected">
+                        <i class="bi bi-trash"></i> Hapus
+                    </button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="clearSelectionBtn">
+                <i class="bi bi-x-circle"></i> Batal Pilih
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Renew Subscription Modal -->
+<div class="modal fade" id="renewSubscriptionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Perpanjang Berlangganan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="renewSubscriptionForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Berlangganan</label>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <div class="fw-bold" id="renewCustomerName">-</div>
+                                        <div class="text-muted" id="renewServiceInfo">-</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="text-primary fw-bold" id="renewCurrentPrice">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="renewDuration" class="form-label">Perpanjang Selama</label>
+                        <select class="form-select" id="renewDuration" name="duration" required>
+                            <option value="7">7 Hari</option>
+                            <option value="14">14 Hari</option>
+                            <option value="30" selected>30 Hari</option>
+                            <option value="60">60 Hari</option>
+                            <option value="90">90 Hari</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="renewAmount" class="form-label">Total Pembayaran</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Rp</span>
+                            <input type="number" class="form-control" id="renewAmount" name="amount" readonly>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="renewPaymentMethod" class="form-label">Metode Pembayaran</label>
+                        <select class="form-select" id="renewPaymentMethod" name="payment_method" required>
+                            <option value="cash">Cash</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="duitku">DuitKu</option>
+                            <option value="credit">Saldo Pelanggan</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="renewNote" class="form-label">Catatan</label>
+                        <textarea class="form-control" id="renewNote" name="note" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Perpanjang
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Renew Modal -->
+<div class="modal fade" id="bulkRenewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Perpanjang Massal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="bulkRenewForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <span id="bulkRenewCount">0</span> berlangganan akan diperpanjang
+                        </label>
+                        <div class="table-responsive" style="max-height: 200px;">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Pelanggan</th>
+                                        <th>Layanan</th>
+                                        <th>Kadaluarsa</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bulkRenewList">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bulkRenewDuration" class="form-label">Perpanjang Selama</label>
+                                <select class="form-select" id="bulkRenewDuration" name="duration" required>
+                                    <option value="7">7 Hari</option>
+                                    <option value="14">14 Hari</option>
+                                    <option value="30" selected>30 Hari</option>
+                                    <option value="60">60 Hari</option>
+                                    <option value="90">90 Hari</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bulkRenewPaymentMethod" class="form-label">Metode Pembayaran</label>
+                                <select class="form-select" id="bulkRenewPaymentMethod" name="payment_method" required>
+                                    <option value="cash">Cash</option>
+                                    <option value="transfer">Transfer</option>
+                                    <option value="credit">Saldo Masing-Masing</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="alert alert-info">
+                            <i class="bi bi-calculator me-2"></i>
+                            <strong>Total Pembayaran:</strong>
+                            <span class="fw-bold" id="bulkRenewTotal">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-arrow-repeat"></i> Perpanjang Semua
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.subscription-row {
+    transition: all 0.2s ease;
+}
+.subscription-row:hover {
+    background-color: #f8f9fa;
+}
+.subscription-row.selected {
+    background-color: #e7f3ff;
+}
+.subscription-badge {
+    font-size: 0.8em;
+}
+.expiry-warning {
+    color: #f39c12;
+}
+.expiry-danger {
+    color: #e74c3c;
+    font-weight: bold;
+}
+</style>
+
+<%- include('../partials/footer', { scripts: ['/public/js/subscriptions.js'] }) %>

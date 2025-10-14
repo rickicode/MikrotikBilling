@@ -1,0 +1,715 @@
+<%- include('../partials/header', { title: 'WhatsApp Settings', currentUrl: '/whatsapp/whatsapp-settings' }) %>
+
+<div class="main-content">
+    <div class="container-fluid mt-4">
+        <!-- WhatsApp Navigation -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body py-3">
+                        <nav class="nav">
+                            <a class="nav-link <%= currentUrl === '/whatsapp/management' ? 'active' : '' %>" href="/whatsapp/management">
+                                <i class="bi bi-house"></i> Dashboard
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/scan') ? 'active' : '' %>" href="/whatsapp/scan">
+                                <i class="bi bi-qr-code"></i> QR Scanner
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/history') ? 'active' : '' %>" href="/whatsapp/history">
+                                <i class="bi bi-chat-dots"></i> Message History
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/message-templates-page') ? 'active' : '' %>" href="/whatsapp/message-templates-page">
+                                <i class="bi bi-file-text"></i> Templates
+                            </a>
+                            <a class="nav-link <%= currentUrl && currentUrl.includes('/whatsapp-settings') ? 'active' : '' %>" href="/whatsapp/whatsapp-settings">
+                                <i class="bi bi-gear"></i> Settings
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">WhatsApp Settings</h1>
+            <div>
+            </div>
+        </div>
+
+        <!-- General Settings -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="bi bi-gear"></i> General Settings
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="generalSettingsForm" class="row g-3">
+                    <div class="col-md-6">
+                        <label for="autoReplyEnabled" class="form-label">Auto Reply</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoReplyEnabled" name="auto_reply_enabled">
+                            <label class="form-check-label" for="autoReplyEnabled">
+                                Enable automatic replies
+                            </label>
+                        </div>
+                        <div class="form-text">Automatically reply to incoming messages</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="messageDelay" class="form-label">Message Delay (seconds)</label>
+                        <input type="number" class="form-control" id="messageDelay" name="message_delay" min="1" max="60" value="1">
+                        <div class="form-text">Delay between messages to prevent spam detection</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="maxRetries" class="form-label">Max Retries</label>
+                        <input type="number" class="form-control" id="maxRetries" name="max_retries" min="1" max="10" value="3">
+                        <div class="form-text">Maximum retry attempts for failed messages</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="sessionTimeout" class="form-label">Session Timeout (hours)</label>
+                        <input type="number" class="form-control" id="sessionTimeout" name="session_timeout" min="1" max="168" value="24">
+                        <div class="form-text">WhatsApp session timeout duration</div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Webhook Configuration -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="bi bi-link-45deg"></i> Webhook Configuration
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="webhookSettingsForm" class="row g-3">
+                    <div class="col-12">
+                        <label for="webhookEnabled" class="form-label">Webhook Integration</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="webhookEnabled" name="webhook_enabled">
+                            <label class="form-check-label" for="webhookEnabled">
+                                Enable webhook notifications
+                            </label>
+                        </div>
+                        <div class="form-text">Send message status updates to external webhook URL</div>
+                    </div>
+                    <div class="col-md-8">
+                        <label for="webhookUrl" class="form-label">Webhook URL</label>
+                        <input type="url" class="form-control" id="webhookUrl" name="webhook_url" placeholder="https://your-domain.com/webhook">
+                        <div class="form-text">URL to receive message status updates</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="webhookSecret" class="form-label">Secret Key</label>
+                        <input type="text" class="form-control" id="webhookSecret" name="webhook_secret" placeholder="Optional secret key">
+                        <div class="form-text">Optional secret for webhook validation</div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Save Webhook Settings
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="testWebhook()">
+                            <i class="bi bi-send"></i> Test Webhook
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Note: Message templates have been moved to <a href="/whatsapp/message-templates-page">Templates Page</a> -->
+
+        <!-- Daily Expiry Reminder Configuration -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="bi bi-calendar-day"></i> Daily Expiry Reminder (Before Expiry)
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="dailyExpirySettingsForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="dailyExpiryReminderEnabled" class="form-label">Daily Expiry Check</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="dailyExpiryReminderEnabled" name="daily_expiry_reminder_enabled" checked>
+                            <label class="form-check-label" for="dailyExpiryReminderEnabled">
+                                Enable daily expiry reminders
+                            </label>
+                        </div>
+                        <div class="form-text">Check and send reminders X days before expiry</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="dailyExpiryReminderDays" class="form-label">Days Before Expiry</label>
+                        <input type="number" class="form-control" id="dailyExpiryReminderDays" name="daily_expiry_reminder_days" min="1" max="30" value="7" required>
+                        <div class="form-text">Send reminder when X days remaining</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="dailyExpiryReminderTime" class="form-label">Reminder Time</label>
+                        <input type="time" class="form-control" id="dailyExpiryReminderTime" name="daily_expiry_reminder_time" value="09:00" required>
+                        <div class="form-text">Time to send daily reminders</div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Save Daily Reminder Settings
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="testDailyExpiryReminder()">
+                            <i class="bi bi-send"></i> Test Daily Reminder
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Real-time Expiry Reminder Configuration -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-warning">
+                    <i class="bi bi-clock"></i> Real-time Expiry Notification (At Expiry)
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="realtimeExpirySettingsForm" class="row g-3">
+                    <div class="col-md-6">
+                        <label for="realtimeExpiryEnabled" class="form-label">Real-time Expiry Notification</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="realtimeExpiryEnabled" name="realtime_expiry_enabled" checked>
+                            <label class="form-check-label" for="realtimeExpiryEnabled">
+                                Enable real-time expiry notifications
+                            </label>
+                        </div>
+                        <div class="form-text">Send notification exactly when subscription expires</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="realtimeExpiryDelay" class="form-label">Notification Delay (minutes)</label>
+                        <input type="number" class="form-control" id="realtimeExpiryDelay" name="realtime_expiry_delay" min="0" max="60" value="5">
+                        <div class="form-text">Delay after expiry to send notification</div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-check-circle"></i> Save Real-time Settings
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="testRealtimeExpiry()">
+                            <i class="bi bi-send"></i> Test Real-time Expiry
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Backup & Restore -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="bi bi-cloud-arrow-up"></i> Backup & Restore
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6>Backup Settings</h6>
+                        <p class="text-muted small">Export your WhatsApp settings and templates</p>
+                        <button type="button" class="btn btn-success" onclick="backupSettings()">
+                            <i class="bi bi-download"></i> Download Backup
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Restore Settings</h6>
+                        <p class="text-muted small">Import previously saved settings</p>
+                        <input type="file" class="form-control mb-2" id="restoreFile" accept=".json">
+                        <button type="button" class="btn btn-warning" onclick="restoreSettings()">
+                            <i class="bi bi-upload"></i> Restore Backup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card shadow mb-4 border-danger">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-danger text-white">
+                <h6 class="m-0 font-weight-bold">
+                    <i class="bi bi-exclamation-triangle"></i> Danger Zone
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6>Clear Message History</h6>
+                        <p class="text-muted small">Permanently delete all message history</p>
+                        <button type="button" class="btn btn-outline-danger" onclick="clearMessageHistory()">
+                            <i class="bi bi-trash"></i> Clear History
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Reset WhatsApp Connection</h6>
+                        <p class="text-muted small">Disconnect and reset WhatsApp session</p>
+                        <button type="button" class="btn btn-outline-danger" onclick="resetWhatsAppConnection()">
+                            <i class="bi bi-x-circle"></i> Reset Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+
+<%- include('../partials/footer', { scripts: ['/public/js/whatsapp.js'] }) %>
+
+<script>
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        loadWhatsAppSettings();
+        loadDailyExpirySettings();
+        loadRealtimeExpirySettings();
+        initializeEventListeners();
+    });
+
+    // Load WhatsApp settings
+    async function loadWhatsAppSettings() {
+        try {
+            const response = await fetch('/whatsapp/api/settings');
+            const data = await response.json();
+
+            if (data.success) {
+                const settings = data.settings || {};
+
+                // General settings
+                document.getElementById('autoReplyEnabled').checked = settings.auto_reply_enabled || false;
+                document.getElementById('messageDelay').value = settings.message_delay || 1;
+                document.getElementById('maxRetries').value = settings.max_retries || 3;
+                document.getElementById('sessionTimeout').value = settings.session_timeout || 24;
+
+                // Webhook settings
+                document.getElementById('webhookEnabled').checked = settings.webhook_enabled || false;
+                document.getElementById('webhookUrl').value = settings.webhook_url || '';
+                document.getElementById('webhookSecret').value = settings.webhook_secret || '';
+            }
+        } catch (error) {
+            console.error('Error loading WhatsApp settings:', error);
+        }
+    }
+
+    // Load daily expiry reminder settings
+    async function loadDailyExpirySettings() {
+        try {
+            const response = await fetch('/whatsapp/api/daily-expiry-settings');
+            const data = await response.json();
+
+            if (data.success) {
+                const settings = data.settings || {};
+
+                document.getElementById('dailyExpiryReminderEnabled').checked = settings.enabled !== false;
+                document.getElementById('dailyExpiryReminderDays').value = settings.days_before_expiry || 7;
+                document.getElementById('dailyExpiryReminderTime').value = settings.reminder_time || '09:00';
+            }
+        } catch (error) {
+            console.error('Error loading daily expiry settings:', error);
+        }
+    }
+
+    // Load real-time expiry settings
+    async function loadRealtimeExpirySettings() {
+        try {
+            const response = await fetch('/whatsapp/api/realtime-expiry-settings');
+            const data = await response.json();
+
+            if (data.success) {
+                const settings = data.settings || {};
+
+                document.getElementById('realtimeExpiryEnabled').checked = settings.enabled !== false;
+                document.getElementById('realtimeExpiryDelay').value = settings.notification_delay || 5;
+            }
+        } catch (error) {
+            console.error('Error loading realtime expiry settings:', error);
+        }
+    }
+
+    // Save general settings
+    // General settings will be handled in initializeEventListeners
+
+    // Save webhook settings
+    if (document.getElementById('webhookSettingsForm')) {
+        document.getElementById('webhookSettingsForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+        const settings = {
+            webhook_enabled: formData.get('webhook_enabled') === 'on',
+            webhook_url: formData.get('webhook_url'),
+            webhook_secret: formData.get('webhook_secret')
+        };
+
+        try {
+            const response = await fetch('/whatsapp/api/webhook-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Pengaturan webhook berhasil disimpan');
+            } else {
+                showError(data.message || 'Gagal menyimpan pengaturan webhook');
+            }
+        } catch (error) {
+            console.error('Error saving webhook settings:', error);
+            showError('Terjadi kesalahan saat menyimpan pengaturan webhook');
+        }
+    });
+    }
+
+    // Save expiry settings
+    if (document.getElementById('expirySettingsForm')) {
+        document.getElementById('expirySettingsForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+        const settings = {
+            enabled: formData.get('expiry_reminder_enabled') === 'on',
+            days_before_expiry: parseInt(formData.get('expiry_reminder_days')),
+            frequency: formData.get('expiry_reminder_frequency')
+        };
+
+        try {
+            const response = await fetch('/whatsapp/api/expiry-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Pengaturan expiry reminder berhasil disimpan');
+            } else {
+                showError(data.message || 'Gagal menyimpan pengaturan expiry reminder');
+            }
+        } catch (error) {
+            console.error('Error saving expiry settings:', error);
+            showError('Terjadi kesalahan saat menyimpan pengaturan expiry reminder');
+        }
+    });
+    }
+
+    // Test webhook
+    async function testWebhook() {
+        try {
+            const response = await fetch('/whatsapp/api/test-webhook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Test webhook berhasil dikirim');
+            } else {
+                showError(data.message || 'Gagal mengirim test webhook');
+            }
+        } catch (error) {
+            console.error('Error testing webhook:', error);
+            showError('Terjadi kesalahan saat mengirim test webhook');
+        }
+    }
+
+    // Test expiry reminder
+    async function testExpiryReminder() {
+        try {
+            showInfo('Mengirim test expiry reminder...');
+
+            const response = await fetch('/whatsapp/api/test-expiry-reminder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Test expiry reminder berhasil dikirim');
+            } else {
+                showError(data.message || 'Gagal mengirim test expiry reminder');
+            }
+        } catch (error) {
+            console.error('Error testing expiry reminder:', error);
+            showError('Terjadi kesalahan saat mengirim test expiry reminder');
+        }
+    }
+
+    // Backup settings
+    async function backupSettings() {
+        try {
+            const response = await fetch('/whatsapp/api/backup-settings');
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `whatsapp-settings-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showSuccess('Backup settings berhasil diunduh');
+            } else {
+                showError('Gagal membuat backup settings');
+            }
+        } catch (error) {
+            console.error('Error backing up settings:', error);
+            showError('Terjadi kesalahan saat membuat backup');
+        }
+    }
+
+    // Restore settings
+    async function restoreSettings() {
+        const fileInput = document.getElementById('restoreFile');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showError('Silakan pilih file backup terlebih dahulu');
+            return;
+        }
+
+        if (!confirm('Restore akan menimpa semua pengaturan saat ini. Lanjutkan?')) {
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('backup', file);
+
+            const response = await fetch('/whatsapp/api/restore-settings', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Settings berhasil di-restore');
+                loadWhatsAppSettings();
+                loadDailyExpirySettings();
+                loadRealtimeExpirySettings();
+                fileInput.value = '';
+            } else {
+                showError(data.message || 'Gagal restore settings');
+            }
+        } catch (error) {
+            console.error('Error restoring settings:', error);
+            showError('Terjadi kesalahan saat restore settings');
+        }
+    }
+
+    // Clear message history
+    async function clearMessageHistory() {
+        if (!confirm('Apakah Anda yakin ingin menghapus semua riwayat pesan? Tindakan ini tidak dapat dibatalkan.')) {
+            return;
+        }
+
+        if (!confirm('Konfirmasi terakhir: Hapus semua riwayat pesan secara permanen?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/whatsapp/api/clear-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Riwayat pesan berhasil dihapus');
+            } else {
+                showError(data.message || 'Gagal menghapus riwayat pesan');
+            }
+        } catch (error) {
+            console.error('Error clearing history:', error);
+            showError('Terjadi kesalahan saat menghapus riwayat pesan');
+        }
+    }
+
+    // Reset WhatsApp connection
+    async function resetWhatsAppConnection() {
+        if (!confirm('Reset akan memutuskan koneksi WhatsApp dan menghapus session. Lanjutkan?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/whatsapp/api/reset-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Koneksi WhatsApp berhasil direset');
+                // Redirect to scan page after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/whatsapp/scan';
+                }, 2000);
+            } else {
+                showError(data.message || 'Gagal mereset koneksi WhatsApp');
+            }
+        } catch (error) {
+            console.error('Error resetting connection:', error);
+            showError('Terjadi kesalahan saat mereset koneksi');
+        }
+    }
+
+    // Show success message
+    function showSuccess(message) {
+        if (typeof ToastSystem !== 'undefined') {
+            ToastSystem.success('Sukses', message);
+        }
+    }
+
+    // Show error message
+    function showError(message) {
+        if (typeof ToastSystem !== 'undefined') {
+            ToastSystem.error('Error', message);
+        }
+    }
+
+    // Show info message
+    function showInfo(message) {
+        if (typeof ToastSystem !== 'undefined') {
+            ToastSystem.info('Info', message);
+        }
+    }
+
+    // Save daily expiry settings
+    async function saveDailyExpirySettings() {
+        const form = document.getElementById('dailyExpirySettingsForm');
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch('/whatsapp/api/daily-expiry-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    enabled: formData.get('enabled') === 'on',
+                    days_before_expiry: parseInt(formData.get('days_before_expiry')) || 7,
+                    reminder_time: formData.get('reminder_time') || '09:00'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Daily expiry settings saved successfully');
+            } else {
+                showError(data.message || 'Failed to save daily expiry settings');
+            }
+        } catch (error) {
+            console.error('Error saving daily expiry settings:', error);
+            showError('Terjadi kesalahan saat menyimpan pengaturan');
+        }
+    }
+
+    // Save realtime expiry settings
+    async function saveRealtimeExpirySettings() {
+        const form = document.getElementById('realtimeExpirySettingsForm');
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch('/whatsapp/api/realtime-expiry-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    enabled: formData.get('enabled') === 'on',
+                    notification_delay_minutes: parseInt(formData.get('notification_delay_minutes')) || 5
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Realtime expiry settings saved successfully');
+            } else {
+                showError(data.message || 'Failed to save realtime expiry settings');
+            }
+        } catch (error) {
+            console.error('Error saving realtime expiry settings:', error);
+            showError('Terjadi kesalahan saat menyimpan pengaturan');
+        }
+    }
+
+  // Save general settings function
+    async function saveGeneralSettings() {
+        const form = document.getElementById('generalSettingsForm');
+        if (!form) return;
+
+        const formData = new FormData(form);
+        const settings = {
+            auto_reply_enabled: formData.get('auto_reply_enabled') === 'on',
+            message_delay: parseInt(formData.get('message_delay')) || 1,
+            max_retries: parseInt(formData.get('max_retries')) || 3,
+            session_timeout: parseInt(formData.get('session_timeout')) || 24
+        };
+
+        try {
+            const response = await fetch('/whatsapp/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess('Pengaturan umum berhasil disimpan');
+            } else {
+                showError(data.message || 'Gagal menyimpan pengaturan');
+            }
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            showError('Terjadi kesalahan saat menyimpan pengaturan');
+        }
+    }
+
+  // Initialize event listeners
+    function initializeEventListeners() {
+        // General settings form
+        const generalForm = document.getElementById('generalSettingsForm');
+        if (generalForm) {
+            generalForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await saveGeneralSettings();
+            });
+        }
+
+        // Daily expiry settings form
+        const dailyForm = document.getElementById('dailyExpirySettingsForm');
+        if (dailyForm) {
+            dailyForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await saveDailyExpirySettings();
+            });
+        }
+
+        // Realtime expiry settings form
+        const realtimeForm = document.getElementById('realtimeExpirySettingsForm');
+        if (realtimeForm) {
+            realtimeForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await saveRealtimeExpirySettings();
+            });
+        }
+    }
+</script>

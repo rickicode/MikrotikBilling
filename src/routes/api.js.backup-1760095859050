@@ -1,0 +1,4261 @@
+async function apiRoutes(fastify, options) {
+  const AuthMiddleware = require('../middleware/auth');
+const { db } = require('../database/DatabaseManager');
+  const auth = new AuthMiddleware(fastify);
+
+  // Test endpoint untuk global error handler (public - no auth required)
+  fastify.get('/test-error', {
+    config: {
+      public: true // Mark as public endpoint
+    }
+  }, async (request, reply) => {
+    // Trigger error untuk testing
+    throw new Error('Test error - Global error handler verification');
+  });
+
+  fastify.get('/test-db-error', {
+    config: {
+      public: true // Mark as public endpoint
+    }
+  }, async (request, reply) => {
+    // Trigger database error
+    return await db.query('SELECT * FROM non_existent_table_for_testing');
+  });
+
+  // Profiles API endpoints
+  // Get profiles list with pagination and filtering
+  fastify.get('/profiles', async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = parseInt(request.query.limit) || 10;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const type = request.query.type || '';
+      const sync = request.query.sync || '';
+      const sort = request.query.sort || 'type';
+      const order = request.query.order || 'asc';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND p.name LIKE ?';
+        params.push(`%${search}%`);
+      }
+
+      if (type) {
+        whereClause += ' AND p.type = ?';
+        params.push(type);
+      }
+
+      if (sync !== '') {
+        whereClause += ' AND p.mikrotik_synced = ?';
+        params.push(sync === '1' ? 1 : 0);
+      }
+
+      // Get profiles with counts
+      db.query('
+        SELECT p.*,
+               COUNT(DISTINCT v.id) as voucher_count,
+               COUNT(DISTINCT pp.id) as pppoe_count
+        FROM profiles p
+        LEFT JOIN vouchers v ON p.id = v.profile_id
+        LEFT JOIN pppoe_users pp ON p.id = pp.profile_id
+        ${whereClause}
+        GROUP BY p.id
+        ORDER BY p.${sort} ${order.toUpperCase()}
+        LIMIT ? OFFSET ?
+      ', [...params, limit, offset]);
+
+      // Get total count
+      const countResult = await db.getOne(`
+        SELECT COUNT(*) as total
+        FROM profiles p
+        ${whereClause}
+      `, params);
+
+      const total = countResult.total;
+      const totalPages = Math.ceil(total / limit);
+
+      return reply.send({
+        success: true,
+        data: profiles,
+        pagination: {
+          current: page,
+          total: totalPages,
+          from: offset + 1,
+          to: Math.min(offset + limit, total),
+          total
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Get profile by ID
+  fastify.get('/profiles/:id', {
+    
+  }, async (request, reply) => {
+    try {
+      const profile = await db.getOne('SELECT * FROM profiles WHERE id = $1', [request.params.id]);
+
+      if (!profile) {
+        return reply.code(404).send({ success: false, message: 'Profile not found' });
+      }
+
+      return reply.send({ success: true, data: profile });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Create profile
+  fastify.post('/profiles', {
+    
+  }, async (request, reply) => {
+    try {
+      const { name, type, bandwidth_up, bandwidth_down, burst_up, burst_down, burst_threshold, burst_time, duration_hours, price_sell, price_cost, managed_by } = request.body;
+
+      // Validate required fields
+      if (!name || !type || !price_sell || !price_cost) {
+        return reply.code(400).send({ success: false, message: 'Required fields are missing' });
+      }
+
+      // Check if profile name exists
+      const existing = await db.getOne('SELECT id FROM profiles WHERE name = $1', [name]);
+      if (existing) {
+        return reply.code(400).send({ success: false, message: 'Profile name already exists' });
+      }
+
+      // Create profile
+      const result = await db.query('
+        INSERT INTO profiles (name, type, bandwidth_up, bandwidth_down, burst_up, burst_down, burst_threshold, burst_time, duration_hours, price_sell, price_cost, mikrotik_name, mikrotik_synced, managed_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+      ', [name, type, bandwidth_up, bandwidth_down, burst_up, burst_down, burst_threshold, burst_time, duration_hours, price_sell, price_cost, name, managed_by || 'manual']);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_profile',
+        'profile',
+        result.lastInsertRowid,
+        { name, type, price_sell, price_cost },
+        request
+      );
+
+      return reply.send({ success: true, message: 'Profile created successfully', id: result.lastInsertRowid });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Update profile
+  fastify.put('/profiles/:id', {
+    
+  }, async (request, reply) => {
+    try {
+      const { name, type, bandwidth_up, bandwidth_down, burst_up, burst_down, burst_threshold, burst_time, duration_hours, price_sell, price_cost, managed_by } = request.body;
+
+      // Validate required fields
+      if (!name || !type || !price_sell || !price_cost) {
+        return reply.code(400).send({ success: false, message: 'Required fields are missing' });
+      }
+
+      // Check if profile name exists (excluding current)
+      const existing = await db.getOne('SELECT id FROM profiles WHERE name = $1 AND id != $2', [name, request.params.id]);
+      if (existing) {
+        return reply.code(400).send({ success: false, message: 'Profile name already exists' });
+      }
+
+      // Update profile
+      await db.query('
+        UPDATE profiles
+        SET name = $1, type = $2, bandwidth_up = $3, bandwidth_down = $4, burst_up = $5, burst_down = $6, burst_threshold = $7, burst_time = $8, duration_hours = $9,
+            price_sell = $10, price_cost = $11, mikrotik_name = $12, managed_by = $13,
+            mikrotik_synced = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $14
+      ', [name, type, bandwidth_up, bandwidth_down, burst_up, burst_down, burst_threshold, burst_time, duration_hours, price_sell, price_cost, name, managed_by, request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_profile',
+        'profile',
+        request.params.id,
+        { name, type, price_sell, price_cost },
+        request
+      );
+
+      return reply.send({ success: true, message: 'Profile updated successfully' });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Sync single profile to RouterOS
+  fastify.post('/profiles/:id/sync', {
+
+  }, async (request, reply) => {
+    try {
+      const profileId = request.params.id;
+
+      // Get profile from database
+      const profile = await db.getOne('SELECT * FROM profiles WHERE id = $1', [profileId]);
+      if (!profile) {
+        return reply.code(404).send({ success: false, message: 'Profile not found' });
+      }
+
+      // Get Mikrotik settings from individual rows
+      const mikrotikHost = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_host']);
+      const mikrotikPort = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_port']);
+      const mikrotikUsername = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_username']);
+      const mikrotikPassword = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_password']);
+
+      if (!mikrotikHost || !mikrotikHost.value || !mikrotikUsername || !mikrotikUsername.value || !mikrotikPassword || !mikrotikPassword.value) {
+        return reply.code(400).send({ success: false, message: 'Mikrotik configuration not found or incomplete' });
+      }
+
+      const { RouterOSClient } = require('mikro-routeros');
+      const client = new RouterOSClient(mikrotikHost.value, parseInt(mikrotikPort.value) || 8728, 10000);
+
+      try {
+        // Connect to RouterOS
+        await client.connect();
+        await client.login(mikrotikUsername.value, mikrotikPassword.value);
+
+        // Determine the path based on profile type
+        const path = profile.type === 'hotspot' ? '/ip/hotspot/user/profile' : '/ppp/profile';
+
+        // First, let's get all existing profiles to see their structure
+        const allProfiles = await client.runQuery(`${path}/print`);
+        console.log('Existing RouterOS profiles:', JSON.stringify(allProfiles, null, 2));
+
+        // Check if profile already exists in RouterOS
+        const existingProfiles = await client.runQuery(`${path}/print`, {
+          '?name': profile.name
+        });
+
+        // Build profile parameters - use ONLY the name parameter for maximum compatibility
+        const profileParams = {
+          name: profile.name
+        };
+
+        console.log('Using minimal profile parameters for maximum compatibility');
+
+        if (existingProfiles && existingProfiles.length > 0) {
+          // Update existing profile
+          const existingId = existingProfiles[0]['.id'];
+          try {
+            await client.runQuery(`${path}/set`, {
+              '.id': existingId,
+              ...profileParams
+            });
+          } catch (updateError) {
+            console.error('Error updating existing profile:', updateError.message);
+            console.error('Profile parameters:', JSON.stringify(profileParams, null, 2));
+            throw new Error(`Failed to update profile: ${updateError.message}`);
+          }
+        } else {
+          // Create new profile
+          try {
+            await client.runQuery(`${path}/add`, profileParams);
+          } catch (createError) {
+            console.error('Error creating new profile:', createError.message);
+            console.error('Profile parameters:', JSON.stringify(profileParams, null, 2));
+            throw new Error(`Failed to create profile: ${createError.message}`);
+          }
+        }
+
+        // Update sync status in database
+        await db.query('UPDATE profiles SET mikrotik_synced = 1, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [profileId]);
+
+        // Log activity
+        await auth.logActivity(
+          request.admin.id,
+          'sync_profile',
+          'profile',
+          profileId,
+          { name: profile.name, type: profile.type, action: existingProfiles.length > 0 ? 'updated' : 'created' },
+          request
+        );
+
+        return reply.send({
+          success: true,
+          message: `Profile ${existingProfiles.length > 0 ? 'updated' : 'created'} successfully in RouterOS`,
+          action: existingProfiles.length > 0 ? 'updated' : 'created'
+        });
+
+      } finally {
+        if (client.connected) {
+          await client.close();
+        }
+      }
+
+    } catch (error) {
+      fastify.log.error('RouterOS sync error:', error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Failed to sync profile to RouterOS: ' + error.message
+      });
+    }
+  });
+
+  // Sync all profiles to RouterOS
+  fastify.post('/profiles/sync-all', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      // Get all unsynced profiles
+      const profiles = db.query('SELECT * FROM profiles WHERE mikrotik_synced = 0 OR mikrotik_synced IS NULL');
+
+      if (profiles.length === 0) {
+        return reply.send({ success: true, message: 'All profiles are already synced' });
+      }
+
+      // Get Mikrotik settings from individual rows
+      const mikrotikHost = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_host']);
+      const mikrotikPort = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_port']);
+      const mikrotikUsername = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_username']);
+      const mikrotikPassword = await db.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_password']);
+
+      if (!mikrotikHost || !mikrotikHost.value || !mikrotikUsername || !mikrotikUsername.value || !mikrotikPassword || !mikrotikPassword.value) {
+        return reply.code(400).send({ success: false, message: 'Mikrotik configuration not found or incomplete' });
+      }
+
+      const { RouterOSClient } = require('mikro-routeros');
+      const client = new RouterOSClient(mikrotikHost.value, parseInt(mikrotikPort.value) || 8728, 10000);
+
+      let successCount = 0;
+      let errorCount = 0;
+      const results = [];
+
+      try {
+        // Connect to RouterOS
+        await client.connect();
+        await client.login(mikrotikUsername.value, mikrotikPassword.value);
+
+        for (const profile of profiles) {
+          try {
+            // Determine the path based on profile type
+            const path = profile.type === 'hotspot' ? '/ip/hotspot/user/profile' : '/ppp/profile';
+
+            // Check if profile already exists in RouterOS
+            const existingProfiles = await client.runQuery(`${path}/print`, {
+              '?name': profile.name
+            });
+
+            // Build profile parameters - use ONLY the name parameter for maximum compatibility
+            const profileParams = {
+              name: profile.name
+            };
+
+            console.log(`Using minimal profile parameters for ${profile.name}`);
+
+            // Add rate limit for RouterOS (different parameter names for different profile types)
+            // NOTE: Skip rate limiting for now to test basic profile creation
+            // if (profile.bandwidth_up || profile.bandwidth_down) {
+            //   if (profile.type === 'hotspot') {
+            //     // For hotspot profiles, use rate-limit
+            //     profileParams['rate-limit'] = `${profile.bandwidth_up || '0'}/${profile.bandwidth_down || '0'}`;
+            //   } else {
+            //     // For PPP profiles, use rate-limit (same parameter)
+            //     profileParams['rate-limit'] = `${profile.bandwidth_up || '0'}/${profile.bandwidth_down || '0'}`;
+            //   }
+            // }
+
+            // Add burst limit if configured
+            // NOTE: Skip burst parameters for now to test basic profile creation
+            // if (profile.burst_up && profile.burst_down) {
+            //   if (profile.type === 'hotspot') {
+            //     profileParams['burst-limit'] = profile.burst_down;
+            //     profileParams['burst-threshold'] = profile.burst_threshold || '50';
+            //     profileParams['burst-time'] = profile.burst_time || '30';
+            //   } else {
+            //     // PPP profiles might use different burst parameter names
+            //     profileParams['burst-limit'] = profile.burst_down;
+            //     profileParams['burst-threshold'] = profile.burst_threshold || '50';
+            //     profileParams['burst-time'] = profile.burst_time || '30';
+            //   }
+            // }
+
+            // Add duration limit for hotspot profiles
+            // NOTE: Skip duration limit for now to test basic profile creation
+            // if (profile.type === 'hotspot' && profile.duration_hours) {
+            //   profileParams['session-timeout'] = profile.duration_hours * 3600; // Convert hours to seconds
+            // }
+
+            if (existingProfiles && existingProfiles.length > 0) {
+              // Update existing profile
+              const existingId = existingProfiles[0]['.id'];
+              await client.runQuery(`${path}/set`, {
+                '.id': existingId,
+                ...profileParams
+              });
+            } else {
+              // Create new profile
+              await client.runQuery(`${path}/add`, profileParams);
+            }
+
+            // Update sync status in database
+            await db.query('UPDATE profiles SET mikrotik_synced = 1, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [profile.id]);
+
+            successCount++;
+            results.push({
+              profileId: profile.id,
+              name: profile.name,
+              status: 'success',
+              action: existingProfiles.length > 0 ? 'updated' : 'created'
+            });
+
+          } catch (profileError) {
+            errorCount++;
+            results.push({
+              profileId: profile.id,
+              name: profile.name,
+              status: 'error',
+              error: profileError.message
+            });
+            fastify.log.error(`Error syncing profile ${profile.name}:`, profileError);
+          }
+        }
+
+        // Log activity
+        await auth.logActivity(
+          request.admin.id,
+          'sync_all_profiles',
+          'profile',
+          null,
+          { total: profiles.length, success: successCount, errors: errorCount },
+          request
+        );
+
+        return reply.send({
+          success: true,
+          message: `Sync completed: ${successCount} successful, ${errorCount} failed`,
+          results: results,
+          summary: { total: profiles.length, success: successCount, errors: errorCount }
+        });
+
+      } finally {
+        if (client.connected) {
+          await client.close();
+        }
+      }
+
+    } catch (error) {
+      fastify.log.error('RouterOS bulk sync error:', error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Failed to sync profiles to RouterOS: ' + error.message
+      });
+    }
+  });
+
+  // Delete profile
+  fastify.delete('/profiles/:id', {
+    
+  }, async (request, reply) => {
+    try {
+      const profile = await db.getOne('SELECT * FROM profiles WHERE id = $1', [request.params.id]);
+
+      if (!profile) {
+        return reply.code(404).send({ success: false, message: 'Profile not found' });
+      }
+
+      // Check if profile is in use
+      const inUse = await db.getOne(`
+        SELECT
+          (SELECT COUNT(*) FROM vouchers WHERE profile_id = ?) +
+          (SELECT COUNT(*) FROM pppoe_users WHERE profile_id = ?) as total
+      `, [request.params.id, request.params.id]);
+
+      if (inUse.total > 0) {
+        return reply.code(400).send({ success: false, message: 'Cannot delete profile that is in use' });
+      }
+
+      // Delete profile
+      await db.query('DELETE FROM profiles WHERE id = $1', [request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'delete_profile',
+        'profile',
+        request.params.id,
+        { profile_data: profile },
+        request
+      );
+
+      return reply.send({ success: true, message: 'Profile deleted successfully' });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Get profiles statistics
+  fastify.get('/profiles/stats', {
+    
+  }, async (request, reply) => {
+    try {
+      const stats = {
+        total: 0,
+        hotspot: 0,
+        pppoe: 0,
+        synced: 0,
+        unsynced: 0
+      };
+
+      // Get total profiles
+      const totalResult = await db.getOne('SELECT COUNT(*) as total FROM profiles');
+      stats.total = totalResult.total;
+
+      // Get by type
+      const hotspotResult = await db.getOne('SELECT COUNT(*) as count FROM profiles WHERE type = \'hotspot\'');
+      stats.hotspot = hotspotResult.rowCount;
+
+      const pppoeResult = await db.getOne('SELECT COUNT(*) as count FROM profiles WHERE type = \'pppoe\'');
+      stats.pppoe = pppoeResult.rowCount;
+
+      // Get sync status
+      const syncedResult = await db.getOne('SELECT COUNT(*) as count FROM profiles WHERE mikrotik_synced = 1');
+      stats.synced = syncedResult.rowCount;
+
+      stats.unsynced = stats.total - stats.synced;
+
+      return reply.send({ success: true, data: stats });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Dashboard statistics API
+  fastify.get('/dashboard/stats', {
+    
+  }, async (request, reply) => {
+    try {
+      // Get real-time statistics from Mikrotik
+      let hotspotStats = { active: 0, used: 0, expired: 0 };
+      let pppoeStats = { active: 0, disabled: 0, online: 0 };
+
+      try {
+        // Get hotspot users
+        const hotspotUsers = await fastify.mikrotik.findSystemUsers('hotspot');
+        hotspotStats.total = hotspotUsers.length;
+        hotspotStats.active = hotspotUsers.filter(u => !u.first_login).length;
+        hotspotStats.used = hotspotUsers.filter(u => u.first_login).length;
+
+        // Get PPPoE users
+        const pppoeUsers = await fastify.mikrotik.findSystemUsers('pppoe');
+        pppoeStats.total = pppoeUsers.length;
+        pppoeStats.active = pppoeUsers.filter(u => u.disabled !== 'true').length;
+        pppoeStats.disabled = pppoeUsers.filter(u => u.disabled === 'true').length;
+
+        // Get active sessions
+        const pppoeActive = await fastify.mikrotik.getPPPoEActive();
+        pppoeStats.online = pppoeActive.length;
+
+      } catch (error) {
+        console.error('Error getting Mikrotik stats:', error);
+      }
+
+      // Get database statistics
+      const dbStats = {
+        totalCustomers: await db.getOne('SELECT COUNT(*) as count FROM customers WHERE status_aktif = 1').rowCount,
+        activeSubscriptions: await db.getOne('SELECT COUNT(*) as count FROM subscriptions WHERE status = \'active\'').rowCount,
+        todayRevenue: await db.getOne(`
+          SELECT COALESCE(SUM(amount), 0) as total
+          FROM payments
+          WHERE payment_status = \'paid\'
+          AND DATE(created_at) = DATE('now')
+        `).total,
+        totalProfit: await db.getOne(`
+          SELECT COALESCE(SUM(p.price_sell - p.price_cost), 0) as total
+          FROM (
+            SELECT price_sell, price_cost FROM vouchers
+            UNION ALL
+            SELECT price_sell, price_cost FROM pppoe_users
+          ) p
+        `).total
+      };
+
+      // Get system health
+      const systemHealth = {
+        mikrotikConnected: fastify.mikrotik.isConnected(),
+        lastCleanup: await db.getOne(`
+          SELECT MAX(created_at) as last_run
+          FROM cleanup_logs
+        `).last_run,
+        pendingNotifications: await db.getOne('SELECT COUNT(*) as count FROM notification_queue WHERE status = \'pending\'').rowCount
+      };
+
+      return reply.send({
+        hotspot: hotspotStats,
+        pppoe: pppoeStats,
+        database: dbStats,
+        system: systemHealth,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Hotspot users API
+  fastify.get('/hotspot/users', {
+    
+  }, async (request, reply) => {
+    try {
+      const users = await fastify.mikrotik.findSystemUsers('hotspot');
+      const activeSessions = await fastify.mikrotik.getHotspotActive();
+
+      const enhancedUsers = users.map(user => {
+        const activeSession = activeSessions.find(s => s.user === user.name);
+        const commentData = fastify.mikrotik.parseComment(user.comment) || {};
+
+        return {
+          name: user.name,
+          profile: user.profile,
+          disabled: user.disabled === 'true',
+          uptime: user.uptime,
+          commentData,
+          activeSession: activeSession ? {
+            address: activeSession.address,
+            uptime: activeSession.uptime,
+            bytesIn: activeSession['bytes-in'],
+            bytesOut: activeSession['bytes-out']
+          } : null
+        };
+      });
+
+      return reply.send({
+        users: enhancedUsers,
+        total: users.length,
+        active: enhancedUsers.filter(u => u.activeSession).length
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // PPPoE users API (Mikrotik system users)
+  fastify.get('/pppoe/users', {
+    
+  }, async (request, reply) => {
+    try {
+      const users = await fastify.mikrotik.findSystemUsers('pppoe');
+      const activeSessions = await fastify.mikrotik.getPPPoEActive();
+
+      const enhancedUsers = users.map(user => {
+        const activeSession = activeSessions.find(s => s.name === user.name);
+        const commentData = fastify.mikrotik.parseComment(user.comment) || {};
+
+        return {
+          name: user.name,
+          profile: user.profile,
+          disabled: user.disabled === 'true',
+          uptime: user.uptime,
+          commentData,
+          activeSession: activeSession ? {
+            address: activeSession.address,
+            uptime: activeSession.uptime,
+            bytesIn: activeSession['bytes-in'],
+            bytesOut: activeSession['bytes-out']
+          } : null
+        };
+      });
+
+      return reply.send({
+        users: enhancedUsers,
+        total: users.length,
+        active: enhancedUsers.filter(u => u.activeSession).length
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // PPPoE database users API (for web interface)
+  fastify.get('/pppoe', {
+    
+  }, async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const pageSize = parseInt(request.query.page_size) || 10;
+      const offset = (page - 1) * pageSize;
+      const search = request.query.search || '';
+      const profile = request.query.profile || '';
+      const status = request.query.status || '';
+      const expiry = request.query.expiry || '';
+      const sync = request.query.sync === 'true';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (p.username LIKE ? OR c.nama LIKE ? OR c.nomor_hp LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (profile) {
+        whereClause += ' AND p.profile_id = ?';
+        params.push(profile);
+      }
+
+      if (status) {
+        whereClause += ' AND p.status = ?';
+        params.push(status);
+      }
+
+      if (expiry === 'today') {
+        whereClause += ' AND DATE(p.expiry_date) = DATE("now")';
+      } else if (expiry === 'week') {
+        whereClause += ' AND DATE(p.expiry_date) >= DATE("now") AND DATE(p.expiry_date) <= DATE("now", "+7 days")';
+      } else if (expiry === 'month') {
+        whereClause += ' AND DATE(p.expiry_date) >= DATE("now") AND DATE(p.expiry_date) <= DATE("now", "+1 month")';
+      } else if (expiry === 'expired') {
+        whereClause += ' AND DATE(p.expiry_date) < DATE("now")';
+      }
+
+      // Get PPPoE users from database
+      db.query('
+        SELECT p.*, c.nama as customer_nama, c.nomor_hp as customer_nomor_hp, c.email as customer_email,
+               pr.name as profile_name, pr.time_limit
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN profiles pr ON p.profile_id = pr.id
+        ${whereClause}
+        ORDER BY p.created_at DESC
+        LIMIT ? OFFSET ?
+      ', [...params, pageSize, offset]);
+
+      // Get total count
+      const countResult = await db.getOne(`
+        SELECT COUNT(*) as total
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        ${whereClause}
+      `, params);
+
+      const total = countResult.total;
+      const totalPages = Math.ceil(total / pageSize);
+
+      // Get real-time online status from Mikrotik if sync is enabled
+      let onlineUsers = new Set();
+      if (sync && fastify.mikrotik.connected) {
+        try {
+          const activeSessions = await fastify.mikrotik.getPPPoEActive();
+          onlineUsers = new Set(activeSessions.map(s => s.name));
+        } catch (error) {
+          console.error('Error getting PPPoE active sessions:', error);
+        }
+      }
+
+      // Enhance users with online status
+      const enhancedUsers = users.map(user => ({
+        ...user,
+        is_online: onlineUsers.has(user.username)
+      }));
+
+      // Get statistics
+      const statistics = {
+        total: await db.getOne('SELECT COUNT(*) as count FROM pppoe_users').rowCount,
+        active: await db.getOne('SELECT COUNT(*) as count FROM pppoe_users WHERE status = \'active\'').rowCount,
+        expired: await db.getOne('SELECT COUNT(*) as count FROM pppoe_users WHERE status = \'expired\'').rowCount,
+        online: onlineUsers.size
+      };
+
+      return reply.send({
+        success: true,
+        pppoe_users: enhancedUsers,
+        pagination: {
+          page,
+          total_pages: totalPages,
+          from: offset + 1,
+          to: Math.min(offset + pageSize, total),
+          total
+        },
+        statistics
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // PPPoE statistics API
+  fastify.get('/pppoe/statistics', {
+    
+  }, async (request, reply) => {
+    try {
+      // Get database statistics
+      const stats = {
+        total: await db.getOne('SELECT COUNT(*) as count FROM pppoe_users').rowCount,
+        active: await db.getOne('SELECT COUNT(*) as count FROM pppoe_users WHERE status = \'active\'').rowCount,
+        disabled: await db.getOne('SELECT COUNT(*) as count FROM pppoe_users WHERE status = \'disabled\'').rowCount,
+        expired: await db.getOne('SELECT COUNT(*) as count FROM pppoe_users WHERE status = \'expired\'').rowCount,
+        online: 0
+      };
+
+      // Get online count from Mikrotik
+      try {
+        const activeSessions = await fastify.mikrotik.getPPPoEActive();
+        stats.online = activeSessions.length;
+      } catch (error) {
+        console.error('Error getting PPPoE online count:', error);
+      }
+
+      return reply.send({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Get PPPoE user by ID
+  fastify.get('/pppoe/:id', {
+    
+  }, async (request, reply) => {
+    try {
+      const user = await db.getOne(`
+        SELECT p.*, c.nama as customer_nama, c.nomor_hp as customer_nomor_hp, c.email as customer_email,
+               pr.name as profile_name
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN profiles pr ON p.profile_id = pr.id
+        WHERE p.id = $1
+      `, [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'PPPoE user not found' });
+      }
+
+      // Check online status from Mikrotik
+      try {
+        const activeSessions = await fastify.mikrotik.getPPPoEActive();
+        const activeSession = activeSessions.find(s => s.name === user.username);
+
+        if (activeSession) {
+          user.is_online = true;
+          user.online_ip = activeSession.address;
+          user.online_uptime = activeSession.uptime;
+        } else {
+          user.is_online = false;
+        }
+      } catch (error) {
+        console.error('Error checking PPPoE online status:', error);
+        user.is_online = false;
+      }
+
+      return reply.send({
+        success: true,
+        data: user
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Enable PPPoE user
+  fastify.post('/pppoe/:id/enable', {
+    
+  }, async (request, reply) => {
+    try {
+      const user = await db.getOne('SELECT * FROM pppoe_users WHERE id = $1', [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'PPPoE user not found' });
+      }
+
+      // Update in database
+      await db.query('
+        UPDATE pppoe_users
+        SET status = 'active', updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      ', [request.params.id]);
+
+      // Update in Mikrotik
+      try {
+        await fastify.mikrotik.updatePPPoESecret(user.username, { disabled: 'no' });
+      } catch (error) {
+        console.error('Error enabling PPPoE in Mikrotik:', error);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'enable_pppoe_user',
+        'pppoe_user',
+        request.params.id,
+        { username: user.username },
+        request
+      );
+
+      return reply.send({ success: true, message: 'PPPoE user enabled successfully' });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Disable PPPoE user
+  fastify.post('/pppoe/:id/disable', {
+    
+  }, async (request, reply) => {
+    try {
+      const user = await db.getOne('SELECT * FROM pppoe_users WHERE id = $1', [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'PPPoE user not found' });
+      }
+
+      // Update in database
+      await db.query('
+        UPDATE pppoe_users
+        SET status = 'disabled', updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      ', [request.params.id]);
+
+      // Update in Mikrotik
+      try {
+        await fastify.mikrotik.updatePPPoESecret(user.username, { disabled: 'yes' });
+      } catch (error) {
+        console.error('Error disabling PPPoE in Mikrotik:', error);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'disable_pppoe_user',
+        'pppoe_user',
+        request.params.id,
+        { username: user.username },
+        request
+      );
+
+      return reply.send({ success: true, message: 'PPPoE user disabled successfully' });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Calculate PPPoE extension cost
+  fastify.get('/pppoe/:id/calculate-extend', {
+    
+  }, async (request, reply) => {
+    try {
+      const user = await db.getOne(`
+        SELECT p.*, pr.price_sell, pr.price_cost
+        FROM pppoe_users p
+        JOIN profiles pr ON p.profile_id = pr.id
+        WHERE p.id = $1
+      `, [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'PPPoE user not found' });
+      }
+
+      const duration = parseInt(request.query.duration) || 30;
+      const dailyRate = user.price_sell / ((user.duration_hours / 24) || 30);
+      const totalPrice = dailyRate * duration;
+
+      return reply.send({
+        success: true,
+        total_price: totalPrice,
+        daily_rate: dailyRate,
+        duration: duration
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Extend PPPoE user
+  fastify.post('/pppoe/:id/extend', {
+    
+  }, async (request, reply) => {
+    try {
+      const { duration_days, payment_method } = request.body;
+      const user = await db.getOne(`
+        SELECT p.*, c.nama as customer_nama, c.nomor_hp, pr.price_sell, pr.price_cost
+        FROM pppoe_users p
+        JOIN customers c ON p.customer_id = c.id
+        JOIN profiles pr ON p.profile_id = pr.id
+        WHERE p.id = $1
+      `, [request.params.id]);
+
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'PPPoE user not found' });
+      }
+
+      // Calculate new expiry date
+      const currentExpiry = new Date(user.expiry_date);
+      const newExpiry = new Date(currentExpiry);
+      newExpiry.setDate(newExpiry.getDate() + parseInt(duration_days));
+
+      // Calculate price
+      const dailyRate = user.price_sell / ((user.duration_hours / 24) || 30);
+      const totalPrice = dailyRate * duration_days;
+
+      // Update in database
+      await db.query(`
+        UPDATE pppoe_users
+        SET expiry_date = $1, status = 'active', updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [newExpiry.toISOString().split('T')[0], request.params.id]);
+
+      // Update in Mikrotik
+      try {
+        const mikrotikUsers = await fastify.mikrotik.getPPPoESecrets();
+        const mikrotikUser = mikrotikUsers.find(u => u.name === user.username);
+
+        if (mikrotikUser) {
+          const commentData = fastify.mikrotik.parseComment(mikrotikUser.comment) || {};
+          commentData.expiry_date = newExpiry.toISOString().split('T')[0];
+          commentData.extended_by = request.admin.username;
+          commentData.extended_date = new Date().toISOString().split('T')[0];
+
+          await fastify.mikrotik.updatePPPoESecret(user.username, {
+            comment: fastify.mikrotik.formatComment(commentData),
+            disabled: 'no'
+          });
+        }
+      } catch (error) {
+        console.error('Error updating PPPoE in Mikrotik:', error);
+      }
+
+      // Record payment if specified
+      if (payment_method && totalPrice > 0) {
+        await db.query('
+          INSERT INTO payments (customer_id, amount, payment_method, payment_status, description)
+          VALUES (?, ?, ?, 'paid', ?)
+        ', [user.customer_id, totalPrice, payment_method, `PPPoE extension: ${user.username}`]);
+
+        // Log transaction
+        await db.query('
+          INSERT INTO transaction_logs (customer_id, type, description, amount)
+          VALUES (?, 'payment', ?, ?)
+        ', [user.customer_id, `PPPoE extension payment: ${user.username}`, totalPrice]);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'extend_pppoe_user',
+        'pppoe_user',
+        request.params.id,
+        {
+          username: user.username,
+          duration_days,
+          new_expiry_date: newExpiry.toISOString().split('T')[0],
+          total_price: totalPrice,
+          payment_method
+        },
+        request
+      );
+
+      // Send notification
+      if (user.nomor_hp) {
+        const whatsappService = fastify.whatsappService;
+        await whatsappService.sendNotification(user.customer_id, 'pppoe_extended', {
+          customer_name: user.customer_nama,
+          username: user.username,
+          new_expiry_date: newExpiry.toLocaleDateString('id-ID'),
+          additional_days: duration_days
+        });
+      }
+
+      return reply.send({
+        success: true,
+        message: 'PPPoE user extended successfully',
+        new_expiry_date: newExpiry.toISOString().split('T')[0]
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Sync PPPoE with Mikrotik
+  fastify.post('/pppoe/sync', {
+    
+  }, async (request, reply) => {
+    try {
+      let syncedCount = 0;
+
+      // Get PPPoE secrets from Mikrotik
+      const mikrotikUsers = await fastify.mikrotik.getPPPoESecrets();
+
+      // Sync each user
+      for (const mikrotikUser of mikrotikUsers) {
+        const commentData = fastify.mikrotik.parseComment(mikrotikUser.comment) || {};
+
+        if (commentData.system === 'pppoe' && commentData.customer_id) {
+          // Check if user exists in database
+          const dbUser = await db.getOne('SELECT * FROM pppoe_users WHERE username = $1', [mikrotikUser.name]);
+
+          if (!dbUser) {
+            // Create user in database
+            const profile = await db.getOne('SELECT * FROM profiles WHERE name = $1', [mikrotikUser.profile]);
+
+            if (profile) {
+              await db.query(`
+                INSERT INTO pppoe_users (
+                  customer_id, profile_id, username, password,
+                  price_sell, price_cost, start_date, expiry_date,
+                  status, mikrotik_user, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+              `, [
+                commentData.customer_id,
+                profile.id,
+                mikrotikUser.name,
+                mikrotikUser.password || 'unknown',
+                commentData.price_sell || profile.price_sell,
+                commentData.price_cost || profile.price_cost,
+                new Date().toISOString().split('T')[0],
+                commentData.expiry_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                mikrotikUser.disabled === 'true' ? 'disabled' : 'active',
+                mikrotikUser.name
+              ]);
+
+              syncedCount++;
+            }
+          } else {
+            // Update existing user status
+            const newStatus = mikrotikUser.disabled === 'true' ? 'disabled' : 'active';
+            if (dbUser.status !== newStatus) {
+              await db.query('
+                UPDATE pppoe_users
+                SET status = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2
+              ', [newStatus, dbUser.id]);
+
+              syncedCount++;
+            }
+          }
+        }
+      }
+
+      return reply.send({
+        success: true,
+        message: 'PPPoE sync completed successfully',
+        synced_count: syncedCount
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // System resources API
+  fastify.get('/system/resources', {
+    
+  }, async (request, reply) => {
+    try {
+      const [resources, health] = await Promise.all([
+        fastify.mikrotik.getSystemResources(),
+        fastify.mikrotik.getSystemHealth()
+      ]);
+
+      return reply.send({
+        resources,
+        health,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Interface traffic API
+  fastify.get('/interface/traffic/:interfaceName', {
+    
+  }, async (request, reply) => {
+    try {
+      const traffic = await fastify.mikrotik.getInterfaceTraffic(request.params.interfaceName);
+      return reply.send({
+        interface: request.params.interfaceName,
+        traffic,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Customer search API
+  fastify.get('/customers/search', {
+    
+  }, async (request, reply) => {
+    try {
+      const query = request.query.q || '';
+      const limit = parseInt(request.query.limit) || 10;
+
+      if (query.length < 2) {
+        return reply.send({ customers: [] });
+      }
+
+      db.query('
+        SELECT id, nama, nomor_hp, email, status_aktif
+        FROM customers
+        WHERE status_aktif = 1
+        AND (nama LIKE ? OR nomor_hp LIKE ? OR email LIKE ?)
+        ORDER BY nama
+        LIMIT ?
+      ', [`%${query}%`, `%${query}%`, `%${query}%`, limit]);
+
+      return reply.send({ customers });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Public Mikrotik connection status check
+  fastify.get('/public/system/connection', async (request, reply) => {
+    try {
+      const connectionInfo = fastify.mikrotik.getConnectionInfo();
+
+      if (connectionInfo.connected && connectionInfo.hasValidConfig) {
+        // Test connection with a simple command
+        await fastify.mikrotik.getSystemResources();
+        connectionInfo.status = 'connected';
+      } else if (!connectionInfo.hasValidConfig) {
+        connectionInfo.status = 'not_configured';
+      } else {
+        connectionInfo.status = 'disconnected';
+      }
+
+      return reply.send(connectionInfo);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.send({
+        connected: false,
+        status: 'error',
+        error: error.message
+      });
+    }
+  });
+
+  // Check Mikrotik connection API (protected)
+  fastify.get('/system/connection', {
+    
+  }, async (request, reply) => {
+    try {
+      const connectionInfo = fastify.mikrotik.getConnectionInfo();
+
+      if (connectionInfo.connected) {
+        // Test connection with a simple command
+        await fastify.mikrotik.getSystemResources();
+        connectionInfo.status = 'connected';
+      } else {
+        connectionInfo.status = 'disconnected';
+      }
+
+      return reply.send(connectionInfo);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.send({
+        connected: false,
+        status: 'error',
+        error: error.message
+      });
+    }
+  });
+
+  // Manual cleanup API
+  fastify.post('/system/cleanup', {
+    
+  }, async (request, reply) => {
+    try {
+      const { type } = request.body;
+
+      let result = { cleaned: 0 };
+
+      if (type === 'hotspot' || type === 'all') {
+        const expiredUsers = await fastify.mikrotik.findExpiredUsers('hotspot');
+        result.hotspot = expiredUsers.length;
+
+        for (const user of expiredUsers) {
+          try {
+            await fastify.mikrotik.deleteHotspotUser(user.name);
+            await db.query('UPDATE vouchers SET status = "expired" WHERE voucher_code = $1', [user.name]);
+            result.cleaned++;
+          } catch (error) {
+            console.error(`Error deleting hotspot user ${user.name}:`, error);
+          }
+        }
+      }
+
+      if (type === 'pppoe' || type === 'all') {
+        const expiredUsers = await fastify.mikrotik.findExpiredUsers('pppoe');
+        result.pppoe = expiredUsers.length;
+
+        for (const user of expiredUsers) {
+          try {
+            await fastify.mikrotik.updatePPPoESecret(user.name, { disabled: 'yes' });
+            await db.query('UPDATE pppoe_users SET status = "disabled" WHERE username = $1', [user.name]);
+            result.cleaned++;
+          } catch (error) {
+            console.error(`Error disabling PPPoE user ${user.name}:`, error);
+          }
+        }
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'manual_cleanup',
+        null,
+        null,
+        { type, cleaned: result.cleaned },
+        request
+      );
+
+      return reply.send({
+        success: true,
+        result
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Export data API
+  fastify.get('/export/:type', {
+    
+  }, async (request, reply) => {
+    try {
+      const { type } = request.params;
+      const { format = 'json' } = request.query;
+
+      let data = [];
+      let filename = '';
+
+      switch (type) {
+        case 'customers':
+          data = db.query('
+            SELECT c.*,
+                   COUNT(DISTINCT s.id) as subscription_count,
+                   COALESCE(SUM(p.amount), 0) as total_payments
+            FROM customers c
+            LEFT JOIN subscriptions s ON c.id = s.customer_id
+            LEFT JOIN payments p ON c.id = p.customer_id AND p.payment_status = 'paid'
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+          ');
+          filename = `customers_${new Date().toISOString().split('T')[0]}`;
+          break;
+
+        case 'vouchers':
+          data = db.query('
+            SELECT v.*, p.name as profile_name, vb.batch_id as batch_reference
+            FROM vouchers v
+            JOIN profiles p ON v.profile_id = p.id
+            JOIN voucher_batches vb ON v.batch_id = vb.batch_id
+            ORDER BY v.created_at DESC
+          ');
+          filename = `vouchers_${new Date().toISOString().split('T')[0]}`;
+          break;
+
+        case 'pppoe':
+          data = db.query('
+            SELECT p.*, c.nama as customer_name, pr.name as profile_name
+            FROM pppoe_users p
+            JOIN customers c ON p.customer_id = c.id
+            JOIN profiles pr ON p.profile_id = pr.id
+            ORDER BY p.created_at DESC
+          ');
+          filename = `pppoe_users_${new Date().toISOString().split('T')[0]}`;
+          break;
+
+        default:
+          return reply.code(400).send({ error: 'Invalid export type' });
+      }
+
+      if (format === 'csv') {
+        // Convert to CSV
+        const headers = Object.keys(data[0] || {});
+        const csvContent = [
+          headers.join(','),
+          ...data.map(row => headers.map(header => {
+            const value = row[header];
+            return typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
+          }).join(','))
+        ].join('\n');
+
+        reply.header('Content-Type', 'text/csv');
+        reply.header('Content-Disposition', `attachment; filename="${filename}.csv"`);
+        return reply.send(csvContent);
+      } else {
+        // Return JSON
+        reply.header('Content-Type', 'application/json');
+        reply.header('Content-Disposition', `attachment; filename="${filename}.json"`);
+        return reply.send(data);
+      }
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Webhook for DuitKu payment notifications
+  fastify.post('/webhook/duitku', {
+    config: { skipAuth: true } // Skip authentication for webhook
+  }, async (request, reply) => {
+    try {
+      const { merchantCode, merchantOrderId, amount, paymentCode, paymentAmount, statusCode } = request.body;
+
+      // Verify merchant code
+      const configuredMerchantCode = await db.getOne('SELECT value FROM settings WHERE key = "duitku_merchant_code"')?.value;
+      if (merchantCode !== configuredMerchantCode) {
+        return reply.code(400).send({ error: 'Invalid merchant code' });
+      }
+
+      // Find payment link
+      const paymentLink = await db.getOne(`
+        SELECT * FROM payment_links
+        WHERE duitku_invoice = $1 AND status = 'pending'
+      `, [merchantOrderId]);
+
+      if (!paymentLink) {
+        return reply.code(404).send({ error: 'Payment link not found' });
+      }
+
+      // Update payment link status
+      let newStatus = 'pending';
+      if (statusCode === '00') {
+        newStatus = 'paid';
+      } else if (statusCode === '01') {
+        newStatus = 'expired';
+      } else {
+        newStatus = 'failed';
+      }
+
+      await db.query('
+        UPDATE payment_links
+        SET status = $1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      ', [newStatus, paymentLink.id]);
+
+      // If payment is successful, create payment record and activate subscription
+      if (statusCode === '00') {
+        // Create payment record
+        await db.query('
+          INSERT INTO payments (customer_id, amount, payment_method, payment_status, description)
+          VALUES (?, ?, 'duitku', 'paid', ?)
+        ', [paymentLink.customer_id, paymentAmount, `DuitKu payment: ${merchantOrderId}`]);
+
+        // Log transaction
+        await db.query('
+          INSERT INTO transaction_logs (customer_id, type, description, amount)
+          VALUES (?, 'payment', ?, ?)
+        ', [paymentLink.customer_id, `DuitKu payment received: ${merchantOrderId}`, paymentAmount]);
+
+        // Activate related subscriptions
+        db.query('
+          SELECT * FROM subscriptions
+          WHERE customer_id = ? AND status = 'expired'
+        ', [paymentLink.customer_id]);
+
+        for (const subscription of subscriptions) {
+          // Calculate new expiry date
+          const newExpiryDate = new Date();
+          switch (subscription.billing_cycle) {
+            case 'daily':
+              newExpiryDate.setDate(newExpiryDate.getDate() + 1);
+              break;
+            case 'weekly':
+              newExpiryDate.setDate(newExpiryDate.getDate() + 7);
+              break;
+            case 'monthly':
+              newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
+              break;
+            case 'yearly':
+              newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1);
+              break;
+          }
+
+          // Update subscription
+          await db.query(`
+            UPDATE subscriptions
+            SET status = 'active', next_billing_date = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
+          `, [newExpiryDate.toISOString().split('T')[0], subscription.id]);
+
+          // Enable related PPPoE users
+          if (subscription.service_type === 'pppoe') {
+            db.query('
+              SELECT * FROM pppoe_users
+              WHERE customer_id = ? AND status = 'disabled'
+            ', [paymentLink.customer_id]);
+
+            for (const user of pppoeUsers) {
+              try {
+                await fastify.mikrotik.updatePPPoESecret(user.username, {
+                  disabled: 'no'
+                });
+
+                await db.query('
+                  UPDATE pppoe_users
+                  SET status = 'active', updated_at = CURRENT_TIMESTAMP
+                  WHERE id = $1
+                ', [user.id]);
+              } catch (error) {
+                console.error(`Error enabling PPPoE user ${user.username}:`, error);
+              }
+            }
+          }
+        }
+
+        // Send confirmation notification
+        const customer = await db.getOne(
+          'SELECT * FROM customers WHERE id = $1',
+          [paymentLink.customer_id]
+        );
+
+        if (customer && customer.nomor_hp) {
+          await whatsappService.sendNotification(paymentLink.customer_id, 'payment_received', {
+            amount: paymentAmount,
+            payment_method: 'DuitKu',
+            merchant_order_id: merchantOrderId
+          });
+        }
+      }
+
+      return reply.send({ success: true, status: newStatus });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Test Mikrotik connection
+  fastify.post('/mikrotik/test-connection', {
+    
+  }, async (request, reply) => {
+    try {
+      const { host, port, username, password, use_ssl } = request.body;
+
+      if (!host || !port || !username) {
+        return reply.code(400).send({
+          success: false,
+          error: 'Host, port, and username are required'
+        });
+      }
+
+      // Create temporary config with provided settings
+      const tempConfig = {
+        host: host,
+        port: parseInt(port),
+        username: username,
+        password: password || '',
+        useSSL: use_ssl || false,
+        timeout: 5000
+      };
+
+      // Test connection with temporary config using mikro-routeros
+      const { RouterOSClient } = require('mikro-routeros');
+      const tempClient = new RouterOSClient(tempConfig.host, tempConfig.port, tempConfig.timeout);
+
+      try {
+        // Connect to RouterOS
+        await tempClient.connect();
+
+        // Login to RouterOS
+        await tempClient.login(tempConfig.username, tempConfig.password);
+
+        // Test connection by getting system identity
+        const identity = await tempClient.runQuery('/system/identity/print');
+
+        if (identity && identity.length > 0) {
+          // Get system info as additional test
+          let systemInfo = {
+            platform: 'Unknown',
+            board_name: 'Unknown',
+            version: 'Unknown'
+          };
+
+          try {
+            const resources = await tempClient.runQuery('/system/resource/print');
+            if (resources && resources[0]) {
+              systemInfo = {
+                platform: resources[0].platform || 'Unknown',
+                board_name: resources[0]['board-name'] || 'Unknown',
+                version: resources[0].version || 'Unknown'
+              };
+            }
+          } catch (infoError) {
+            console.warn('Could not get system resources:', infoError.message);
+          }
+
+          await tempClient.close();
+
+          // Extract identity name
+          const identityName = identity[0]?.name || identity[0]['identity-name'] || identity[0]?.identity || 'Unknown';
+
+          return reply.send({
+            success: true,
+            message: 'Connection successful',
+            identity: identityName,
+            info: systemInfo
+          });
+        } else {
+          await tempClient.close();
+          return reply.send({
+            success: false,
+            error: 'No response from Mikrotik'
+          });
+        }
+      } catch (connectionError) {
+        try {
+          await tempClient.close();
+        } catch (closeError) {
+          // Ignore close errors
+        }
+
+        return reply.send({
+          success: false,
+          error: `Connection failed: ${connectionError.message}`
+        });
+      }
+    } catch (error) {
+      fastify.log.error('Mikrotik connection test failed:', error);
+      return reply.send({
+        success: false,
+        error: error.message || 'Connection test failed'
+      });
+    }
+  });
+
+  // Settings API endpoints
+  // Get all settings
+  fastify.get('/settings', {
+
+  }, async (request, reply) => {
+    try {
+      const settings = await db.query('SELECT key, value FROM settings ORDER BY key');
+      const settingsMap = {};
+      settings.forEach(setting => {
+        settingsMap[setting.key] = setting.value;
+      });
+
+
+      return reply.send({
+        success: true,
+        data: settingsMap
+      });
+    } catch (error) {
+      fastify.log.error('Error loading settings:', error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Failed to load settings',
+        error: error.message,
+        details: error.stack
+      });
+    }
+  });
+
+  // Update settings
+  fastify.put('/settings', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      console.log('PUT /api/settings - Request body:', request.body);
+      console.log('Admin from request:', request.admin?.id);
+
+      // Check if request.body exists
+      if (!request.body) {
+        console.error('Request body is undefined or null');
+        return reply.code(400).send({ success: false, message: 'Request body is required' });
+      }
+
+      const { section, data } = request.body;
+      console.log(`Processing section: ${section}, data keys:`, Object.keys(data || {}));
+
+      if (section && data) {
+        // Update specific section
+        for (const [key, value] of Object.entries(data)) {
+          try {
+            console.log(`Saving setting: ${key} = ${value} (${typeof value})`);
+            await db.query('
+              INSERT INTO settings (key, value, description, updated_at)
+              VALUES ($1, $2, 'System setting', CURRENT_TIMESTAMP)
+              ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP
+            ', [key, typeof value === 'boolean' ? value.toString() : value]);
+          } catch (error) {
+            console.error(`Error saving setting ${key}:`, error);
+            throw new Error(`Failed to save setting ${key}: ${error.message}`);
+          }
+        }
+      } else {
+        // Update all settings from request body
+        const { settings: allSettings } = request.body;
+        if (allSettings) {
+          for (const [key, value] of Object.entries(allSettings)) {
+            try {
+              await db.query('
+                INSERT INTO settings (key, value, description, updated_at)
+                VALUES ($1, $2, 'System setting', CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET
+                  value = EXCLUDED.value,
+                  updated_at = CURRENT_TIMESTAMP
+              ', [key, typeof value === 'boolean' ? value.toString() : value]);
+            } catch (error) {
+              console.error(`Error saving setting ${key}:`, error);
+            }
+          }
+        }
+      }
+
+      // Log activity (only if admin is authenticated)
+      try {
+        if (request.admin && request.admin.id) {
+          await auth.logActivity(
+            request.admin.id,
+            'update_settings',
+            null,
+            null,
+            { section, updated_keys: Object.keys(data || {}) },
+            request
+          );
+        }
+      } catch (logError) {
+        console.error('Error in logActivity:', logError);
+        // Continue even if logging fails
+      }
+
+      // Return updated settings
+      const settings = await db.query('SELECT key, value FROM settings ORDER BY key');
+      const settingsMap = {};
+      settings.forEach(setting => {
+        settingsMap[setting.key] = setting.value;
+      });
+
+      // Add cache control headers to prevent caching
+      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      reply.header('Pragma', 'no-cache');
+      reply.header('Expires', '0');
+      reply.header('Surrogate-Control', 'no-store');
+
+      return reply.send({
+        success: true,
+        message: 'Settings updated successfully',
+        data: settingsMap
+      });
+    } catch (error) {
+      fastify.log.error('Error updating settings:', error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Failed to update settings',
+        error: error.message,
+        details: error.stack,
+        request_body: request.body
+      });
+    }
+  });
+
+  // Reset settings to default
+  fastify.post('/settings/reset', {
+    
+  }, async (request, reply) => {
+    try {
+      // Define default settings
+      const defaultSettings = {
+        company_name: 'Mikrotik Billing System',
+        company_address: '',
+        company_phone: '',
+        company_email: '',
+        currency: 'IDR',
+        language: 'id',
+        mikrotik_host: '',
+        mikrotik_port: '8728',
+        mikrotik_username: '',
+        mikrotik_password: '',
+        mikrotik_use_ssl: 'false',
+        hotspot_comment_marker: 'VOUCHER_SYSTEM',
+        pppoe_comment_marker: 'PPPOE_SYSTEM',
+        database_type: 'sqlite',
+        backup_interval: '60',
+        auto_backup: 'false',
+        optimize_on_startup: 'false',
+        whatsapp_provider: '',
+        whatsapp_api_key: '',
+        notify_voucher_created: 'true',
+        notify_expiry_warning: 'true',
+        notify_expired: 'true',
+        duitku_merchant_code: '',
+        duitku_api_key: '',
+        duitku_environment: 'sandbox',
+        duitku_callback_url: '',
+        enable_duitku: 'false',
+        session_timeout: '30',
+        log_level: 'info',
+        cleanup_schedule: '24',
+        max_log_days: '30',
+        enable_registration: 'false',
+        enable_demo: 'false',
+        enable_maintenance: 'false'
+      };
+
+      // Clear existing settings and insert defaults
+      await db.query('DELETE FROM settings');
+
+      for (const [key, value] of Object.entries(defaultSettings)) {
+        await db.query('
+          INSERT INTO settings (key, value, description, created_at, updated_at)
+          VALUES (?, ?, 'Default system setting', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ', [key, value]);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'reset_settings',
+        null,
+        null,
+        {},
+        request
+      );
+
+      return reply.send({
+        success: true,
+        message: 'Settings reset to default successfully'
+      });
+    } catch (error) {
+      fastify.log.error('Error resetting settings:', error);
+      return reply.code(500).send({ success: false, message: 'Failed to reset settings' });
+    }
+  });
+
+  // Export settings
+  fastify.get('/settings/export', {
+    
+  }, async (request, reply) => {
+    try {
+      const settings = db.query('SELECT key, value FROM settings ORDER BY key');
+      const settingsMap = {};
+      settings.forEach(setting => {
+        settingsMap[setting.key] = setting.value;
+      });
+
+      // Add cache control headers to prevent caching
+      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      reply.header('Pragma', 'no-cache');
+      reply.header('Expires', '0');
+      reply.header('Surrogate-Control', 'no-store');
+
+      return reply.send({
+        success: true,
+        data: settingsMap
+      });
+    } catch (error) {
+      fastify.log.error('Error exporting settings:', error);
+      return reply.code(500).send({ success: false, message: 'Failed to export settings' });
+    }
+  });
+
+  // WhatsApp API endpoints
+  // Get WhatsApp message by ID
+  fastify.get('/whatsapp/:id', {
+
+  }, async (request, reply) => {
+    try {
+      const messageId = request.params.id;
+      const message = await db.getOne(`
+        SELECT wm.*,
+               c.nama as customer_name
+        FROM whatsapp_messages wm
+        LEFT JOIN customers c ON wm.related_id = c.id AND wm.related_type = 'customer'
+        WHERE wm.id = $1
+      `, [messageId]);
+
+      if (!message) {
+        return reply.code(404).send({ error: 'WhatsApp message not found' });
+      }
+
+      return reply.send(message);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get WhatsApp notifications
+  fastify.get('/whatsapp/notifications', {
+
+  }, async (request, reply) => {
+    try {
+      const { all = false } = request.query;
+
+      let query = `
+        SELECT wm.*,
+               c.nama as customer_name
+        FROM whatsapp_messages wm
+        LEFT JOIN customers c ON wm.related_id = c.id AND wm.related_type = 'customer'
+        ORDER BY wm.created_at DESC
+      `;
+
+      let params = [];
+
+      if (!all || all === 'false') {
+        query += ` LIMIT 20`;
+      }
+
+      const notifications = await db.query(query, params);
+
+      // Transform the data to match expected format
+      const transformedNotifications = notifications.map(notification => ({
+        id: notification.id,
+        type: notification.message_type || 'outgoing',
+        phoneNumber: notification.to_number || notification.from_number,
+        content: notification.content,
+        status: notification.status,
+        createdAt: notification.created_at,
+        customerName: notification.customer_name,
+        read: notification.status === 'read' || notification.status === 'delivered'
+      }));
+
+      return reply.send({
+        success: true,
+        notifications: transformedNotifications
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Mark notification as read
+  fastify.post('/whatsapp/notifications/:id/read', {
+
+  }, async (request, reply) => {
+    try {
+      const notificationId = request.params.id;
+
+      const result = await db.query('
+        UPDATE whatsapp_messages
+        SET status = 'read', updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      ', [notificationId]);
+
+      if (result.changes === 0) {
+        return reply.code(404).send({ error: 'Notification not found' });
+      }
+
+      return reply.send({ success: true });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Mark all notifications as read
+  fastify.post('/whatsapp/notifications/read-all', {
+
+  }, async (request, reply) => {
+    try {
+      await db.query('
+        UPDATE whatsapp_messages
+        SET status = 'read', updated_at = CURRENT_TIMESTAMP
+        WHERE status IN ('pending', 'sent', 'delivered')
+      ');
+
+      return reply.send({ success: true });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get WhatsApp template by ID
+  fastify.get('/whatsapp/templates/:id', {
+
+  }, async (request, reply) => {
+    try {
+      const templateId = request.params.id;
+      const template = await db.getOne('SELECT * FROM whatsapp_templates WHERE id = $1', [templateId]);
+
+      if (!template) {
+        return reply.code(404).send({ error: 'WhatsApp template not found' });
+      }
+
+      // Get usage count
+      template.usage_count = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM whatsapp_messages
+        WHERE template_id = ?
+      `, [templateId]).rowCount;
+
+      return reply.send(template);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Create WhatsApp template
+  fastify.post('/whatsapp/templates', {
+
+  }, async (request, reply) => {
+    try {
+      const { name, displayName, content, category, variables, is_active = true } = request.body;
+
+      // Check if template name already exists
+      const existing = await db.getOne('SELECT id FROM whatsapp_templates WHERE name = $1', [name]);
+      if (existing) {
+        return reply.code(400).send({ error: 'WhatsApp template name already exists' });
+      }
+
+      const result = await db.query(`
+        INSERT INTO whatsapp_templates (name, display_name, content, category, variables, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `, [name, displayName, content, category, variables ? JSON.stringify(variables) : '[]', is_active]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_whatsapp_template',
+        'whatsapp_template',
+        result.lastID,
+        { name, category },
+        request
+      );
+
+      return reply.send({ success: true, id: result.lastID });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Update WhatsApp template
+  fastify.put('/whatsapp/templates/:id', {
+
+  }, async (request, reply) => {
+    try {
+      const templateId = request.params.id;
+      const { name, displayName, content, category, variables, is_active } = request.body;
+
+      // Check if template name already exists (excluding current template)
+      const existing = await db.getOne('SELECT id FROM whatsapp_templates WHERE name = $1 AND id != $2', [name, templateId]);
+      if (existing) {
+        return reply.code(400).send({ error: 'WhatsApp template name already exists' });
+      }
+
+      await db.query(`
+        UPDATE whatsapp_templates
+        SET name = $1, display_name = $2, content = $3, category = $4, variables = $5, is_active = $6, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $7
+      `, [name, displayName, content, category, variables ? JSON.stringify(variables) : '[]', is_active, templateId]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_whatsapp_template',
+        'whatsapp_template',
+        templateId,
+        { name, category },
+        request
+      );
+
+      return reply.send({ success: true });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Public WhatsApp message count
+  fastify.get('/public/whatsapp/count', async (request, reply) => {
+    try {
+      const { status } = request.query;
+      let whereClause = '1=1';
+      let params = [];
+
+      if (status) {
+        whereClause += ' AND status = ?';
+        params.push(status);
+      }
+
+      // Check if database is available
+      if (!fastify.db || !fastify.db.get) {
+        return reply.status(503).send({
+          success: false,
+          message: 'Database not available'
+        });
+      }
+
+      const count = await db.getOne(
+        `SELECT COUNT(*) as count FROM whatsapp_messages WHERE ${whereClause}`,
+        params
+      );
+
+      return reply.send({ count: count.rowCount });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get WhatsApp queue statistics
+  fastify.get('/whatsapp/stats', {
+
+  }, async (request, reply) => {
+    try {
+      const stats = {
+        total: 0,
+        sent: 0,
+        delivered: 0,
+        failed: 0,
+        read: 0,
+        pending: 0,
+        avg_delivery_time: 0,
+        min_delivery_time: 0,
+        max_delivery_time: 0
+      };
+
+      // Get basic WhatsApp message stats
+      const basicStats = await db.getOne(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent,
+          SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered,
+          SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+          SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) as read,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+        FROM whatsapp_messages
+        WHERE message_type = 'outgoing'
+      `);
+
+      Object.assign(stats, basicStats);
+
+      // Get delivery time stats from WhatsApp messages
+      const timeStats = await db.getOne(`
+        SELECT
+          AVG(CASE
+            WHEN wm.delivered_at IS NOT NULL
+            THEN (julianday(wm.delivered_at) - julianday(wm.timestamp)) * 24 * 60 * 60
+            ELSE NULL
+          END) as avg_delivery_time,
+          MIN(CASE
+            WHEN wm.delivered_at IS NOT NULL
+            THEN (julianday(wm.delivered_at) - julianday(wm.timestamp)) * 24 * 60 * 60
+            ELSE NULL
+          END) as min_delivery_time,
+          MAX(CASE
+            WHEN wm.delivered_at IS NOT NULL
+            THEN (julianday(wm.delivered_at) - julianday(wm.timestamp)) * 24 * 60 * 60
+            ELSE NULL
+          END) as max_delivery_time
+        FROM whatsapp_messages wm
+        WHERE wm.delivered_at IS NOT NULL
+        AND wm.message_type = 'outgoing'
+      `);
+
+      if (timeStats) {
+        stats.avg_delivery_time = Math.round(timeStats.avg_delivery_time || 0);
+        stats.min_delivery_time = Math.round(timeStats.min_delivery_time || 0);
+        stats.max_delivery_time = Math.round(timeStats.max_delivery_time || 0);
+      }
+
+      // Get type distribution
+      stats.by_type = db.query('
+        SELECT type, COUNT(*) as count
+        FROM notification_queue
+        GROUP BY type
+      ');
+
+      // Get retry count
+      stats.retried = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM notification_queue
+        WHERE attempts > 1
+      `).rowCount || 0;
+
+      return reply.send(stats);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // === CUSTOMER MANAGEMENT API (Phase 7) ===
+
+  // Get customers list with pagination and filtering
+  fastify.get('/customers', async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = parseInt(request.query.limit) || 10;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+      const sort = request.query.sort || 'created_at';
+      const order = request.query.order || 'desc';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (c.nama LIKE ? OR c.nomor_hp LIKE ? OR c.email LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status !== '') {
+        whereClause += ' AND c.status_aktif = ?';
+        params.push(status === '1' ? 1 : 0);
+      }
+
+      // Get customers with subscription counts and payment summary
+      db.query('
+        SELECT c.*,
+               COUNT(DISTINCT s.id) as subscription_count,
+               COUNT(DISTINCT p.id) as payment_count,
+               COALESCE(SUM(CASE WHEN p.payment_status = 'paid' THEN p.amount ELSE 0 END), 0) as total_paid,
+               COALESCE(SUM(CASE WHEN p.payment_status = 'pending' THEN p.amount ELSE 0 END), 0) as total_pending
+        FROM customers c
+        LEFT JOIN subscriptions s ON c.id = s.customer_id
+        LEFT JOIN payments p ON c.id = p.customer_id
+        ${whereClause}
+        GROUP BY c.id
+        ORDER BY c.${sort} ${order.toUpperCase()}
+        LIMIT ? OFFSET ?
+      ', [...params, limit, offset]);
+
+      // Get total count
+      const totalResult = await db.getOne(`
+        SELECT COUNT(*) as total
+        FROM customers c
+        ${whereClause}
+      `, params);
+
+      const totalPages = Math.ceil(totalResult.total / limit);
+
+      return reply.send({
+        data: customers,
+        pagination: {
+          current_page: page,
+          total_pages: totalPages,
+          total_items: totalResult.total,
+          items_per_page: limit,
+          has_next: page < totalPages,
+          has_prev: page > 1
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get single customer by ID with detailed information
+  fastify.get('/customers/:id', async (request, reply) => {
+    try {
+      const customer = await db.getOne(`
+        SELECT c.*
+        FROM customers c
+        WHERE c.id = $1
+      `, [request.params.id]);
+
+      if (!customer) {
+        return reply.code(404).send({ error: 'Customer not found' });
+      }
+
+      // Get customer subscriptions
+      db.query('
+        SELECT s.*, p.name as profile_name, p.type as service_type
+        FROM subscriptions s
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.customer_id = ?
+        ORDER BY s.created_at DESC
+      ', [customer.id]);
+
+      // Get customer payments
+      db.query('
+        SELECT p.*,
+               CASE WHEN p.subscription_id IS NOT NULL THEN
+                 (SELECT username FROM subscriptions WHERE id = p.subscription_id)
+               ELSE NULL END as related_subscription
+        FROM payments p
+        WHERE p.customer_id = ?
+        ORDER BY p.created_at DESC
+        LIMIT 10
+      ', [customer.id]);
+
+      // Get payment statistics
+      const stats = await db.getOne(`
+        SELECT
+          COUNT(*) as total_payments,
+          SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END) as total_paid,
+          SUM(CASE WHEN payment_status = 'pending' THEN amount ELSE 0 END) as total_pending,
+          MAX(created_at) as last_payment_date
+        FROM payments
+        WHERE customer_id = ?
+      `, [customer.id]);
+
+      return reply.send({
+        customer,
+        subscriptions,
+        payments,
+        stats
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Create new customer
+  fastify.post('/customers', async (request, reply) => {
+    try {
+      const { nama, nomor_hp, email, credit_balance = 0, debt_balance = 0 } = request.body;
+
+      // Validate required fields
+      if (!nama || !nomor_hp) {
+        return reply.code(400).send({
+          error: 'Missing required fields',
+          required: ['nama', 'nomor_hp']
+        });
+      }
+
+      // Check if phone number already exists
+      const existingCustomer = await db.getOne(`
+        SELECT id FROM customers WHERE nomor_hp = $1
+      `, [nomor_hp]);
+
+      if (existingCustomer) {
+        return reply.code(400).send({
+          error: 'Phone number already registered',
+          field: 'nomor_hp'
+        });
+      }
+
+      // Insert new customer
+      const result = await db.query('
+        INSERT INTO customers (nama, nomor_hp, email, credit_balance, debt_balance)
+        VALUES (?, ?, ?, ?, ?)
+      ', [nama, nomor_hp, email, credit_balance, debt_balance]);
+
+      const newCustomer = await db.getOne(`
+        SELECT * FROM customers WHERE id = $1
+      `, [result.lastID]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_customer',
+        'customer',
+        result.lastID,
+        { nama, nomor_hp, email },
+        request
+      );
+
+      return reply.status(201).send({
+        message: 'Customer created successfully',
+        customer: newCustomer
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Update customer
+  fastify.put('/customers/:id', async (request, reply) => {
+    try {
+      const { nama, nomor_hp, email, status_aktif, credit_balance, debt_balance } = request.body;
+
+      // Check if customer exists
+      const existingCustomer = await db.getOne(`
+        SELECT * FROM customers WHERE id = $1
+      `, [request.params.id]);
+
+      if (!existingCustomer) {
+        return reply.code(404).send({ error: 'Customer not found' });
+      }
+
+      // Check if phone number already exists (excluding current customer)
+      if (nomor_hp && nomor_hp !== existingCustomer.nomor_hp) {
+        const duplicatePhone = await db.getOne(`
+          SELECT id FROM customers WHERE nomor_hp = $1 AND id != $2
+        `, [nomor_hp, request.params.id]);
+
+        if (duplicatePhone) {
+          return reply.code(400).send({
+            error: 'Phone number already registered',
+            field: 'nomor_hp'
+          });
+        }
+      }
+
+      // Update customer
+      await db.query('
+        UPDATE customers
+        SET nama = COALESCE($1, nama),
+            nomor_hp = COALESCE(?, nomor_hp),
+            email = COALESCE(?, email),
+            status_aktif = COALESCE(?, status_aktif),
+            credit_balance = COALESCE(?, credit_balance),
+            debt_balance = COALESCE(?, debt_balance),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      ', [nama, nomor_hp, email, status_aktif, credit_balance, debt_balance, request.params.id]);
+
+      const updatedCustomer = await db.getOne(`
+        SELECT * FROM customers WHERE id = $1
+      `, [request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_customer',
+        'customer',
+        request.params.id,
+        {
+          changes: {
+            nama: nama !== existingCustomer.nama ? nama : undefined,
+            nomor_hp: nomor_hp !== existingCustomer.nomor_hp ? nomor_hp : undefined,
+            email: email !== existingCustomer.email ? email : undefined,
+            status_aktif: status_aktif !== existingCustomer.status_aktif ? status_aktif : undefined
+          }
+        },
+        request
+      );
+
+      return reply.send({
+        message: 'Customer updated successfully',
+        customer: updatedCustomer
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Delete customer (with safety checks)
+  fastify.delete('/customers/:id', async (request, reply) => {
+    try {
+      // Check if customer exists
+      const customer = await db.getOne(`
+        SELECT * FROM customers WHERE id = $1
+      `, [request.params.id]);
+
+      if (!customer) {
+        return reply.code(404).send({ error: 'Customer not found' });
+      }
+
+      // Check if customer has active subscriptions
+      const activeSubscriptions = await db.getOne(`
+        SELECT COUNT(*) as count FROM subscriptions
+        WHERE customer_id = ? AND status = 'active'
+      `, [request.params.id]);
+
+      if (activeSubscriptions.rowCount > 0) {
+        return reply.code(400).send({
+          error: 'Cannot delete customer with active subscriptions',
+          active_subscriptions: activeSubscriptions.rowCount
+        });
+      }
+
+      // Delete customer (cascading will handle related records)
+      await db.query('
+        DELETE FROM customers WHERE id = $1
+      ', [request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'delete_customer',
+        'customer',
+        request.params.id,
+        { customer_nama: customer.nama, customer_nomor_hp: customer.nomor_hp },
+        request
+      );
+
+      return reply.send({
+        message: 'Customer deleted successfully'
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get customer statistics
+  fastify.get('/customers/stats', async (request, reply) => {
+    try {
+      const stats = await db.getOne(`
+        SELECT
+          COUNT(*) as total_customers,
+          SUM(CASE WHEN status_aktif = 1 THEN 1 ELSE 0 END) as active_customers,
+          SUM(CASE WHEN status_aktif = 0 THEN 1 ELSE 0 END) as inactive_customers,
+          COALESCE(SUM(credit_balance), 0) as total_credit_balance,
+          COALESCE(SUM(debt_balance), 0) as total_debt_balance,
+          AVG(credit_balance) as avg_credit_balance,
+          AVG(debt_balance) as avg_debt_balance,
+          MAX(created_at) as latest_customer_date
+        FROM customers
+      `);
+
+      // Get subscription stats
+      const subscriptionStats = await db.getOne(`
+        SELECT
+          COUNT(DISTINCT c.id) as customers_with_subscriptions,
+          COUNT(s.id) as total_subscriptions,
+          SUM(CASE WHEN s.status = 'active' THEN 1 ELSE 0 END) as active_subscriptions,
+          SUM(CASE WHEN s.status = 'expired' THEN 1 ELSE 0 END) as expired_subscriptions
+        FROM customers c
+        LEFT JOIN subscriptions s ON c.id = s.customer_id
+      `);
+
+      // Get payment stats
+      const paymentStats = await db.getOne(`
+        SELECT
+          COUNT(p.id) as total_payments,
+          SUM(CASE WHEN p.payment_status = 'paid' THEN p.amount ELSE 0 END) as total_revenue,
+          SUM(CASE WHEN p.payment_status = 'pending' THEN p.amount ELSE 0 END) as pending_payments
+        FROM customers c
+        LEFT JOIN payments p ON c.id = p.customer_id
+      `);
+
+      return reply.send({
+        customer_stats: stats,
+        subscription_stats: subscriptionStats,
+        payment_stats: paymentStats
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // === SUBSCRIPTION MANAGEMENT API (Phase 7) ===
+
+  // Get subscriptions list with pagination and filtering
+  fastify.get('/subscriptions', async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = parseInt(request.query.limit) || 10;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+      const service_type = request.query.service_type || '';
+      const customer_id = request.query.customer_id || '';
+      const sort = request.query.sort || 'created_at';
+      const order = request.query.order || 'desc';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (s.username LIKE ? OR c.nama LIKE ? OR c.nomor_hp LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status) {
+        whereClause += ' AND s.status = ?';
+        params.push(status);
+      }
+
+      if (service_type) {
+        whereClause += ' AND s.service_type = ?';
+        params.push(service_type);
+      }
+
+      if (customer_id) {
+        whereClause += ' AND s.customer_id = ?';
+        params.push(customer_id);
+      }
+
+      // Get subscriptions with customer and profile information
+      db.query('
+        SELECT s.*,
+               c.nama as customer_name,
+               c.nomor_hp as customer_phone,
+               p.name as profile_name,
+               p.type as profile_type
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        ${whereClause}
+        ORDER BY s.${sort} ${order.toUpperCase()}
+        LIMIT ? OFFSET ?
+      ', [...params, limit, offset]);
+
+      // Get total count
+      const totalResult = await db.getOne(`
+        SELECT COUNT(*) as total
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        ${whereClause}
+      `, params);
+
+      const totalPages = Math.ceil(totalResult.total / limit);
+
+      return reply.send({
+        data: subscriptions,
+        pagination: {
+          current_page: page,
+          total_pages: totalPages,
+          total_items: totalResult.total,
+          items_per_page: limit,
+          has_next: page < totalPages,
+          has_prev: page > 1
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get single subscription by ID
+  fastify.get('/subscriptions/:id', async (request, reply) => {
+    try {
+      const subscription = await db.getOne(`
+        SELECT s.*,
+               c.nama as customer_name,
+               c.nomor_hp as customer_phone,
+               c.email as customer_email,
+               p.name as profile_name,
+               p.type as profile_type
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.id = $1
+      `, [request.params.id]);
+
+      if (!subscription) {
+        return reply.code(404).send({ error: 'Subscription not found' });
+      }
+
+      // Get subscription payments
+      db.query('
+        SELECT * FROM payments
+        WHERE subscription_id = ?
+        ORDER BY created_at DESC
+        LIMIT 10
+      ', [subscription.id]);
+
+      // Get payment statistics for this subscription
+      const stats = await db.getOne(`
+        SELECT
+          COUNT(*) as total_payments,
+          SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END) as total_paid,
+          MAX(created_at) as last_payment_date
+        FROM payments
+        WHERE subscription_id = ?
+      `, [subscription.id]);
+
+      return reply.send({
+        subscription,
+        payments,
+        stats
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Create new subscription
+  fastify.post('/subscriptions', async (request, reply) => {
+    try {
+      const {
+        customer_id,
+        service_type,
+        profile_id,
+        username,
+        password,
+        price_sell,
+        price_cost,
+        billing_cycle,
+        cycle_type = 'duration_based',
+        duration_days,
+        start_date,
+        expiry_date,
+        auto_renew = 0
+      } = request.body;
+
+      // Validate required fields
+      if (!customer_id || !service_type || !profile_id || !username || !password || !price_sell || !billing_cycle) {
+        return reply.code(400).send({
+          error: 'Missing required fields',
+          required: ['customer_id', 'service_type', 'profile_id', 'username', 'password', 'price_sell', 'billing_cycle']
+        });
+      }
+
+      // Validate billing cycle
+      const validCycles = ['weekly', 'monthly', 'quarterly', 'yearly', 'custom'];
+      if (!validCycles.includes(billing_cycle)) {
+        return reply.code(400).send({
+          error: 'Invalid billing cycle',
+          valid_cycles: validCycles
+        });
+      }
+
+      // Check if customer exists
+      const customer = await db.getOne('SELECT * FROM customers WHERE id = $1', [customer_id]);
+      if (!customer) {
+        return reply.code(400).send({ error: 'Customer not found' });
+      }
+
+      // Check if username already exists
+      const existingSubscription = await db.getOne('SELECT id FROM subscriptions WHERE username = $1', [username]);
+      if (existingSubscription) {
+        return reply.code(400).send({
+          error: 'Username already exists',
+          field: 'username'
+        });
+      }
+
+      // Calculate dates if not provided
+      let finalStartDate = start_date;
+      let finalExpiryDate = expiry_date;
+
+      if (!finalStartDate) {
+        finalStartDate = new Date().toISOString().split('T')[0];
+      }
+
+      if (!finalExpiryDate && cycle_type === 'duration_based' && duration_days) {
+        const startDate = new Date(finalStartDate);
+        startDate.setDate(startDate.getDate() + parseInt(duration_days));
+        finalExpiryDate = startDate.toISOString().split('T')[0];
+      }
+
+      // Insert new subscription
+      const result = await db.query('
+        INSERT INTO subscriptions (
+          customer_id, service_type, profile_id, username, password,
+          price_sell, price_cost, billing_cycle, cycle_type,
+          duration_days, start_date, expiry_date, auto_renew
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ', [
+        customer_id, service_type, profile_id, username, password,
+        price_sell, price_cost || 0, billing_cycle, cycle_type,
+        duration_days, finalStartDate, finalExpiryDate, auto_renew
+      ]);
+
+      const newSubscription = await db.getOne(`
+        SELECT s.*,
+               c.nama as customer_name,
+               p.name as profile_name
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.id = $1
+      `, [result.lastID]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_subscription',
+        'subscription',
+        result.lastID,
+        {
+          username,
+          service_type,
+          customer_id,
+          price_sell,
+          billing_cycle
+        },
+        request
+      );
+
+      return reply.status(201).send({
+        message: 'Subscription created successfully',
+        subscription: newSubscription
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Update subscription
+  fastify.put('/subscriptions/:id', async (request, reply) => {
+    try {
+      const {
+        status,
+        expiry_date,
+        auto_renew,
+        profile_id,
+        price_sell,
+        price_cost
+      } = request.body;
+
+      // Check if subscription exists
+      const existingSubscription = await db.getOne(`
+        SELECT * FROM subscriptions WHERE id = $1
+      `, [request.params.id]);
+
+      if (!existingSubscription) {
+        return reply.code(404).send({ error: 'Subscription not found' });
+      }
+
+      // Update subscription
+      await db.query('
+        UPDATE subscriptions
+        SET status = COALESCE($1, status),
+            expiry_date = COALESCE(?, expiry_date),
+            auto_renew = COALESCE(?, auto_renew),
+            profile_id = COALESCE(?, profile_id),
+            price_sell = COALESCE(?, price_sell),
+            price_cost = COALESCE(?, price_cost),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      ', [status, expiry_date, auto_renew, profile_id, price_sell, price_cost, request.params.id]);
+
+      const updatedSubscription = await db.getOne(`
+        SELECT s.*,
+               c.nama as customer_name,
+               p.name as profile_name
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.id = $1
+      `, [request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_subscription',
+        'subscription',
+        request.params.id,
+        {
+          changes: {
+            status: status !== existingSubscription.status ? status : undefined,
+            expiry_date: expiry_date !== existingSubscription.expiry_date ? expiry_date : undefined,
+            auto_renew: auto_renew !== existingSubscription.auto_renew ? auto_renew : undefined
+          }
+        },
+        request
+      );
+
+      return reply.send({
+        message: 'Subscription updated successfully',
+        subscription: updatedSubscription
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Delete subscription
+  fastify.delete('/subscriptions/:id', async (request, reply) => {
+    try {
+      // Check if subscription exists
+      const subscription = await db.getOne(`
+        SELECT s.*, c.nama as customer_name
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        WHERE s.id = $1
+      `, [request.params.id]);
+
+      if (!subscription) {
+        return reply.code(404).send({ error: 'Subscription not found' });
+      }
+
+      // Delete subscription (cascading will handle related records)
+      await db.query('DELETE FROM subscriptions WHERE id = $1', [request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'delete_subscription',
+        'subscription',
+        request.params.id,
+        {
+          username: subscription.username,
+          customer_name: subscription.customer_name,
+          service_type: subscription.service_type
+        },
+        request
+      );
+
+      return reply.send({
+        message: 'Subscription deleted successfully'
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get subscription statistics
+  fastify.get('/subscriptions/stats', async (request, reply) => {
+    try {
+      const stats = await db.getOne(`
+        SELECT
+          COUNT(*) as total_subscriptions,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_subscriptions,
+          SUM(CASE WHEN status = 'disabled' THEN 1 ELSE 0 END) as disabled_subscriptions,
+          SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as expired_subscriptions,
+          SUM(CASE WHEN service_type = 'hotspot' THEN 1 ELSE 0 END) as hotspot_subscriptions,
+          SUM(CASE WHEN service_type = 'pppoe' THEN 1 ELSE 0 END) as pppoe_subscriptions,
+          SUM(CASE WHEN auto_renew = 1 THEN 1 ELSE 0 END) as auto_renew_count,
+          COALESCE(SUM(price_sell), 0) as total_monthly_revenue
+        FROM subscriptions
+      `);
+
+      // Get billing cycle distribution
+      db.query('
+        SELECT billing_cycle, COUNT(*) as count
+        FROM subscriptions
+        GROUP BY billing_cycle
+        ORDER BY count DESC
+      ');
+
+      // Get expiring soon (next 7 days)
+      const expiringSoon = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM subscriptions
+        WHERE status = 'active' AND expiry_date BETWEEN date('now') AND date('now', '+7 days')
+      `);
+
+      return reply.send({
+        subscription_stats: stats,
+        billing_cycle_distribution: billingCycleStats,
+        expiring_soon: expiringSoon
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Extend subscription
+  fastify.post('/subscriptions/:id/extend', async (request, reply) => {
+    try {
+      const { duration_days, payment_method } = request.body;
+
+      if (!duration_days || duration_days <= 0) {
+        return reply.code(400).send({
+          error: 'Invalid duration_days',
+          message: 'duration_days must be greater than 0'
+        });
+      }
+
+      // Get subscription details
+      const subscription = await db.getOne(`
+        SELECT s.*, c.nama as customer_name, p.name as profile_name
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.id = $1
+      `, [request.params.id]);
+
+      if (!subscription) {
+        return reply.code(404).send({ error: 'Subscription not found' });
+      }
+
+      // Calculate new expiry date
+      const currentExpiry = new Date(subscription.expiry_date || subscription.start_date);
+      currentExpiry.setDate(currentExpiry.getDate() + parseInt(duration_days));
+      const newExpiry = currentExpiry.toISOString().split('T')[0];
+
+      // Update subscription
+      await db.query('
+        UPDATE subscriptions
+        SET expiry_date = $1, status = 'active', updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      ', [newExpiry, request.params.id]);
+
+      // Calculate total price
+      const dailyPrice = subscription.price_sell / 30; // Assuming monthly price
+      const totalPrice = dailyPrice * duration_days;
+
+      // Record payment if specified
+      if (payment_method && totalPrice > 0) {
+        await db.query('
+          INSERT INTO payments (customer_id, subscription_id, amount, payment_method, payment_status, description)
+          VALUES (?, ?, ?, ?, 'paid', ?)
+        ', [subscription.customer_id, subscription.id, totalPrice, payment_method, `Subscription extension: ${subscription.username}`]);
+
+        // Log transaction
+        await db.query('
+          INSERT INTO transaction_logs (customer_id, type, description, amount)
+          VALUES (?, 'payment', ?, ?)
+        ', [subscription.customer_id, `Subscription extension: ${subscription.username}`, totalPrice]);
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'extend_subscription',
+        'subscription',
+        request.params.id,
+        {
+          username: subscription.username,
+          duration_days,
+          new_expiry_date: newExpiry,
+          total_price: totalPrice,
+          payment_method
+        },
+        request
+      );
+
+      const updatedSubscription = await db.getOne(`
+        SELECT s.*,
+               c.nama as customer_name,
+               p.name as profile_name
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.id = $1
+      `, [request.params.id]);
+
+      return reply.send({
+        message: 'Subscription extended successfully',
+        subscription: updatedSubscription,
+        extension_details: {
+          duration_days,
+          new_expiry_date: newExpiry,
+          total_price: totalPrice
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // === PAYMENT PROCESSING API (Phase 7) ===
+
+  // Get payments list with pagination and filtering
+  fastify.get('/payments', async (request, reply) => {
+    try {
+      const page = parseInt(request.query.page) || 1;
+      const limit = parseInt(request.query.limit) || 10;
+      const offset = (page - 1) * limit;
+      const search = request.query.search || '';
+      const status = request.query.status || '';
+      const method = request.query.payment_method || '';
+      const customer_id = request.query.customer_id || '';
+      const subscription_id = request.query.subscription_id || '';
+      const start_date = request.query.start_date || '';
+      const end_date = request.query.end_date || '';
+      const sort = request.query.sort || 'created_at';
+      const order = request.query.order || 'desc';
+
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
+      if (search) {
+        whereClause += ' AND (p.description LIKE ? OR c.nama LIKE ? OR c.nomor_hp LIKE ? OR s.username LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      if (status) {
+        whereClause += ' AND p.payment_status = ?';
+        params.push(status);
+      }
+
+      if (method) {
+        whereClause += ' AND p.payment_method = ?';
+        params.push(method);
+      }
+
+      if (customer_id) {
+        whereClause += ' AND p.customer_id = ?';
+        params.push(customer_id);
+      }
+
+      if (subscription_id) {
+        whereClause += ' AND p.subscription_id = ?';
+        params.push(subscription_id);
+      }
+
+      if (start_date) {
+        whereClause += ' AND DATE(p.created_at) >= ?';
+        params.push(start_date);
+      }
+
+      if (end_date) {
+        whereClause += ' AND DATE(p.created_at) <= ?';
+        params.push(end_date);
+      }
+
+      // Get payments with customer and subscription information
+      db.query('
+        SELECT p.*,
+               c.nama as customer_name,
+               c.nomor_hp as customer_phone,
+               s.username as subscription_username,
+               CASE
+                 WHEN p.subscription_id IS NOT NULL THEN s.username
+                 ELSE NULL
+               END as related_service
+        FROM payments p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN subscriptions s ON p.subscription_id = s.id
+        ${whereClause}
+        ORDER BY p.${sort} ${order.toUpperCase()}
+        LIMIT ? OFFSET ?
+      ', [...params, limit, offset]);
+
+      // Get total count
+      const totalResult = await db.getOne(`
+        SELECT COUNT(*) as total
+        FROM payments p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN subscriptions s ON p.subscription_id = s.id
+        ${whereClause}
+      `, params);
+
+      const totalPages = Math.ceil(totalResult.total / limit);
+
+      return reply.send({
+        data: payments,
+        pagination: {
+          current_page: page,
+          total_pages: totalPages,
+          total_items: totalResult.total,
+          items_per_page: limit,
+          has_next: page < totalPages,
+          has_prev: page > 1
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get single payment by ID
+  fastify.get('/payments/:id', async (request, reply) => {
+    try {
+      const payment = await db.getOne(`
+        SELECT p.*,
+               c.nama as customer_name,
+               c.nomor_hp as customer_phone,
+               c.email as customer_email,
+               s.username as subscription_username,
+               s.service_type as subscription_service_type
+        FROM payments p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN subscriptions s ON p.subscription_id = s.id
+        WHERE p.id = $1
+      `, [request.params.id]);
+
+      if (!payment) {
+        return reply.code(404).send({ error: 'Payment not found' });
+      }
+
+      return reply.send({ payment });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Create payment
+  fastify.post('/payments', async (request, reply) => {
+    try {
+      const {
+        customer_id,
+        subscription_id,
+        amount,
+        payment_method,
+        payment_status = 'pending',
+        description
+      } = request.body;
+
+      // Validate required fields
+      if (!customer_id || !amount || !payment_method) {
+        return reply.code(400).send({
+          error: 'Missing required fields',
+          required: ['customer_id', 'amount', 'payment_method']
+        });
+      }
+
+      // Validate payment method
+      const validMethods = ['cash', 'duitku', 'transfer', 'credit'];
+      if (!validMethods.includes(payment_method)) {
+        return reply.code(400).send({
+          error: 'Invalid payment method',
+          valid_methods: validMethods
+        });
+      }
+
+      // Validate payment status
+      const validStatuses = ['pending', 'paid', 'failed', 'cancelled'];
+      if (!validStatuses.includes(payment_status)) {
+        return reply.code(400).send({
+          error: 'Invalid payment status',
+          valid_statuses: validStatuses
+        });
+      }
+
+      // Check if customer exists
+      const customer = await db.getOne('SELECT * FROM customers WHERE id = $1', [customer_id]);
+      if (!customer) {
+        return reply.code(400).send({ error: 'Customer not found' });
+      }
+
+      // Check if subscription exists (if provided)
+      if (subscription_id) {
+        const subscription = await db.getOne('SELECT * FROM subscriptions WHERE id = $1', [subscription_id]);
+        if (!subscription) {
+          return reply.code(400).send({ error: 'Subscription not found' });
+        }
+      }
+
+      // Insert payment
+      const result = await db.query('
+        INSERT INTO payments (customer_id, subscription_id, amount, payment_method, payment_status, description)
+        VALUES (?, ?, ?, ?, ?, ?)
+      ', [customer_id, subscription_id, amount, payment_method, payment_status, description]);
+
+      const newPayment = await db.getOne(`
+        SELECT p.*,
+               c.nama as customer_name,
+               s.username as subscription_username
+        FROM payments p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN subscriptions s ON p.subscription_id = s.id
+        WHERE p.id = $1
+      `, [result.lastID]);
+
+      // Update customer balance if payment is paid
+      if (payment_status === 'paid') {
+        if (payment_method === 'credit') {
+          // Deduct from credit balance
+          await db.query('
+            UPDATE customers
+            SET credit_balance = credit_balance - $1
+            WHERE id = $2
+          ', [amount, customer_id]);
+        }
+        // Deduct from debt balance if exists
+        await db.query('
+          UPDATE customers
+          SET debt_balance = MAX(0, debt_balance - $1)
+          WHERE id = ?
+        ', [amount, customer_id]);
+      }
+
+      // Log transaction
+      await db.query('
+        INSERT INTO transaction_logs (customer_id, type, description, amount, reference_id)
+        VALUES (?, ?, ?, ?, ?)
+      ', [customer_id, 'payment', description || `Payment: ${payment_method}`, amount, result.lastID]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'create_payment',
+        'payment',
+        result.lastID,
+        {
+          customer_id,
+          subscription_id,
+          amount,
+          payment_method,
+          payment_status
+        },
+        request
+      );
+
+      return reply.status(201).send({
+        message: 'Payment created successfully',
+        payment: newPayment
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Update payment status
+  fastify.put('/payments/:id/status', async (request, reply) => {
+    try {
+      const { payment_status, duitku_reference } = request.body;
+
+      if (!payment_status) {
+        return reply.code(400).send({
+          error: 'Missing payment_status field'
+        });
+      }
+
+      // Validate payment status
+      const validStatuses = ['pending', 'paid', 'failed', 'cancelled'];
+      if (!validStatuses.includes(payment_status)) {
+        return reply.code(400).send({
+          error: 'Invalid payment status',
+          valid_statuses: validStatuses
+        });
+      }
+
+      // Check if payment exists
+      const existingPayment = await db.getOne(`
+        SELECT p.*, c.nama as customer_name
+        FROM payments p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        WHERE p.id = $1
+      `, [request.params.id]);
+
+      if (!existingPayment) {
+        return reply.code(404).send({ error: 'Payment not found' });
+      }
+
+      // Update payment status
+      await db.query('
+        UPDATE payments
+        SET payment_status = COALESCE($1, payment_status),
+            duitku_reference = COALESCE(?, duitku_reference),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      ', [payment_status, duitku_reference, request.params.id]);
+
+      // Update customer balance if payment status changed to paid
+      if (payment_status === 'paid' && existingPayment.payment_status !== 'paid') {
+        if (existingPayment.payment_method === 'credit') {
+          // Deduct from credit balance
+          await db.query('
+            UPDATE customers
+            SET credit_balance = credit_balance - $1
+            WHERE id = $2
+          ', [existingPayment.amount, existingPayment.customer_id]);
+        }
+        // Deduct from debt balance if exists
+        await db.query('
+          UPDATE customers
+          SET debt_balance = MAX(0, debt_balance - $1)
+          WHERE id = ?
+        ', [existingPayment.amount, existingPayment.customer_id]);
+
+        // Log transaction
+        await db.query('
+          INSERT INTO transaction_logs (customer_id, type, description, amount, reference_id)
+          VALUES (?, 'payment_complete', ?, ?, ?)
+        ', [existingPayment.customer_id, `Payment completed: ${existingPayment.payment_method}`, existingPayment.amount, existingPayment.id]);
+      }
+
+      const updatedPayment = await db.getOne(`
+        SELECT p.*,
+               c.nama as customer_name,
+               s.username as subscription_username
+        FROM payments p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN subscriptions s ON p.subscription_id = s.id
+        WHERE p.id = $1
+      `, [request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'update_payment_status',
+        'payment',
+        request.params.id,
+        {
+          old_status: existingPayment.payment_status,
+          new_status: payment_status,
+          duitku_reference
+        },
+        request
+      );
+
+      return reply.send({
+        message: 'Payment status updated successfully',
+        payment: updatedPayment
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Delete payment
+  fastify.delete('/payments/:id', async (request, reply) => {
+    try {
+      // Check if payment exists
+      const payment = await db.getOne(`
+        SELECT p.*, c.nama as customer_name
+        FROM payments p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        WHERE p.id = $1
+      `, [request.params.id]);
+
+      if (!payment) {
+        return reply.code(404).send({ error: 'Payment not found' });
+      }
+
+      // Only allow deletion of pending or failed payments
+      if (payment.payment_status === 'paid') {
+        return reply.code(400).send({
+          error: 'Cannot delete paid payment',
+          message: 'Paid payments cannot be deleted for audit purposes'
+        });
+      }
+
+      // Delete payment
+      await db.query('DELETE FROM payments WHERE id = $1', [request.params.id]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'delete_payment',
+        'payment',
+        request.params.id,
+        {
+          amount: payment.amount,
+          payment_method: payment.payment_method,
+          customer_name: payment.customer_name
+        },
+        request
+      );
+
+      return reply.send({
+        message: 'Payment deleted successfully'
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get payment statistics
+  fastify.get('/payments/stats', async (request, reply) => {
+    try {
+      const start_date = request.query.start_date || '';
+      const end_date = request.query.end_date || '';
+
+      let dateFilter = '';
+      const params = [];
+
+      if (start_date) {
+        dateFilter += ' AND DATE(p.created_at) >= ?';
+        params.push(start_date);
+      }
+
+      if (end_date) {
+        dateFilter += ' AND DATE(p.created_at) <= ?';
+        params.push(end_date);
+      }
+
+      const stats = await db.getOne(`
+        SELECT
+          COUNT(*) as total_payments,
+          SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END) as total_revenue,
+          SUM(CASE WHEN payment_status = 'pending' THEN amount ELSE 0 END) as pending_amount,
+          SUM(CASE WHEN payment_status = 'failed' THEN amount ELSE 0 END) as failed_amount,
+          AVG(CASE WHEN payment_status = 'paid' THEN amount END) as avg_payment_amount,
+          MAX(CASE WHEN payment_status = 'paid' THEN amount END) as max_payment_amount,
+          MAX(created_at) as last_payment_date
+        FROM payments p
+        WHERE 1=1 ${dateFilter}
+      `, params);
+
+      // Get payment method distribution
+      const methodStats = db.query(`
+        SELECT payment_method,
+               COUNT(*) as count,
+               SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END) as revenue
+        FROM payments p
+        WHERE 1=1 ${dateFilter}
+        GROUP BY payment_method
+        ORDER BY revenue DESC
+      `, params);
+
+      // Get daily revenue trend (last 30 days)
+      db.query('
+        SELECT
+          DATE(created_at) as date,
+          COUNT(*) as payment_count,
+          SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END) as daily_revenue
+        FROM payments p
+        WHERE payment_status = 'paid' AND created_at >= date('now', '-30 days')
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+        LIMIT 30
+      ');
+
+      return reply.send({
+        payment_stats: stats,
+        method_distribution: methodStats,
+        daily_revenue_trend: dailyStats
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Add customer credit/debt
+  fastify.post('/customers/:id/balance', async (request, reply) => {
+    try {
+      const { type, amount, description } = request.body;
+
+      if (!type || !amount) {
+        return reply.code(400).send({
+          error: 'Missing required fields',
+          required: ['type', 'amount']
+        });
+      }
+
+      if (!['credit', 'debt'].includes(type)) {
+        return reply.code(400).send({
+          error: 'Invalid type. Must be credit or debt'
+        });
+      }
+
+      if (amount <= 0) {
+        return reply.code(400).send({
+          error: 'Amount must be greater than 0'
+        });
+      }
+
+      // Check if customer exists
+      const customer = await db.getOne('SELECT * FROM customers WHERE id = $1', [request.params.id]);
+      if (!customer) {
+        return reply.code(404).send({ error: 'Customer not found' });
+      }
+
+      // Update customer balance
+      await db.query('
+        UPDATE customers
+        SET ${type}_balance = ${type}_balance + $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      ', [amount, request.params.id]);
+
+      // Create payment record
+      const result = await db.query('
+        INSERT INTO payments (customer_id, amount, payment_method, payment_status, description)
+        VALUES (?, ?, ?, 'paid', ?)
+      ', [request.params.id, amount, type, description || `${type} balance adjustment`]);
+
+      // Log transaction
+      await db.query('
+        INSERT INTO transaction_logs (customer_id, type, description, amount, reference_id)
+        VALUES (?, '${type}_adjustment', ?, ?, ?)
+      ', [request.params.id, description || `${type} balance adjustment`, amount, result.lastID]);
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        `adjust_customer_${type}`,
+        'customer',
+        request.params.id,
+        {
+          type,
+          amount,
+          description,
+          old_balance: customer[`${type}_balance`],
+          new_balance: customer[`${type}_balance`] + amount
+        },
+        request
+      );
+
+      const updatedCustomer = await db.getOne('SELECT * FROM customers WHERE id = $1', [request.params.id]);
+
+      return reply.send({
+        message: `Customer ${type} balance updated successfully`,
+        customer: updatedCustomer,
+        adjustment: {
+          type,
+          amount,
+          description
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // ========== EXPIRY MONITORING API ENDPOINTS ==========
+
+  // Get expiry statistics
+  fastify.get('/monitoring/expiry/stats', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      // Get subscriptions expiring in different timeframes
+      const stats = {
+        expiring_today: 0,
+        expiring_week: 0,
+        expiring_month: 0,
+        expired: 0,
+        active: 0,
+        total: 0
+      };
+
+      // Today
+      const todayResult = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM subscriptions
+        WHERE status = 'active'
+        AND DATE(next_billing_date) = DATE('now')
+      `);
+      stats.expiring_today = todayResult.rowCount;
+
+      // This week
+      const weekResult = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM subscriptions
+        WHERE status = 'active'
+        AND DATE(next_billing_date) >= DATE('now')
+        AND DATE(next_billing_date) <= DATE('now', '+7 days')
+      `);
+      stats.expiring_week = weekResult.rowCount;
+
+      // This month
+      const monthResult = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM subscriptions
+        WHERE status = 'active'
+        AND DATE(next_billing_date) >= DATE('now')
+        AND DATE(next_billing_date) <= DATE('now', '+1 month')
+      `);
+      stats.expiring_month = monthResult.rowCount;
+
+      // Expired
+      const expiredResult = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM subscriptions
+        WHERE status = 'expired'
+        OR (status = 'active' AND DATE(next_billing_date) < DATE('now'))
+      `);
+      stats.expired = expiredResult.rowCount;
+
+      // Active
+      const activeResult = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM subscriptions
+        WHERE status = 'active'
+      `);
+      stats.active = activeResult.rowCount;
+
+      // Total
+      const totalResult = await db.getOne(`
+        SELECT COUNT(*) as count
+        FROM subscriptions
+      `);
+      stats.total = totalResult.rowCount;
+
+      // Get PPPoE users expiry stats
+      const pppoeStats = await db.getOne(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN DATE(expiry_date) = DATE('now') THEN 1 ELSE 0 END) as expiring_today,
+          SUM(CASE WHEN DATE(expiry_date) >= DATE('now') AND DATE(expiry_date) <= DATE('now', '+7 days') THEN 1 ELSE 0 END) as expiring_week,
+          SUM(CASE WHEN DATE(expiry_date) >= DATE('now') AND DATE(expiry_date) <= DATE('now', '+1 month') THEN 1 ELSE 0 END) as expiring_month,
+          SUM(CASE WHEN DATE(expiry_date) < DATE('now') THEN 1 ELSE 0 END) as expired
+        FROM pppoe_users
+      `);
+
+      return reply.send({
+        subscriptions: stats,
+        pppoe_users: pppoeStats
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get expiring subscriptions list
+  fastify.get('/monitoring/expiry/subscriptions', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const { timeframe = 'week', page = 1, limit = 20 } = request.query;
+      const offset = (page - 1) * limit;
+
+      let dateFilter = '';
+      switch (timeframe) {
+        case 'today':
+          dateFilter = 'AND DATE(s.next_billing_date) = DATE("now")';
+          break;
+        case 'week':
+          dateFilter = 'AND DATE(s.next_billing_date) >= DATE("now") AND DATE(s.next_billing_date) <= DATE("now", "+7 days")';
+          break;
+        case 'month':
+          dateFilter = 'AND DATE(s.next_billing_date) >= DATE("now") AND DATE(s.next_billing_date) <= DATE("now", "+1 month")';
+          break;
+        case 'expired':
+          dateFilter = 'AND (s.status = "expired" OR DATE(s.next_billing_date) < DATE("now"))';
+          break;
+      }
+
+      db.query('
+        SELECT s.*, c.nama as customer_nama, c.nomor_hp as customer_nomor_hp, c.email as customer_email,
+               p.name as profile_name, p.price_sell as profile_price
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.status = 'active' ${dateFilter}
+        ORDER BY s.next_billing_date ASC
+        LIMIT ? OFFSET ?
+      ', [parseInt(limit), offset]);
+
+      // Get total count
+      const countResult = await db.getOne(`
+        SELECT COUNT(*) as total
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        WHERE s.status = 'active' ${dateFilter}
+      `);
+
+      const total = countResult.total;
+      const totalPages = Math.ceil(total / parseInt(limit));
+
+      return reply.send({
+        subscriptions,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: totalPages,
+          total_items: total,
+          items_per_page: parseInt(limit)
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get expiring PPPoE users list
+  fastify.get('/monitoring/expiry/pppoe', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const { timeframe = 'week', page = 1, limit = 20 } = request.query;
+      const offset = (page - 1) * limit;
+
+      let dateFilter = '';
+      switch (timeframe) {
+        case 'today':
+          dateFilter = 'AND DATE(p.expiry_date) = DATE("now")';
+          break;
+        case 'week':
+          dateFilter = 'AND DATE(p.expiry_date) >= DATE("now") AND DATE(p.expiry_date) <= DATE("now", "+7 days")';
+          break;
+        case 'month':
+          dateFilter = 'AND DATE(p.expiry_date) >= DATE("now") AND DATE(p.expiry_date) <= DATE("now", "+1 month")';
+          break;
+        case 'expired':
+          dateFilter = 'AND DATE(p.expiry_date) < DATE("now")';
+          break;
+      }
+
+      db.query('
+        SELECT p.*, c.nama as customer_nama, c.nomor_hp as customer_nomor_hp, c.email as customer_email,
+               pr.name as profile_name, pr.time_limit
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        LEFT JOIN profiles pr ON p.profile_id = pr.id
+        WHERE p.status != 'deleted' ${dateFilter}
+        ORDER BY p.expiry_date ASC
+        LIMIT ? OFFSET ?
+      ', [parseInt(limit), offset]);
+
+      // Get total count
+      const countResult = await db.getOne(`
+        SELECT COUNT(*) as total
+        FROM pppoe_users p
+        LEFT JOIN customers c ON p.customer_id = c.id
+        WHERE p.status != 'deleted' ${dateFilter}
+      `);
+
+      const total = countResult.total;
+      const totalPages = Math.ceil(total / parseInt(limit));
+
+      return reply.send({
+        users,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: totalPages,
+          total_items: total,
+          items_per_page: parseInt(limit)
+        }
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Manually trigger expiry warnings
+  fastify.post('/monitoring/expiry/send-warnings', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      const { type = 'all' } = request.body;
+
+      let warningsSent = 0;
+
+      if (type === 'all' || type === 'subscriptions') {
+        // Send warnings for subscriptions
+        if (fastify.whatsappService) {
+          await fastify.whatsappService.sendExpiryWarnings();
+          warningsSent++;
+        }
+      }
+
+      if (type === 'all' || type === 'pppoe') {
+        // Send warnings for PPPoE users
+        db.query('
+          SELECT p.*, c.nama, c.nomor_hp
+          FROM pppoe_users p
+          LEFT JOIN customers c ON p.customer_id = c.id
+          WHERE p.status = 'active'
+          AND DATE(p.expiry_date) BETWEEN DATE('now') AND DATE('now', '+3 days')
+        ');
+
+        for (const user of expiringUsers) {
+          if (user.nomor_hp && fastify.whatsappService) {
+            try {
+              await fastify.whatsappService.sendNotification(
+                user.customer_id,
+                'subscription_expiry_warning',
+                {
+                  days: Math.ceil((new Date(user.expiry_date) - new Date()) / (1000 * 60 * 60 * 24)),
+                  package_name: user.profile_name || 'PPPoE Service'
+                }
+              );
+              warningsSent++;
+            } catch (error) {
+              console.error(`Failed to send warning to ${user.nama}:`, error);
+            }
+          }
+        }
+      }
+
+      // Log activity
+      await auth.logActivity(
+        request.admin.id,
+        'send_expiry_warnings',
+        null,
+        null,
+        { type, warnings_sent: warningsSent },
+        request
+      );
+
+      return reply.send({
+        message: 'Expiry warnings sent successfully',
+        warnings_sent: warningsSent,
+        type: type
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Get expiry monitoring dashboard data
+  fastify.get('/monitoring/expiry/dashboard', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, async (request, reply) => {
+    try {
+      // Get overall stats
+      const stats = await db.getOne(`
+        SELECT
+          COUNT(*) as total_subscriptions,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_subscriptions,
+          SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as expired_subscriptions,
+          SUM(CASE WHEN status = 'active' AND DATE(next_billing_date) = DATE('now') THEN 1 ELSE 0 END) as expiring_today,
+          SUM(CASE WHEN status = 'active' AND DATE(next_billing_date) <= DATE('now', '+7 days') THEN 1 ELSE 0 END) as expiring_this_week,
+          SUM(CASE WHEN status = 'active' AND DATE(next_billing_date) <= DATE('now', '+30 days') THEN 1 ELSE 0 END) as expiring_this_month
+        FROM subscriptions
+      `);
+
+      // Get PPPoE stats
+      const pppoeStats = await db.getOne(`
+        SELECT
+          COUNT(*) as total_pppoe,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_pppoe,
+          SUM(CASE WHEN status = 'disabled' THEN 1 ELSE 0 END) as disabled_pppoe,
+          SUM(CASE WHEN status = 'active' AND DATE(expiry_date) = DATE('now') THEN 1 ELSE 0 END) as expiring_today,
+          SUM(CASE WHEN status = 'active' AND DATE(expiry_date) <= DATE('now', '+7 days') THEN 1 ELSE 0 END) as expiring_this_week,
+          SUM(CASE WHEN status = 'active' AND DATE(expiry_date) <= DATE('now', '+30 days') THEN 1 ELSE 0 END) as expiring_this_month
+        FROM pppoe_users
+      `);
+
+      // Get recent expiries (last 7 days)
+      db.query('
+        SELECT s.*, c.nama as customer_nama, c.nomor_hp as customer_nomor_hp,
+               p.name as profile_name
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.status = 'expired'
+        AND DATE(s.updated_at) >= DATE('now', '-7 days')
+        ORDER BY s.updated_at DESC
+        LIMIT 10
+      ');
+
+      // Get upcoming renewals (next 7 days)
+      db.query('
+        SELECT s.*, c.nama as customer_nama, c.nomor_hp as customer_nomor_hp,
+               p.name as profile_name, p.price_sell
+        FROM subscriptions s
+        JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN profiles p ON s.profile_id = p.id
+        WHERE s.status = 'active'
+        AND DATE(s.next_billing_date) BETWEEN DATE('now') AND DATE('now', '+7 days')
+        ORDER BY s.next_billing_date ASC
+        LIMIT 10
+      ');
+
+      return reply.send({
+        stats,
+        pppoe_stats: pppoeStats,
+        recent_expiries: recentExpiries,
+        upcoming_renewals: upcomingRenewals
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Performance Analytics Endpoint
+  fastify.post('/analytics/performance', {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 minute'
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const metrics = request.body;
+
+      // Log performance metrics
+      fastify.log.info('Performance analytics received:', {
+        userAgent: request.headers['user-agent'],
+        timestamp: new Date().toISOString(),
+        metrics: metrics
+      });
+
+      // Store in memory or send to monitoring service
+      if (global.performanceMonitor) {
+        global.performanceMonitor.recordClientMetrics(metrics);
+      }
+
+      return reply.send({
+        success: true,
+        message: 'Performance metrics recorded'
+      });
+    } catch (error) {
+      fastify.log.error('Analytics performance error:', error);
+      return reply.status(500).send({
+        success: false,
+        message: 'Failed to record performance metrics'
+      });
+    }
+  });
+
+  // ===== BOT MANAGEMENT ENDPOINTS =====
+
+  // Initialize bot service if dependencies are available
+  let botService = null;
+  const whatsappService = fastify.whatsappService;
+  const mikrotikService = fastify.mikrotik;
+
+  if (whatsappService && mikrotikService) {
+    const WhatsAppBotService = require('../services/WhatsAppBotService');
+    botService = new WhatsAppBotService(whatsappService, fastify.db, mikrotikService);
+    whatsappService.setBotService(botService);
+    console.log('✅ WhatsApp Bot Service initialized in API routes');
+  } else {
+    console.log('⚠️  WhatsApp Bot Service initialization skipped in API routes - missing dependencies');
+  }
+
+  // Get bot status
+  fastify.get('/bot/status', async (request, reply) => {
+    try {
+      if (!botService) {
+        return reply.status(503).send({
+          success: false,
+          error: 'Bot service not available'
+        });
+      }
+      const status = botService.getStatus();
+      return reply.send({
+        success: true,
+        data: status
+      });
+    } catch (error) {
+      fastify.log.error('Error getting bot status:', error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to get bot status',
+        message: error.message
+      });
+    }
+  });
+
+  // Enable/disable bot (simple toggle without requiring enabled parameter)
+  fastify.post('/bot/toggle', async (request, reply) => {
+    try {
+      if (!botService) {
+        return reply.status(503).send({
+          success: false,
+          error: 'Bot service not available'
+        });
+      }
+      // Get current status and toggle it
+      const currentStatus = botService.getStatus();
+      const newEnabledState = !currentStatus.enabled;
+      botService.setEnabled(newEnabledState);
+      return reply.send({
+        success: true,
+        data: {
+          enabled: newEnabledState,
+          message: newEnabledState ? 'Bot enabled successfully' : 'Bot disabled successfully',
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      fastify.log.error('Error toggling bot:', error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to toggle bot',
+        message: error.message
+      });
+    }
+  });
+
+  // Set bot command
+  fastify.post('/bot/command', {
+    schema: {
+      body: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', minLength: 1 }
+        },
+        required: ['command']
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { command } = request.body;
+      if (!botService) {
+        return reply.status(503).send({
+          success: false,
+          error: 'Bot service not available'
+        });
+      }
+      botService.setBotCommand(command);
+      return reply.send({
+        success: true,
+        data: {
+          command,
+          message: 'Bot command updated successfully',
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      fastify.log.error('Error setting bot command:', error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to set bot command',
+        message: error.message
+      });
+    }
+  });
+
+  // Test bot functionality
+  fastify.post('/bot/test', {
+    schema: {
+      body: {
+        type: 'object',
+        properties: {
+          phoneNumber: { type: 'string', minLength: 10 },
+          message: { type: 'string', minLength: 1 }
+        },
+        required: ['phoneNumber', 'message']
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { phoneNumber, message } = request.body;
+      if (!botService) {
+        return reply.status(503).send({
+          success: false,
+          error: 'Bot service not available'
+        });
+      }
+      // Send test message via WhatsApp service
+      const result = await whatsappService.sendMessage(phoneNumber, message);
+      return reply.send({
+        success: true,
+        data: {
+          sent: true,
+          to: phoneNumber,
+          message: message,
+          messageId: result.id,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      fastify.log.error('Error testing bot:', error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to send test message',
+        message: error.message
+      });
+    }
+  });
+
+  // ===== WHATSAPP BULK MESSAGING =====
+  // Send bulk messages (API)
+  fastify.post('/bulk/send', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['messages'],
+        properties: {
+          messages: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['to', 'message'],
+              properties: {
+                to: { type: 'string' },
+                message: { type: 'string' },
+                priority: { type: 'string', enum: ['urgent', 'high', 'normal', 'low', 'bulk'] },
+                relatedId: { type: 'number' },
+                relatedType: { type: 'string' }
+              }
+            }
+          },
+          priority: { type: 'string', enum: ['urgent', 'high', 'normal', 'low', 'bulk'] },
+          delayBetween: { type: 'number' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { messages, priority = 'bulk', delayBetween = 2000 } = request.body;
+      const results = {
+        successful: [],
+        failed: [],
+        queued: [],
+        rateLimited: []
+      };
+
+      // Get WhatsApp services
+      const whatsappService = fastify.whatsappService;
+      if (!whatsappService) {
+        return reply.status(503).send({
+          success: false,
+          error: 'WhatsApp service not available'
+        });
+      }
+
+      // Get rate limiter and queue services
+      const RateLimiterService = require('../services/RateLimiterService');
+      const QueueService = require('../services/QueueService');
+      const rateLimiterService = new RateLimiterService();
+      const queueService = new QueueService(fastify.db, whatsappService);
+
+      // Process messages in batches with delays
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        const messagePriority = message.priority || priority;
+
+        try {
+          // Check rate limiting for each message
+          const rateLimitCheck = await rateLimiterService.checkLimit({ priority: messagePriority });
+
+          if (!rateLimitCheck.allowed) {
+            // Queue rate limited messages using addBulkMessage for bulk messages
+            const queueId = await queueService.addBulkMessage({
+              recipient: message.to,
+              message: message.message,
+              priority: messagePriority,
+              relatedId: message.relatedId,
+              relatedType: message.relatedType || 'bulk',
+              scheduledAt: new Date(Date.now() + rateLimitCheck.retryAfter)
+            });
+
+            results.queued.push({
+              index: i,
+              to: message.to,
+              queueId: queueId,
+              retryAfter: rateLimitCheck.retryAfter
+            });
+            results.rateLimited.push(i);
+          } else {
+            // Send message directly
+            const sendResult = await whatsappService.sendMessage(message.to, message.message, {
+              priority: messagePriority,
+              relatedId: message.relatedId,
+              relatedType: message.relatedType
+            });
+
+            // Record in rate limiter
+            rateLimiterService.recordMessage();
+
+            results.successful.push({
+              index: i,
+              to: message.to,
+              messageId: sendResult.id,
+              status: sendResult.status
+            });
+          }
+
+          // Add delay between messages (except for urgent priority)
+          if (messagePriority !== 'urgent' && i < messages.length - 1 && delayBetween > 0) {
+            await new Promise(resolve => setTimeout(resolve, delayBetween));
+          }
+        } catch (error) {
+          results.failed.push({
+            index: i,
+            to: message.to,
+            error: error.message
+          });
+        }
+      }
+
+      return reply.send({
+        success: true,
+        results: results,
+        summary: {
+          total: messages.length,
+          successful: results.successful.length,
+          failed: results.failed.length,
+          queued: results.queued.length,
+          rateLimited: results.rateLimited.length
+        }
+      });
+    } catch (error) {
+      fastify.log.error('Error sending bulk messages:', error);
+      return reply.status(500).send({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+}
+
+module.exports = apiRoutes;

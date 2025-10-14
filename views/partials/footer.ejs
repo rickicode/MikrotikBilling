@@ -1,0 +1,411 @@
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-dark-800 border-t border-dark-700 py-6 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-dark-400 text-sm mb-4 sm:mb-0">
+                        © <%= new Date().getFullYear() %> <%= settings?.company_name || 'Mikrotik Billing System' %>
+                    </div>
+                    <div class="text-dark-400 text-sm flex items-center">
+                        <i class="fas fa-code mr-2"></i>
+                        Version 1.0.0
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="/public/js/main.js"></script>
+
+    <!-- Real-time updates script -->
+    <script>
+        // Mobile menu toggle with enhanced animations
+        document.getElementById('mobile-menu-button')?.addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            const button = this;
+            const icon = button.querySelector('i');
+
+            if (mobileMenu.classList.contains('hidden')) {
+                mobileMenu.classList.remove('hidden');
+                mobileMenu.classList.add('animate-slide-in');
+                icon.classList.remove('fa-bars');
+                icon.classList.add('fa-times');
+            } else {
+                mobileMenu.classList.add('animate-slide-out');
+                icon.classList.remove('fa-times');
+                icon.classList.add('fa-bars');
+                setTimeout(() => {
+                    mobileMenu.classList.add('hidden');
+                    mobileMenu.classList.remove('animate-slide-out');
+                }, 300);
+            }
+        });
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const mobileMenu = document.getElementById('mobile-menu');
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+
+            if (mobileMenu && !mobileMenu.classList.contains('hidden') &&
+                !mobileMenu.contains(event.target) && !mobileMenuButton.contains(event.target)) {
+                mobileMenu.classList.add('animate-slide-out');
+                const icon = mobileMenuButton.querySelector('i');
+                icon.classList.remove('fa-times');
+                icon.classList.add('fa-bars');
+                setTimeout(() => {
+                    mobileMenu.classList.add('hidden');
+                    mobileMenu.classList.remove('animate-slide-out');
+                }, 300);
+            }
+        });
+
+        // Mobile action menu functions
+        function openMobileActionMenu() {
+            const menu = document.getElementById('mobileActionMenu');
+            if (menu) {
+                menu.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeMobileActionMenu() {
+            const menu = document.getElementById('mobileActionMenu');
+            if (menu) {
+                menu.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Close mobile action menu when clicking outside
+        document.getElementById('mobileActionMenu')?.addEventListener('click', function(event) {
+            if (event.target === this) {
+                closeMobileActionMenu();
+            }
+        });
+
+  
+        // Mobile swipe gestures for navigation
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        document.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, { passive: true });
+
+        function handleSwipe() {
+            const swipeThreshold = 100;
+            const diff = touchStartX - touchEndX;
+
+            if (Math.abs(diff) < swipeThreshold) return;
+
+            if (diff > 0) {
+                // Swipe left - could trigger navigation or actions
+                console.log('Swipe left detected');
+            } else {
+                // Swipe right - could open navigation or go back
+                console.log('Swipe right detected');
+            }
+        }
+
+        // Mobile viewport height fix for iOS
+        function setViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        setViewportHeight();
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setViewportHeight, 100);
+        });
+
+        // Mobile performance optimizations
+        if ('IntersectionObserver' in window) {
+            // Lazy load images on mobile
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                        }
+                        observer.unobserve(img);
+                    }
+                });
+            });
+
+            document.querySelectorAll('img[data-src]').forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
+
+        // Add haptic feedback (vibration) for mobile interactions
+        function vibrate(pattern = 50) {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(pattern);
+            }
+        }
+
+        // Add vibrate to button clicks on mobile
+        if ('ontouchstart' in window) {
+            document.addEventListener('click', function(e) {
+                if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                    vibrate(25);
+                }
+            });
+        }
+
+        // Mobile network status monitoring
+        function updateNetworkStatus() {
+            const statusElement = document.getElementById('networkStatus');
+            if (!statusElement) return;
+
+            if (navigator.onLine) {
+                statusElement.textContent = 'Online';
+                statusElement.className = 'text-green-400';
+            } else {
+                statusElement.textContent = 'Offline';
+                statusElement.className = 'text-red-400';
+                showToast('You are currently offline', 'warning');
+            }
+        }
+
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+        updateNetworkStatus();
+
+        // Mobile storage management
+        function checkStorageQuota() {
+            if ('storage' in navigator && 'estimate' in navigator.storage) {
+                navigator.storage.estimate().then(estimate => {
+                    const usedSpace = (estimate.usage / 1024 / 1024).toFixed(2);
+                    const availableSpace = (estimate.quota / 1024 / 1024).toFixed(2);
+
+                    if (usedSpace > availableSpace * 0.9) {
+                        showToast('Storage space running low', 'warning');
+                    }
+                });
+            }
+        }
+
+        // Check storage quota every 5 minutes
+        setInterval(checkStorageQuota, 300000);
+
+        // Accessibility Enhancements
+        // ========================
+
+        // Keyboard navigation detection
+        let keyboardUser = false;
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                keyboardUser = true;
+                document.body.classList.add('keyboard-user');
+            }
+        });
+
+        document.addEventListener('mousedown', function() {
+            keyboardUser = false;
+            document.body.classList.remove('keyboard-user');
+        });
+
+        // Announce dynamic content changes to screen readers
+        function announceToScreenReader(message, priority = 'polite') {
+            const announcement = document.createElement('div');
+            announcement.setAttribute('aria-live', priority);
+            announcement.setAttribute('aria-atomic', 'true');
+            announcement.className = 'sr-announcement';
+            announcement.textContent = message;
+
+            document.body.appendChild(announcement);
+
+            setTimeout(() => {
+                document.body.removeChild(announcement);
+            }, 1000);
+        }
+
+        // Enhanced mobile menu with accessibility
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        if (mobileMenuButton && mobileMenu) {
+            mobileMenuButton.addEventListener('click', function() {
+                const isExpanded = this.getAttribute('aria-expanded') === 'true';
+
+                if (isExpanded) {
+                    mobileMenu.classList.add('hidden');
+                    this.setAttribute('aria-expanded', 'false');
+                    this.querySelector('i').classList.remove('fa-times');
+                    this.querySelector('i').classList.add('fa-bars');
+                    announceToScreenReader('Mobile menu closed');
+                } else {
+                    mobileMenu.classList.remove('hidden');
+                    this.setAttribute('aria-expanded', 'true');
+                    this.querySelector('i').classList.remove('fa-bars');
+                    this.querySelector('i').classList.add('fa-times');
+
+                    // Focus first menu item
+                    const firstMenuItem = mobileMenu.querySelector('a');
+                    if (firstMenuItem) {
+                        setTimeout(() => firstMenuItem.focus(), 100);
+                    }
+
+                    announceToScreenReader('Mobile menu opened');
+                }
+            });
+
+            // Close mobile menu on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && mobileMenuButton.getAttribute('aria-expanded') === 'true') {
+                    mobileMenuButton.click();
+                    mobileMenuButton.focus();
+                }
+            });
+        }
+
+        // Skip to main content functionality
+        const skipLink = document.querySelector('a[href="#main-content"]');
+        const mainContent = document.getElementById('main-content');
+
+        if (skipLink && mainContent) {
+            skipLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                mainContent.focus();
+                mainContent.scrollIntoView();
+            });
+        }
+
+        // Performance Optimization Features (DISABLED for faster loading)
+
+  
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            const timeElement = document.getElementById('currentTime');
+            if (timeElement) {
+                timeElement.textContent = now.toLocaleString('id-ID');
+            }
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Check Mikrotik connection
+        async function checkMikrotikConnection() {
+            try {
+                const response = await fetch('/api/public/system/connection');
+                const data = await response.json();
+                const statusElement = document.getElementById('mikrotikStatus');
+
+                if (statusElement) {
+                    if (data.connected) {
+                        statusElement.textContent = 'Connected';
+                        statusElement.className = 'text-green-400';
+                    } else {
+                        statusElement.textContent = 'Disconnected';
+                        statusElement.className = 'text-red-400';
+                    }
+                }
+            } catch (error) {
+                const statusElement = document.getElementById('mikrotikStatus');
+                if (statusElement) {
+                    statusElement.textContent = 'Error';
+                    statusElement.className = 'text-red-400';
+                }
+            }
+        }
+
+        // Check connection every 30 seconds
+        setInterval(checkMikrotikConnection, 30000);
+        checkMikrotikConnection();
+
+        // HTMX configuration
+        if (typeof htmx !== 'undefined') {
+            htmx.config.globalViewTransitions = true;
+
+            // Show loading indicator
+            document.addEventListener('htmx:beforeRequest', function(evt) {
+                document.body.style.cursor = 'wait';
+            });
+
+            document.addEventListener('htmx:afterRequest', function(evt) {
+                document.body.style.cursor = 'default';
+            });
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'info', duration = 5000) {
+            const toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) return;
+
+            const toast = document.createElement('div');
+
+            const bgColor = {
+                success: 'bg-green-600',
+                error: 'bg-red-600',
+                warning: 'bg-yellow-600',
+                info: 'bg-blue-600'
+            }[type] || 'bg-gray-600';
+
+            const icon = {
+                success: 'fas fa-check-circle',
+                error: 'fas fa-exclamation-circle',
+                warning: 'fas fa-exclamation-triangle',
+                info: 'fas fa-info-circle'
+            }[type] || 'fas fa-info-circle';
+
+            toast.className = `${bgColor} text-white px-6 py-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+            toast.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <i class="${icon}"></i>
+                    <span class="flex-1">${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            toastContainer.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+                toast.classList.add('translate-x-0');
+            }, 100);
+
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // Auto-hide alerts after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('[role="alert"]');
+            alerts.forEach(function(alert) {
+                if (alert.style.display !== 'none') {
+                    alert.style.transition = 'opacity 0.5s';
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 500);
+                }
+            });
+        }, 5000);
+    </script>
+
+    <!-- Page-specific scripts -->
+    <% if (typeof scripts !== 'undefined' && scripts && scripts.length > 0) { %>
+        <% scripts.forEach(script => { %>
+            <script src="<%= script %>"></script>
+        <% }); %>
+    <% } %>
+</body>
+</html>

@@ -1,0 +1,592 @@
+/* WhatsApp Management Modern Styles - Dark Theme with Tailwind */
+
+/* Custom animations and transitions */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Tab content animations */
+.tab-content {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Tab button hover effects */
+.tab-button {
+    position: relative;
+    overflow: hidden;
+}
+
+.tab-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    transition: left 0.5s;
+}
+
+.tab-button:hover::before {
+    left: 100%;
+}
+
+/* Status indicator animations */
+.status-indicator {
+    position: relative;
+}
+
+.status-indicator::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.connected::before {
+    background-color: rgba(34, 197, 94, 0.2);
+}
+
+.status-indicator.disconnected::before {
+    background-color: rgba(239, 68, 68, 0.2);
+}
+
+/* QR Code styling */
+.qr-code-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.qr-code-container img {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.qr-code-container:hover img {
+    transform: scale(1.05);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Message table styling */
+.message-row {
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.message-row:hover {
+    border-left-color: #3b82f6;
+    background: linear-gradient(to right, rgba(59, 130, 246, 0.05), transparent);
+}
+
+.message-row.outgoing {
+    border-left-color: #10b981;
+}
+
+.message-row.incoming {
+    border-left-color: #6366f1;
+}
+
+/* Statistics cards hover effects */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6, #10b981, #6366f1, #f59e0b);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover::before {
+    transform: scaleX(1);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Button effects */
+.whatsapp-button {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.whatsapp-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.whatsapp-button:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+.whatsapp-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Modal animations */
+.modal-backdrop {
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Loading states */
+.loading-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-overlay {
+    position: relative;
+    overflow: hidden;
+}
+
+.loading-overlay::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 10;
+}
+
+.loading-overlay::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: spin 1s linear infinite;
+    z-index: 11;
+}
+
+/* Form styling */
+.form-input {
+    transition: all 0.2s ease;
+}
+
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-input:hover:not(:focus) {
+    border-color: #4b5563;
+}
+
+/* Badge animations */
+.badge {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.badge.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Progress bar styling */
+.progress-bar {
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* File upload area */
+.file-upload-area {
+    border: 2px dashed #4b5563;
+    transition: all 0.3s ease;
+}
+
+.file-upload-area:hover {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.file-upload-area.dragover {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+/* Toast notifications */
+.toast-notification {
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast-notification.removing {
+    animation: slideOutRight 0.3s ease-out;
+}
+
+@keyframes slideOutRight {
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Template cards */
+.template-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.template-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.template-card.selected {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+}
+
+/* Search bar styling */
+.search-input {
+    transition: all 0.2s ease;
+}
+
+.search-input:focus {
+    width: 300px;
+}
+
+.search-input:not(:focus) {
+    width: 200px;
+}
+
+/* Character counter */
+.char-counter {
+    transition: color 0.2s ease;
+}
+
+.char-counter.warning {
+    color: #f59e0b;
+}
+
+.char-counter.danger {
+    color: #ef4444;
+    font-weight: bold;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .tab-button {
+        font-size: 0.75rem;
+        padding: 0.5rem 0.25rem;
+    }
+
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+
+    .modal-content {
+        margin: 1rem;
+        max-height: calc(100vh - 2rem);
+    }
+
+    .search-input:focus {
+        width: 100%;
+    }
+
+    .search-input:not(:focus) {
+        width: 100%;
+    }
+}
+
+/* Dark theme specific styles */
+.dark-theme {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --border-color: #334155;
+    --accent-primary: #3b82f6;
+    --accent-success: #10b981;
+    --accent-warning: #f59e0b;
+    --accent-danger: #ef4444;
+}
+
+/* Custom scrollbar for message containers */
+.message-container {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
+}
+
+.message-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.message-container::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+.message-container::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 3px;
+}
+
+/* Connection status animations */
+.connection-status {
+    position: relative;
+}
+
+.connection-status::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    animation: pulse 2s infinite;
+}
+
+.connection-status.connected::after {
+    background: #10b981;
+}
+
+.connection-status.connecting::after {
+    background: #f59e0b;
+}
+
+.connection-status.disconnected::after {
+    background: #ef4444;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 640px) {
+    .grid-responsive {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+    .grid-responsive {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (min-width: 1025px) {
+    .grid-responsive {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    .print-only {
+        display: block !important;
+    }
+
+    .bg-slate-800 {
+        background: white !important;
+        color: black !important;
+        border: 1px solid #ccc !important;
+    }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Focus styles for better accessibility */
+.focus-visible:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .bg-slate-800 {
+        border: 2px solid #f1f5f9;
+    }
+
+    .text-slate-300 {
+        color: #f1f5f9;
+    }
+}
+
+/* Loading skeleton */
+.skeleton {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Hover tooltip */
+.tooltip {
+    position: relative;
+}
+
+.tooltip::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #f1f5f9;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 50;
+}
+
+.tooltip:hover::before {
+    opacity: 1;
+}

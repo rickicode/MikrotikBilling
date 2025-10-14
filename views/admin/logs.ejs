@@ -1,0 +1,372 @@
+<%- include('../partials/header') %>
+
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+        <i class="bi bi-clock-history text-blue-600"></i>
+        Log Aktivitas Admin
+    </h1>
+</div>
+
+<!-- Statistics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-blue-600 text-white rounded-lg shadow-lg p-6 transform hover:scale-105 transition-transform duration-200">
+        <div class="flex justify-between items-center">
+            <div>
+                <p class="text-blue-100 text-sm font-medium">Total Aktivitas</p>
+                <p class="text-3xl font-bold" id="totalActivities">-</p>
+            </div>
+            <div class="bg-blue-700 bg-opacity-50 rounded-full p-3">
+                <i class="bi bi-activity text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-green-600 text-white rounded-lg shadow-lg p-6 transform hover:scale-105 transition-transform duration-200">
+        <div class="flex justify-between items-center">
+            <div>
+                <p class="text-green-100 text-sm font-medium">Hari Ini</p>
+                <p class="text-3xl font-bold" id="todayActivities">-</p>
+            </div>
+            <div class="bg-green-700 bg-opacity-50 rounded-full p-3">
+                <i class="bi bi-calendar-day text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-cyan-600 text-white rounded-lg shadow-lg p-6 transform hover:scale-105 transition-transform duration-200">
+        <div class="flex justify-between items-center">
+            <div>
+                <p class="text-cyan-100 text-sm font-medium">Admin Aktif</p>
+                <p class="text-3xl font-bold" id="activeAdmins">-</p>
+            </div>
+            <div class="bg-cyan-700 bg-opacity-50 rounded-full p-3">
+                <i class="bi bi-people text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-amber-600 text-white rounded-lg shadow-lg p-6 transform hover:scale-105 transition-transform duration-200">
+        <div class="flex justify-between items-center">
+            <div>
+                <p class="text-amber-100 text-sm font-medium">Aksi Terakhir</p>
+                <p class="text-3xl font-bold" id="lastAction">-</p>
+            </div>
+            <div class="bg-amber-700 bg-opacity-50 rounded-full p-3">
+                <i class="bi bi-arrow-clockwise text-2xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Form -->
+<div class="bg-white rounded-lg shadow-md mb-6 border border-gray-200">
+    <div class="border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <i class="bi bi-funnel text-blue-600"></i>
+            Filter Log
+        </h3>
+    </div>
+    <div class="p-6">
+        <form id="filterForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label for="actionFilter" class="block text-sm font-medium text-gray-700 mb-2">Aksi</label>
+                <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-colors" id="actionFilter" name="action">
+                    <option value="">Semua Aksi</option>
+                    <option value="create">Create</option>
+                    <option value="update">Update</option>
+                    <option value="delete">Delete</option>
+                    <option value="login">Login</option>
+                    <option value="logout">Logout</option>
+                </select>
+            </div>
+            <div>
+                <label for="adminFilter" class="block text-sm font-medium text-gray-700 mb-2">Admin</label>
+                <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-colors" id="adminFilter" name="admin">
+                    <option value="">Semua Admin</option>
+                </select>
+            </div>
+            <div>
+                <label for="targetTypeFilter" class="block text-sm font-medium text-gray-700 mb-2">Target Type</label>
+                <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-colors" id="targetTypeFilter" name="targetType">
+                    <option value="">Semua Type</option>
+                    <option value="customer">Customer</option>
+                    <option value="voucher">Voucher</option>
+                    <option value="pppoe">PPPoE</option>
+                    <option value="profile">Profile</option>
+                    <option value="settings">Settings</option>
+                </select>
+            </div>
+            <div>
+                <label for="dateFilter" class="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
+                <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-colors" id="dateFilter" name="date">
+            </div>
+            <div class="md:col-span-4 flex flex-wrap gap-2">
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <button type="button" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors duration-200 flex items-center gap-2" id="clearFilter">
+                    <i class="bi bi-x-circle"></i> Clear
+                </button>
+                <button type="button" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200 flex items-center gap-2" id="exportBtn">
+                    <i class="bi bi-download"></i> Export CSV
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Activity Logs Table -->
+<div class="bg-white rounded-lg shadow-md border border-gray-200">
+    <div class="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+        <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <i class="bi bi-list-ul text-blue-600"></i>
+            Daftar Aktivitas
+        </h3>
+        <div>
+            <button class="px-3 py-1.5 text-blue-600 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors duration-200 flex items-center gap-2 text-sm" id="refreshBtn">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detail</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="logsTableBody">
+                <% logs.forEach(log => { %>
+                    <tr class="hover:bg-gray-50 transition-colors duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm text-gray-500">
+                                <%= new Date(log.created_at).toLocaleString('id-ID') %>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                <%= log.admin_name %>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                <%=
+                                    ['create', 'login', 'view'].includes(log.action) ? 'bg-green-100 text-green-800' :
+                                    ['update'].includes(log.action) ? 'bg-yellow-100 text-yellow-800' :
+                                    ['delete'].includes(log.action) ? 'bg-red-100 text-red-800' :
+                                    ['logout'].includes(log.action) ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'
+                                %>">
+                                <%= log.action %>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <% if (log.target_type) { %>
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    <%= log.target_type %>
+                                    <% if (log.target_id) { %>
+                                        #<%= log.target_id %>
+                                    <% } %>
+                                </span>
+                            <% } else { %>
+                                <span class="text-gray-400 text-sm">-</span>
+                            <% } %>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <% if (log.details) { %>
+                                <button class="px-3 py-1 text-xs font-medium text-cyan-700 bg-cyan-100 rounded-md hover:bg-cyan-200 transition-colors duration-200 flex items-center gap-1" onclick="showDetails(encodeURIComponent('<%= JSON.stringify(log.details).replace(/'/g, "\\'") %>'))">
+                                    <i class="bi bi-eye"></i> Lihat
+                                </button>
+                            <% } else { %>
+                                <span class="text-gray-400 text-sm">-</span>
+                            <% } %>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="px-6 py-4 border-t border-gray-200">
+        <nav aria-label="Page navigation">
+            <ul class="flex justify-center items-center space-x-1">
+                <% if (pagination.current > 1) { %>
+                    <li>
+                        <a href="?page=<%= pagination.current - 1 %>" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors duration-200">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                <% } %>
+
+                <% for (let i = Math.max(1, pagination.current - 2); i <= Math.min(pagination.total, pagination.current + 2); i++) { %>
+                    <li>
+                        <a href="?page=<%= i %>" class="px-3 py-2 text-sm font-medium
+                            <%= i === pagination.current ? 'text-blue-600 bg-blue-50 border-blue-500' : 'text-gray-500 bg-white border-gray-300 hover:bg-gray-50' %>
+                            border rounded-md transition-colors duration-200">
+                            <%= i %>
+                        </a>
+                    </li>
+                <% } %>
+
+                <% if (pagination.current < pagination.total) { %>
+                    <li>
+                        <a href="?page=<%= pagination.current + 1 %>" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors duration-200">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                <% } %>
+            </ul>
+        </nav>
+
+        <div class="text-center mt-4">
+            <p class="text-sm text-gray-500">
+                Menampilkan <%= pagination.from %> - <%= pagination.to %> dari <%= pagination.total %> aktivitas
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div id="detailsModal" class="fixed inset-0 z-50 hidden overflow-y-auto" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" onclick="closeDetailsModal()"></div>
+
+        <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800">Detail Aktivitas</h3>
+                <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <pre id="detailsContent" class="bg-gray-50 p-4 rounded-md text-sm font-mono text-gray-700 overflow-x-auto border-l-4 border-blue-500"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Modal functions
+function showDetails(details) {
+    try {
+        const parsed = JSON.parse(details);
+        document.getElementById('detailsContent').textContent = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+        document.getElementById('detailsContent').textContent = details;
+    }
+    document.getElementById('detailsModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDetailsModal() {
+    document.getElementById('detailsModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeDetailsModal();
+    }
+});
+</script>
+
+<script>
+// Helper function for EJS (client-side)
+function getActionBadgeClass(action) {
+    const badgeClasses = {
+        'create': 'success',
+        'update': 'warning',
+        'delete': 'danger',
+        'login': 'info',
+        'logout': 'secondary',
+        'view': 'primary'
+    };
+    return badgeClasses[action] || 'secondary';
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Load statistics
+    loadStatistics();
+
+    // Load admin filter options
+    loadAdminOptions();
+
+    // Auto refresh every 30 seconds
+    setInterval(loadStatistics, 30000);
+});
+
+// Load statistics
+function loadStatistics() {
+    fetch('/api/statistics')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('totalActivities').textContent = data.totalActivities || 0;
+            document.getElementById('todayActivities').textContent = data.todayActivities || 0;
+            document.getElementById('activeAdmins').textContent = data.activeAdmins || 0;
+            document.getElementById('lastAction').textContent = data.lastAction || '-';
+        })
+        .catch(error => console.error('Error loading statistics:', error));
+}
+
+// Load admin options for filter
+function loadAdminOptions() {
+    fetch('/api/admins')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('adminFilter');
+            data.admins.forEach(admin => {
+                const option = document.createElement('option');
+                option.value = admin;
+                option.textContent = admin;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => console.error('Error loading admin options:', error));
+}
+
+// Filter form submission
+document.getElementById('filterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const params = new URLSearchParams(formData);
+    window.location.href = '/logs?' + params.toString();
+});
+
+// Clear filter
+document.getElementById('clearFilter').addEventListener('click', function() {
+    window.location.href = '/logs';
+});
+
+// Refresh button
+document.getElementById('refreshBtn').addEventListener('click', function() {
+    location.reload();
+});
+
+// Export CSV
+document.getElementById('exportBtn').addEventListener('click', function() {
+    const filterForm = document.getElementById('filterForm');
+    const formData = new FormData(filterForm);
+    const params = new URLSearchParams(formData);
+    window.location.href = '/api/logs/export?' + params.toString();
+});
+</script>
+
+<%- include('../partials/footer') %>

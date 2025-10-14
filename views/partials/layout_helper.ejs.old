@@ -1,0 +1,15 @@
+<%#
+// Layout helper for proper content wrapping
+// This file should be included at the top of page templates
+// Usage: <%- include('../partials/layout_helper', {
+//   title: 'Page Title',
+//   content: `
+//     <!-- Page content goes here -->
+//   `
+// }) %>
+%>
+<%- include('../partials/layout', {
+    title: title,
+    scripts: scripts,
+    content: content
+}) %>

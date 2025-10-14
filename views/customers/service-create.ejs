@@ -1,0 +1,456 @@
+<%- include('../partials/header', { title: `Tambah Layanan - ${customer.nama}`, currentUrl: `/customers/${customer.id}/services/create` }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Tambah Layanan</h1>
+            <p class="text-slate-400">
+                Pelanggan: <strong class="text-white"><%= customer.nama %></strong> (#<%= customer.id %>)
+            </p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="/customers/<%= customer.id %>" class="inline-flex items-center px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors duration-200">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Kembali ke Detail
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Main Content -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Service Type Selection -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h2 class="text-xl font-semibold text-white">Pilih Jenis Layanan</h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Hotspot Service Card -->
+                    <div class="service-type-card bg-slate-700/50 border border-slate-600 rounded-xl p-6 cursor-pointer hover:border-blue-500 hover:bg-slate-700/70 transition-all duration-300 transform hover:-translate-y-1" data-service="hotspot">
+                        <div class="text-center">
+                            <i class="fas fa-wifi text-5xl text-blue-400 mb-4"></i>
+                            <h3 class="text-lg font-semibold text-white mb-2">Hotspot Voucher</h3>
+                            <p class="text-slate-400 text-sm mb-4">Layanan internet hotspot untuk penggunaan sementara</p>
+                            <div class="flex items-center justify-center">
+                                <input type="radio" name="service_type" id="hotspot" value="hotspot" class="w-4 h-4 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-800 border-slate-600 bg-slate-700">
+                                <label for="hotspot" class="ml-2 text-sm text-slate-300 cursor-pointer">Pilih Hotspot</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PPPoE Service Card -->
+                    <div class="service-type-card bg-slate-700/50 border border-slate-600 rounded-xl p-6 cursor-pointer hover:border-green-500 hover:bg-slate-700/70 transition-all duration-300 transform hover:-translate-y-1" data-service="pppoe">
+                        <div class="text-center">
+                            <i class="fas fa-network-wired text-5xl text-green-400 mb-4"></i>
+                            <h3 class="text-lg font-semibold text-white mb-2">PPPoE</h3>
+                            <p class="text-slate-400 text-sm mb-4">Layanan internet dedicated untuk rumah/kantor</p>
+                            <div class="flex items-center justify-center">
+                                <input type="radio" name="service_type" id="pppoe" value="pppoe" class="w-4 h-4 text-green-600 focus:ring-green-500 focus:ring-offset-slate-800 border-slate-600 bg-slate-700">
+                                <label for="pppoe" class="ml-2 text-sm text-slate-300 cursor-pointer">Pilih PPPoE</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service Configuration Form -->
+        <div id="serviceConfigCard" class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg hidden">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h2 class="text-xl font-semibold text-white">Konfigurasi Layanan</h2>
+            </div>
+            <div class="p-6">
+                <form id="serviceForm" novalidate class="space-y-6">
+                    <input type="hidden" name="customer_id" value="<%= customer.id %>">
+                    <input type="hidden" name="service_type" id="selectedServiceType">
+
+                    <!-- Hotspot Configuration -->
+                    <div id="hotspotConfig" class="space-y-6 hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="hotspot_profile" class="block text-sm font-medium text-slate-300 mb-2">Profile Hotspot</label>
+                                <select id="hotspot_profile" name="profile_name" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                                    <option value="">Pilih Profile</option>
+                                    <% profiles.forEach(profile => { %>
+                                        <option value="<%= profile.name %>" data-price="<%= profile.price_sell %>">
+                                            <%= profile.name %> - <%= new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(profile.price_sell) %>
+                                        </option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="hotspot_duration" class="block text-sm font-medium text-slate-300 mb-2">Durasi</label>
+                                <select id="hotspot_duration" name="duration" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                                    <option value="">Pilih Durasi</option>
+                                    <option value="1">1 Hari</option>
+                                    <option value="7">7 Hari</option>
+                                    <option value="14">14 Hari</option>
+                                    <option value="30">30 Hari</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="hotspot_auto_renew" name="auto_renew" value="1" class="h-4 w-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-800">
+                            <label for="hotspot_auto_renew" class="ml-2 text-sm text-slate-300">
+                                Auto-renewal subscription
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- PPPoE Configuration -->
+                    <div id="pppoeConfig" class="space-y-6 hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="pppoe_profile" class="block text-sm font-medium text-slate-300 mb-2">Profile PPPoE</label>
+                                <select id="pppoe_profile" name="profile_name" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                    <option value="">Pilih Profile</option>
+                                    <% pppProfiles.forEach(profile => { %>
+                                        <option value="<%= profile.name %>" data-price="<%= profile.price_sell %>">
+                                            <%= profile.name %> - <%= new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(profile.price_sell) %>
+                                        </option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="pppoe_username" class="block text-sm font-medium text-slate-300 mb-2">Username</label>
+                                <div class="flex">
+                                    <input type="text" id="pppoe_username" name="username" placeholder="Auto-generate" class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                    <button type="button" onclick="generateUsername()" class="h-10 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-r-lg border border-l-0 border-slate-600 transition-colors duration-200">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="pppoe_password" class="block text-sm font-medium text-slate-300 mb-2">Password</label>
+                                <div class="flex">
+                                    <input type="text" id="pppoe_password" name="password" placeholder="Auto-generate" class="flex-1 h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-l-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                    <button type="button" onclick="generatePassword()" class="h-10 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-r-lg border border-l-0 border-slate-600 transition-colors duration-200">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="pppoe_billing" class="block text-sm font-medium text-slate-300 mb-2">Siklus Billing</label>
+                                <select id="pppoe_billing" name="billing_cycle" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                    <option value="weekly">Mingguan</option>
+                                    <option value="monthly" selected>Bulanan</option>
+                                    <option value="quarterly">3 Bulanan</option>
+                                    <option value="semiannual">6 Bulanan</option>
+                                    <option value="yearly">Tahunan</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="pppoe_auto_renew" name="auto_renew" value="1" class="h-4 w-4 rounded border-slate-600 bg-slate-700 text-green-600 focus:ring-green-500 focus:ring-offset-slate-800">
+                            <label for="pppoe_auto_renew" class="ml-2 text-sm text-slate-300">
+                                Auto-renewal subscription
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Information -->
+                    <div class="border-t border-slate-700 pt-6">
+                        <h3 class="text-lg font-semibold text-white mb-4">Informasi Harga</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Harga Jual</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <span class="text-slate-400">Rp</span>
+                                    </div>
+                                    <input type="number" id="price_sell" name="price_sell" readonly class="w-full h-10 pl-12 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Biaya Operasional</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <span class="text-slate-400">Rp</span>
+                                    </div>
+                                    <input type="number" id="price_cost" name="price_cost" readonly class="w-full h-10 pl-12 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Keuntungan</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <span class="text-slate-400">Rp</span>
+                                    </div>
+                                    <input type="number" id="profit" readonly class="w-full h-10 pl-12 pr-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-2">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 border-t border-slate-700">
+                        <button type="button" onclick="resetForm()" class="inline-flex items-center px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors duration-200">
+                            <i class="fas fa-times-circle mr-2"></i>
+                            Reset
+                        </button>
+                        <button type="submit" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            Buat Layanan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- Customer Summary -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">Informasi Pelanggan</h3>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-lg mr-4">
+                        <%= customer.nama.charAt(0).toUpperCase() %>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-white"><%= customer.nama %></div>
+                        <div class="text-sm text-slate-400"><%= customer.nomor_hp %></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div class="bg-slate-700/50 rounded-lg p-3">
+                        <div class="text-xs text-slate-400 mb-1">Saldo</div>
+                        <div class="font-bold text-green-400">
+                            <%= new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(customer.credit_balance || 0) %>
+                        </div>
+                    </div>
+                    <div class="bg-slate-700/50 rounded-lg p-3">
+                        <div class="text-xs text-slate-400 mb-1">Hutang</div>
+                        <div class="font-bold text-red-400">
+                            <%= new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(customer.debt_balance || 0) %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service Preview -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">Preview Layanan</h3>
+            </div>
+            <div class="p-6">
+                <div id="servicePreview">
+                    <div class="text-center text-slate-400 py-8">
+                        <i class="fas fa-eye-slash text-4xl mb-3 opacity-50"></i>
+                        <p class="text-sm">Pilih jenis layanan untuk melihat preview</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">Quick Actions</h3>
+            </div>
+            <div class="p-6 space-y-3">
+                <button type="button" onclick="checkExistingServices()" class="w-full inline-flex items-center justify-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200">
+                    <i class="fas fa-search mr-2"></i>
+                    Cek Layanan Aktif
+                </button>
+                <button type="button" onclick="viewCustomerHistory()" class="w-full inline-flex items-center justify-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200">
+                    <i class="fas fa-clock-rotate-left mr-2"></i>
+                    Riwayat Layanan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.service-type-card {
+    transition: all 0.3s ease;
+}
+.service-type-card.selected {
+    border-color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.1);
+}
+</style>
+
+<script>
+let selectedService = null;
+
+// Service type selection
+document.querySelectorAll('.service-type-card').forEach(card => {
+    card.addEventListener('click', function() {
+        // Remove previous selection
+        document.querySelectorAll('.service-type-card').forEach(c => c.classList.remove('selected'));
+        document.querySelectorAll('input[name="service_type"]').forEach(r => r.checked = false);
+
+        // Select current
+        this.classList.add('selected');
+        const radio = this.querySelector('input[type="radio"]');
+        radio.checked = true;
+
+        selectedService = this.dataset.service;
+        showServiceConfig(selectedService);
+    });
+});
+
+// Show service configuration
+function showServiceConfig(serviceType) {
+    document.getElementById('serviceConfigCard').classList.remove('hidden');
+    document.getElementById('selectedServiceType').value = serviceType;
+
+    // Hide all configs
+    document.getElementById('hotspotConfig').classList.add('hidden');
+    document.getElementById('pppoeConfig').classList.add('hidden');
+
+    // Show selected config
+    if (serviceType === 'hotspot') {
+        document.getElementById('hotspotConfig').classList.remove('hidden');
+        updatePreview('hotspot');
+    } else if (serviceType === 'pppoe') {
+        document.getElementById('pppoeConfig').classList.remove('hidden');
+        generateUsername();
+        generatePassword();
+        updatePreview('pppoe');
+    }
+}
+
+// Update pricing when profile changes
+document.getElementById('hotspot_profile')?.addEventListener('change', updatePricing);
+document.getElementById('pppoe_profile')?.addEventListener('change', updatePricing);
+
+function updatePricing() {
+    const selectedProfile = document.querySelector(`#${selectedService}_profile option:checked`);
+    if (selectedProfile) {
+        const priceSell = parseFloat(selectedProfile.dataset.price) || 0;
+        const priceCost = Math.floor(priceSell * 0.7); // Assume 70% is cost
+
+        document.getElementById('price_sell').value = priceSell;
+        document.getElementById('price_cost').value = priceCost;
+        document.getElementById('profit').value = priceSell - priceCost;
+
+        updatePreview(selectedService);
+    }
+}
+
+// Update preview
+function updatePreview(serviceType) {
+    const preview = document.getElementById('servicePreview');
+    const profile = document.querySelector(`#${serviceType}_profile option:checked`);
+
+    if (!profile) return;
+
+    const priceSell = parseFloat(profile.dataset.price) || 0;
+    const duration = serviceType === 'hotspot' ?
+        document.getElementById('hotspot_duration').value + ' hari' :
+        document.getElementById('pppoe_billing').options[document.getElementById('pppoe_billing').selectedIndex].text;
+
+    const autoRenew = document.querySelector(`#${serviceType}_auto_renew`).checked;
+
+    preview.innerHTML = `
+        <div class="text-center">
+            <i class="fas fa-${serviceType === 'hotspot' ? 'wifi' : 'network-wired'} text-4xl mb-3 ${serviceType === 'hotspot' ? 'text-blue-400' : 'text-green-400'}"></i>
+            <h4 class="font-semibold text-white mb-2">${serviceType.toUpperCase()}</h4>
+            <p class="text-slate-400 text-sm mb-3">${profile.text}</p>
+            <div class="bg-slate-700/50 rounded-lg p-4">
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                        <div class="text-xs text-slate-400">Harga</div>
+                        <div class="font-bold text-white">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(priceSell)}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400">Durasi</div>
+                        <div class="font-bold text-white">${duration}</div>
+                    </div>
+                </div>
+                ${autoRenew ? '<div class="text-green-400 text-sm mt-3"><i class="fas fa-sync-alt mr-1"></i> Auto-renewal aktif</div>' : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Generate username
+function generateUsername() {
+    const prefix = 'user';
+    const random = Math.floor(Math.random() * 9000 + 1000);
+    document.getElementById('pppoe_username').value = `${prefix}${random}`;
+}
+
+// Generate password
+function generatePassword() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('pppoe_password').value = password;
+}
+
+// Reset form
+function resetForm() {
+    document.getElementById('serviceForm').reset();
+    document.querySelectorAll('.service-type-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('serviceConfigCard').classList.add('hidden');
+    document.getElementById('servicePreview').innerHTML = `
+        <div class="text-center text-slate-400 py-8">
+            <i class="fas fa-eye-slash text-4xl mb-3 opacity-50"></i>
+            <p class="text-sm">Pilih jenis layanan untuk melihat preview</p>
+        </div>
+    `;
+    selectedService = null;
+}
+
+// Form submission
+document.getElementById('serviceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    if (!selectedService) {
+        alert('Pilih jenis layanan terlebih dahulu');
+        return;
+    }
+
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+        const response = await fetch('/customers/<%= customer.id %>/services', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert('Layanan berhasil dibuat!');
+            window.location.href = '/customers/<%= customer.id %>';
+        } else {
+            alert('Gagal membuat layanan: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan');
+    }
+});
+
+// Check existing services
+function checkExistingServices() {
+    // Implementation would fetch existing services from API
+    alert('Fitur dalam pengembangan');
+}
+
+// View customer history
+function viewCustomerHistory() {
+    window.location.href = '/customers/<%= customer.id %>';
+}
+</script>
+
+<%- include('../partials/footer') %>

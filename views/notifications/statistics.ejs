@@ -1,0 +1,178 @@
+<%- include('../partials/header', { title: 'Notification Statistics', currentUrl: '/notifications/statistics' }) %>
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h1 class="h3 mb-0">
+          <i class="bi bi-graph-up"></i> Notification Statistics
+        </h1>
+        <p class="text-muted mb-0">View notification delivery performance and analytics</p>
+      </div>
+      <div>
+        <button type="button" class="btn btn-outline-primary" id="exportCsvBtn">
+          <i class="bi bi-download"></i> Export CSV
+        </button>
+        <button type="button" class="btn btn-outline-primary" id="exportJsonBtn">
+          <i class="bi bi-download"></i> Export JSON
+        </button>
+        <a href="/notifications/queue" class="btn btn-outline-secondary">
+          <i class="bi bi-list-ul"></i> Queue
+        </a>
+        <a href="/notifications/templates" class="btn btn-outline-secondary">
+          <i class="bi bi-file-text"></i> Templates
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Flash Messages -->
+<% if (success) { %>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> <%= success %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+<% } %>
+
+<% if (error) { %>
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> <%= error %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+<% } %>
+
+  <!-- Overview Stats -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="stat-card primary">
+        <div class="stat-icon primary">
+          <i class="bi bi-send"></i>
+        </div>
+        <h3 class="mb-1"><%= stats?.total || 0 %></h3>
+        <p class="text-muted mb-0">Total Sent</p>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card success">
+        <div class="stat-icon success">
+          <i class="bi bi-check-circle"></i>
+        </div>
+        <h3 class="mb-1"><%= stats?.sent || 0 %></h3>
+        <p class="text-muted mb-0">Success Rate</p>
+        <small class="text-muted">
+          <%= stats?.total ? Math.round((stats.sent / stats.total) * 100) : 0 %>%
+        </small>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card danger">
+        <div class="stat-icon danger">
+          <i class="bi bi-x-circle"></i>
+        </div>
+        <h3 class="mb-1"><%= stats?.failed || 0 %></h3>
+        <p class="text-muted mb-0">Failed</p>
+        <small class="text-muted">
+          <%= stats?.total ? Math.round((stats.failed / stats.total) * 100) : 0 %>%
+        </small>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card warning">
+        <div class="stat-icon warning">
+          <i class="bi bi-clock"></i>
+        </div>
+        <h3 class="mb-1"><%= (stats?.avg_delivery_time || 0) %>s</h3>
+        <p class="text-muted mb-0">Avg Delivery</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Daily Delivery Chart -->
+    <div class="col-lg-8">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-graph-up"></i> Daily Delivery Trends
+          </h5>
+        </div>
+        <div class="card-body">
+          <canvas id="dailyChart" width="400" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Template Usage -->
+    <div class="col-lg-4">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-file-text"></i> Template Usage
+          </h5>
+        </div>
+        <div class="card-body">
+          <canvas id="templateChart" width="300" height="300"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Performance Metrics -->
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-speedometer2"></i> Performance Metrics
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <tbody>
+                <tr>
+                  <td><strong>Success Rate</strong></td>
+                  <td><%= stats?.total ? Math.round((stats.sent / stats.total) * 100) : 0 %>%</td>
+                </tr>
+                <tr>
+                  <td><strong>Average Delivery Time</strong></td>
+                  <td><%= (stats?.avg_delivery_time || 0) %> seconds</td>
+                </tr>
+                <tr>
+                  <td><strong>Fastest Delivery</strong></td>
+                  <td><%= (stats?.min_delivery_time || 0) %> seconds</td>
+                </tr>
+                <tr>
+                  <td><strong>Slowest Delivery</strong></td>
+                  <td><%= (stats?.max_delivery_time || 0) %> seconds</td>
+                </tr>
+                <tr>
+                  <td><strong>Retry Rate</strong></td>
+                  <td><%= stats?.total ? Math.round((stats.retried / stats.total) * 100) : 0 %>%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Type Distribution -->
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-pie-chart"></i> Type Distribution
+          </h5>
+        </div>
+        <div class="card-body">
+          <canvas id="typeChart" width="300" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+<%- include('../partials/footer', { scripts: ['/public/js/notifications-statistics.js'] }) %>

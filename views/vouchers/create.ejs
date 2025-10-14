@@ -1,0 +1,1049 @@
+<%- include('../partials/header', { title: 'Generate Voucher Hotspot', currentUrl: '/vouchers/create' }) %>
+
+<!-- Main Content -->
+<main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-white mb-2">Generate Voucher Hotspot</h1>
+                <p class="text-slate-400">Generate voucher hotspot dengan konfigurasi lengkap</p>
+            </div>
+            <div class="mt-4 sm:mt-0">
+                <a href="/vouchers" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                    <i class="bi bi-arrow-left mr-2"></i>
+                    Kembali
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Vouchers -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-slate-400 text-sm font-medium mb-1">Total Voucher</p>
+                    <p class="text-3xl font-bold text-white" id="totalVouchersStat">-</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                        <i class="bi bi-ticket-perforated-fill text-blue-400 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Vouchers -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-slate-400 text-sm font-medium mb-1">Tersedia</p>
+                    <p class="text-3xl font-bold text-white" id="availableVouchersStat">-</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
+                        <i class="bi bi-check-circle-fill text-green-400 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generated Today -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-yellow-500/10 transition-all duration-300 transform hover:-translate-y-1">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-slate-400 text-sm font-medium mb-1">Generated Hari Ini</p>
+                    <p class="text-3xl font-bold text-white" id="todayGeneratedStat">-</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="w-14 h-14 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
+                        <i class="bi bi-calendar-plus-fill text-yellow-400 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Revenue -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 transform hover:-translate-y-1">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-slate-400 text-sm font-medium mb-1">Total Revenue</p>
+                    <p class="text-3xl font-bold text-white" id="revenueStat">-</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="w-14 h-14 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20">
+                        <i class="bi bi-cash-fill text-purple-400 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Templates -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="flex items-center">
+                <i class="bi bi-lightning-charge text-blue-400 mr-2 text-xl"></i>
+                <h6 class="text-white font-medium mb-0">Template Cepat:</h6>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 template-btn" data-template="basic">
+                    <i class="bi bi-wifi mr-2"></i>
+                    Basic
+                </button>
+                <button type="button" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 template-btn" data-template="weekly">
+                    <i class="bi bi-calendar-week mr-2"></i>
+                    Weekly
+                </button>
+                <button type="button" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 template-btn" data-template="monthly">
+                    <i class="bi bi-calendar-month mr-2"></i>
+                    Monthly
+                </button>
+                <button type="button" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 template-btn" data-template="custom">
+                    <i class="bi bi-gear mr-2"></i>
+                    Custom
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2">
+            <!-- Main Form Card -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden mb-8">
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+                    <h6 class="text-white font-medium mb-0 flex items-center">
+                        <i class="bi bi-plus-circle-fill mr-2"></i>
+                        Konfigurasi Voucher
+                    </h6>
+                </div>
+                <div class="p-6">
+                    <form id="voucherForm" novalidate>
+                        <!-- Profile Selection -->
+                        <div class="mb-6">
+                            <h6 class="text-blue-400 font-medium mb-4 flex items-center">
+                                <i class="bi bi-shield-check mr-2"></i>
+                                Profile & Paket
+                            </h6>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="profile_id" class="block text-sm font-medium text-slate-300 mb-2">
+                                        Pilih Profile <span class="text-red-400">*</span>
+                                    </label>
+                                    <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" id="profile_id" name="profile_id" required>
+                                        <option value="" class="bg-slate-700">-- Pilih Profile --</option>
+                                        <% profiles.forEach(profile => { %>
+                                            <option value="<%= profile.id %>"
+                                                    data-price-sell="<%= profile.price_sell %>"
+                                                    data-price-cost="<%= profile.price_cost %>"
+                                                    data-bandwidth="<%= profile.bandwidth || 'N/A' %>"
+                                                    class="bg-slate-700">
+                                                <%= profile.name %> - <%= formatCurrency(profile.price_sell) %>
+                                            </option>
+                                        <% }); %>
+                                    </select>
+                                    <div class="text-red-400 text-sm mt-1 hidden" id="profile_id-error">
+                                        Silakan pilih profile voucher
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="quantity" class="block text-sm font-medium text-slate-300 mb-2">
+                                        Jumlah Voucher <span class="text-red-400">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="bi bi-ticket-perforated text-slate-400"></i>
+                                        </div>
+                                        <input type="number" class="w-full pl-10 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" id="quantity" name="quantity"
+                                               min="1" max="1000" value="10" required>
+                                    </div>
+                                    <p class="text-slate-400 text-xs mt-1">Maksimal 1000 voucher per generate</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pricing -->
+                        <div class="mb-6">
+                            <h6 class="text-green-400 font-medium mb-4 flex items-center">
+                                <i class="bi bi-currency-dollar mr-2"></i>
+                                Harga
+                            </h6>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="price_sell" class="block text-sm font-medium text-slate-300 mb-2">Harga Jual</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <span class="text-slate-400">Rp</span>
+                                        </div>
+                                        <input type="number" class="w-full pl-12 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" id="price_sell" name="price_sell"
+                                               min="0" step="100" value="0">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="price_cost" class="block text-sm font-medium text-slate-300 mb-2">Harga Modal</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <span class="text-slate-400">Rp</span>
+                                        </div>
+                                        <input type="number" class="w-full pl-12 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" id="price_cost" name="price_cost"
+                                               min="0" step="100" value="0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Voucher Settings -->
+                        <div class="mb-6">
+                            <h6 class="text-purple-400 font-medium mb-4 flex items-center">
+                                <i class="bi bi-gear mr-2"></i>
+                                Pengaturan Voucher
+                            </h6>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="prefix" class="block text-sm font-medium text-slate-300 mb-2">Prefix Kode</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="bi bi-tag text-slate-400"></i>
+                                        </div>
+                                        <input type="text" class="w-full pl-10 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" id="prefix" name="prefix"
+                                               placeholder="Contoh: HOTSPOT" maxlength="10">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="code_length" class="block text-sm font-medium text-slate-300 mb-2">Panjang Kode ( karakter)</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="bi bi-rulers text-slate-400"></i>
+                                        </div>
+                                        <input type="number" class="w-full pl-10 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" id="code_length" name="code_length"
+                                               min="4" max="20" value="8">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Duration Settings -->
+                        <div class="mb-6">
+                            <h6 class="text-yellow-400 font-medium mb-4 flex items-center">
+                                <i class="bi bi-clock mr-2"></i>
+                                Durasi & Kadaluarsa
+                            </h6>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="duration_hours" class="block text-sm font-medium text-slate-300 mb-2">
+                                        Durasi (Jam) <span class="text-red-400">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="bi bi-clock-history text-slate-400"></i>
+                                        </div>
+                                        <input type="number" class="w-full pl-10 pr-16 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent" id="duration_hours" name="duration_hours"
+                                               min="0" max="8760" value="24" required>
+                                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                            <span class="text-slate-400">jam</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-slate-400 text-xs mt-1">0 = Unlimited</p>
+                                </div>
+                                <div>
+                                    <label for="expired_hours" class="block text-sm font-medium text-slate-300 mb-2">
+                                        Kadaluarsa (Jam) <span class="text-red-400">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="bi bi-calendar-x text-slate-400"></i>
+                                        </div>
+                                        <input type="number" class="w-full pl-10 pr-16 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent" id="expired_hours" name="expired_hours"
+                                               min="0" max="8760" value="0" required>
+                                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                            <span class="text-slate-400">jam</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-slate-400 text-xs mt-1">0 = Never expired</p>
+                                </div>
+                            </div>
+
+                            <!-- Quick Duration Buttons -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <div>
+                                    <p class="text-sm font-medium text-slate-300 mb-2">Quick Durasi</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 duration-quick-btn" data-hours="1">1J</button>
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 duration-quick-btn" data-hours="6">6J</button>
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 duration-quick-btn" data-hours="24">1H</button>
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 duration-quick-btn" data-hours="168">1M</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-slate-300 mb-2">Quick Kadaluarsa</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 expired-quick-btn" data-hours="0">∞</button>
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 expired-quick-btn" data-hours="24">1H</button>
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 expired-quick-btn" data-hours="168">1M</button>
+                                        <button type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors duration-200 expired-quick-btn" data-hours="720">1B</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Options -->
+                        <div class="mb-6">
+                            <h6 class="text-indigo-400 font-medium mb-4 flex items-center">
+                                <i class="bi bi-sliders mr-2"></i>
+                                Opsi
+                            </h6>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="case_format" class="block text-sm font-medium text-slate-300 mb-2">Format Kode</label>
+                                    <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" id="case_format" name="case_format">
+                                        <option value="uppercase" class="bg-slate-700">UPPERCASE</option>
+                                        <option value="lowercase" class="bg-slate-700">lowercase</option>
+                                        <option value="mixed" class="bg-slate-700">Mixed</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-end">
+                                    <label class="flex items-center space-x-3 cursor-pointer">
+                                        <input type="checkbox" id="show_preview" name="show_preview" checked class="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
+                                        <span class="text-sm font-medium text-slate-300">
+                                            <i class="bi bi-eye mr-1"></i>
+                                            Preview sebelum generate
+                                        </span>
+                                    </label>
+                                </div>
+                                <div class="flex items-end">
+                                    <label class="flex items-center space-x-3 cursor-pointer">
+                                        <input type="checkbox" id="auto_print" name="auto_print" checked class="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
+                                        <span class="text-sm font-medium text-slate-300">
+                                            <i class="bi bi-printer mr-1"></i>
+                                            Print otomatis
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-slate-700">
+                            <button type="button" class="w-full sm:w-auto px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200" id="resetFormBtn">
+                                <i class="bi bi-arrow-clockwise mr-2"></i>
+                                Reset
+                            </button>
+                            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                                <button type="button" class="w-full sm:w-auto px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200" id="previewVouchersBtn">
+                                    <i class="bi bi-eye mr-2"></i>
+                                    Preview
+                                </button>
+                                <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                                    <i class="bi bi-plus-circle mr-2"></i>
+                                    Generate Voucher
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden" id="previewCard" style="display: none;">
+                <div class="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center">
+                    <h6 class="text-white font-medium mb-0 flex items-center">
+                        <i class="bi bi-eye-fill mr-2"></i>
+                        Preview Voucher
+                    </h6>
+                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium" id="previewCount">0 voucher</span>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="previewContent">
+                        <!-- Preview will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1">
+            <!-- Profile Info Card -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden mb-8">
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+                    <h6 class="text-white font-medium mb-0 flex items-center">
+                        <i class="bi bi-info-circle-fill mr-2"></i>
+                        Info Profile
+                    </h6>
+                </div>
+                <div class="p-6" id="profileInfo">
+                    <div class="text-center text-slate-400 py-8">
+                        <i class="bi bi-info-circle text-4xl mb-3"></i>
+                        <p>Pilih profile untuk info</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cost Calculation Card -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden mb-8">
+                <div class="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4">
+                    <h6 class="text-white font-medium mb-0 flex items-center">
+                        <i class="bi bi-calculator-fill mr-2"></i>
+                        Perhitungan Biaya
+                    </h6>
+                </div>
+                <div class="p-6" id="costCalculation">
+                    <div class="text-center text-slate-400 py-8">
+                        <i class="bi bi-calculator text-4xl mb-3"></i>
+                        <p>Pilih profile & jumlah</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Card -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-slate-600 to-slate-700 px-6 py-4">
+                    <h6 class="text-white font-medium mb-0 flex items-center">
+                        <i class="bi bi-clock-history mr-2"></i>
+                        Generate Terakhir
+                    </h6>
+                </div>
+                <div class="p-6" id="recentActivity">
+                    <div class="text-center text-slate-400 py-8">
+                        <i class="bi bi-clock-history text-4xl mb-3"></i>
+                        <p>Belum ada aktivitas</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Preview Modal -->
+<div class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" id="previewModal">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="bg-slate-800 rounded-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex justify-between items-center">
+                <h5 class="text-white font-medium mb-0">Preview Voucher</h5>
+                <button type="button" class="text-white hover:text-slate-300 transition-colors" onclick="closePreviewModal()">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <div id="previewModalContent">
+                    <!-- Preview content will be loaded here -->
+                </div>
+            </div>
+            <div class="bg-slate-900 px-6 py-4 flex justify-end gap-3">
+                <button type="button" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200" onclick="closePreviewModal()">
+                    Batal
+                </button>
+                <button type="button" class="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-lg transition-all duration-200" id="confirmGenerateBtn">
+                    <i class="bi bi-check-circle mr-2"></i>
+                    Generate Voucher
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" id="successModal">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="bg-slate-800 rounded-xl max-w-md w-full">
+            <div class="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center border-0">
+                <h5 class="text-white font-medium mb-0 flex items-center">
+                    <i class="bi bi-check-circle-fill mr-2"></i>
+                    Berhasil!
+                </h5>
+                <button type="button" class="text-white hover:text-slate-300 transition-colors" onclick="closeSuccessModal()">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 text-center">
+                <i class="bi bi-ticket-perforated text-6xl text-green-400 mb-4"></i>
+                <h6 class="text-xl font-semibold text-white mb-2">Voucher berhasil di-generate</h6>
+                <p class="text-slate-400 mb-6" id="successMessage"></p>
+                <div id="generatedVouchers" class="mb-6">
+                    <!-- Generated vouchers will be shown here -->
+                </div>
+            </div>
+            <div class="bg-slate-900 px-6 py-4 flex flex-col sm:flex-row gap-3">
+                <button type="button" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200" onclick="closeSuccessModal()">
+                    Tutup
+                </button>
+                <button type="button" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200" id="printVouchersBtn">
+                    <i class="bi bi-printer mr-2"></i>
+                    Print Voucher
+                </button>
+                <a href="/vouchers" class="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-lg transition-all duration-200 text-center">
+                    <i class="bi bi-list mr-2"></i>
+                    Lihat Semua
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables
+let generatedVoucherData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeForm();
+    loadStatistics();
+    loadRecentActivity();
+});
+
+// Initialize form
+function initializeForm() {
+    const form = document.getElementById('voucherForm');
+
+    // Form submission
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        if (!validateForm()) {
+            return;
+        }
+
+        if (document.getElementById('show_preview').checked) {
+            showPreviewModal();
+        } else {
+            await generateVouchers();
+        }
+    });
+
+    // Profile change event
+    document.getElementById('profile_id').addEventListener('change', function() {
+        updateProfileInfo();
+        updateCostCalculation();
+        updatePreview();
+    });
+
+    // Quantity change event
+    document.getElementById('quantity').addEventListener('input', function() {
+        updateCostCalculation();
+        updatePreview();
+    });
+
+    // Price override events
+    ['price_sell', 'price_cost'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateCostCalculation);
+    });
+
+    // Duration override events
+    ['duration_hours', 'expired_hours'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updatePreview);
+    });
+
+    // Prefix change event
+    document.getElementById('prefix').addEventListener('input', updatePreview);
+
+    // Case format change event
+    document.getElementById('case_format').addEventListener('change', updatePreview);
+
+    // Duration quick select buttons
+    document.querySelectorAll('.duration-quick-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const hours = parseInt(this.dataset.hours);
+            document.getElementById('duration_hours').value = hours;
+            updatePreview();
+        });
+    });
+
+    // Expired quick select buttons
+    document.querySelectorAll('.expired-quick-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const hours = parseInt(this.dataset.hours);
+            document.getElementById('expired_hours').value = hours;
+            updatePreview();
+        });
+    });
+
+    // Duration input change event
+    document.getElementById('duration_hours').addEventListener('input', updatePreview);
+
+    // Confirm generate button event listener (using event delegation for dynamically loaded modal)
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.id === 'confirmGenerateBtn') {
+            confirmGenerate();
+        }
+    });
+
+    // Template buttons event listener (using event delegation)
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('template-btn')) {
+            applyTemplate(e.target.dataset.template);
+        }
+    });
+
+    // Reset form button
+    document.getElementById('resetFormBtn').addEventListener('click', resetForm);
+}
+
+// Update duration display
+function updateDurationDisplay() {
+    const durationHours = parseInt(document.getElementById('duration_hours').value) || 0;
+    const expiredHours = parseInt(document.getElementById('expired_hours').value) || 0;
+    const durationDisplay = document.getElementById('durationDisplay');
+
+    // Duration display
+    let durationText = '';
+    if (durationHours === 0) {
+        durationText = 'Unlimited';
+    } else if (durationHours < 24) {
+        durationText = `${durationHours} jam`;
+    } else if (durationHours === 24) {
+        durationText = '1 hari (24 jam)';
+    } else if (durationHours === 48) {
+        durationText = '2 hari (48 jam)';
+    } else if (durationHours === 168) {
+        durationText = '1 minggu (168 jam)';
+    } else if (durationHours === 720) {
+        durationText = '1 bulan (720 jam)';
+    } else {
+        const days = Math.floor(durationHours / 24);
+        const remainingHours = durationHours % 24;
+        if (remainingHours === 0) {
+            durationText = `${days} hari (${durationHours} jam)`;
+        } else {
+            durationText = `${days} hari ${remainingHours} jam (${durationHours} jam)`;
+        }
+    }
+
+    // Expired display
+    let expiredText = '';
+    if (expiredHours === 0) {
+        expiredText = 'Never expired';
+    } else if (expiredHours < 24) {
+        expiredText = `${expiredHours} jam`;
+    } else if (expiredHours === 24) {
+        expiredText = '1 hari';
+    } else if (expiredHours === 168) {
+        expiredText = '1 minggu';
+    } else if (expiredHours === 720) {
+        expiredText = '1 bulan';
+    } else {
+        const days = Math.floor(expiredHours / 24);
+        expiredText = `${days} hari`;
+    }
+
+    durationDisplay.innerHTML = `
+        <div><strong>${durationText}</strong></div>
+        <div class="text-slate-400 text-sm">Berlaku: ${expiredText}</div>
+    `;
+}
+
+// Update profile information
+function updateProfileInfo() {
+    const profileSelect = document.getElementById('profile_id');
+    const selectedOption = profileSelect.options[profileSelect.selectedIndex];
+
+    if (!selectedOption.value) {
+        document.getElementById('profileInfo').innerHTML = `
+            <div class="text-center text-slate-400 py-8">
+                <i class="bi bi-info-circle text-4xl mb-3"></i>
+                <p>Pilih profile untuk melihat informasi</p>
+            </div>
+        `;
+        return;
+    }
+
+    const profile = {
+        name: selectedOption.text.split(' - ')[0],
+        price_sell: parseFloat(selectedOption.dataset.price_sell) || 0,
+        price_cost: parseFloat(selectedOption.dataset.price_cost) || 0,
+        bandwidth: selectedOption.dataset.bandwidth || 'N/A'
+    };
+
+    document.getElementById('profileInfo').innerHTML = `
+        <div class="space-y-3">
+            <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                <span class="text-slate-400 text-sm">Nama Profile</span>
+                <span class="text-white font-medium">${profile.name}</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                <span class="text-slate-400 text-sm">Harga Jual</span>
+                <span class="text-green-400 font-medium">${formatCurrency(profile.price_sell)}</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                <span class="text-slate-400 text-sm">Harga Modal</span>
+                <span class="text-red-400 font-medium">${formatCurrency(profile.price_cost)}</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                <span class="text-slate-400 text-sm">Durasi</span>
+                <span class="text-white font-medium" id="durationDisplay">-</span>
+            </div>
+            <div class="flex justify-between items-center py-2">
+                <span class="text-slate-400 text-sm">Bandwidth</span>
+                <span class="text-white">${profile.bandwidth}</span>
+            </div>
+        </div>
+    `;
+
+    updateDurationDisplay();
+}
+
+// Update cost calculation
+function updateCostCalculation() {
+    const profileSelect = document.getElementById('profile_id');
+    const quantity = parseInt(document.getElementById('quantity').value) || 0;
+    const selectedOption = profileSelect.options[profileSelect.selectedIndex];
+
+    if (!selectedOption.value || quantity === 0) {
+        document.getElementById('costCalculation').innerHTML = `
+            <div class="text-center text-slate-400 py-8">
+                <i class="bi bi-calculator text-4xl mb-3"></i>
+                <p>Pilih profile & jumlah</p>
+            </div>
+        `;
+        return;
+    }
+
+    const profilePriceSell = parseFloat(document.getElementById('price_sell').value) || parseFloat(selectedOption.dataset.price_sell) || 0;
+    const profilePriceCost = parseFloat(document.getElementById('price_cost').value) || parseFloat(selectedOption.dataset.price_cost) || 0;
+
+    const totalSell = profilePriceSell * quantity;
+    const totalCost = profilePriceCost * quantity;
+    const totalProfit = totalSell - totalCost;
+
+    document.getElementById('costCalculation').innerHTML = `
+        <div class="space-y-4">
+            <div class="bg-slate-700 rounded-lg p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-slate-300 text-sm">Harga Jual / Voucher</span>
+                    <span class="text-green-400 font-medium">${formatCurrency(profilePriceSell)}</span>
+                </div>
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-slate-300 text-sm">Harga Modal / Voucher</span>
+                    <span class="text-red-400 font-medium">${formatCurrency(profilePriceCost)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-300 text-sm">Profit / Voucher</span>
+                    <span class="text-yellow-400 font-medium">${formatCurrency(profilePriceSell - profilePriceCost)}</span>
+                </div>
+            </div>
+
+            <div class="border-t border-slate-700 pt-4">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-slate-300 text-sm">Jumlah Voucher</span>
+                    <span class="text-white font-medium">${quantity}</span>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-slate-300 text-sm font-medium">Total Penjualan</span>
+                    <span class="text-green-400 font-bold text-lg">${formatCurrency(totalSell)}</span>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-slate-300 text-sm font-medium">Total Modal</span>
+                    <span class="text-red-400 font-bold text-lg">${formatCurrency(totalCost)}</span>
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-slate-700">
+                    <span class="text-slate-300 font-medium">Total Profit</span>
+                    <span class="text-yellow-400 font-bold text-xl">${formatCurrency(totalProfit)}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Apply template
+function applyTemplate(templateName) {
+    const profileSelect = document.getElementById('profile_id');
+    const durationInput = document.getElementById('duration_hours');
+    const expiredInput = document.getElementById('expired_hours');
+    const quantityInput = document.getElementById('quantity');
+
+    const templates = {
+        basic: {
+            profile: '',
+            duration: 1,
+            expired: 24,
+            quantity: 10
+        },
+        weekly: {
+            profile: '',
+            duration: 168,
+            expired: 168,
+            quantity: 5
+        },
+        monthly: {
+            profile: '',
+            duration: 720,
+            expired: 720,
+            quantity: 3
+        },
+        custom: {
+            profile: '',
+            duration: 6,
+            expired: 72,
+            quantity: 20
+        }
+    };
+
+    const template = templates[templateName];
+    if (!template) return;
+
+    // Set values
+    durationInput.value = template.duration;
+    expiredInput.value = template.expired;
+    quantityInput.value = template.quantity;
+
+    // Find appropriate profile based on template
+    for (let i = 0; i < profileSelect.options.length; i++) {
+        const option = profileSelect.options[i];
+        const optionText = option.text.toLowerCase();
+
+        if (templateName === 'basic' && optionText.includes('basic')) {
+            profileSelect.value = option.value;
+            break;
+        } else if (templateName === 'weekly' && (optionText.includes('week') || optionText.includes('minggu'))) {
+            profileSelect.value = option.value;
+            break;
+        } else if (templateName === 'monthly' && (optionText.includes('month') || optionText.includes('bulan'))) {
+            profileSelect.value = option.value;
+            break;
+        }
+    }
+
+    // Update displays
+    updateProfileInfo();
+    updateCostCalculation();
+    updatePreview();
+}
+
+// Validate form
+function validateForm() {
+    const profileId = document.getElementById('profile_id');
+    const quantity = document.getElementById('quantity');
+    const durationHours = document.getElementById('duration_hours');
+    const expiredHours = document.getElementById('expired_hours');
+
+    let isValid = true;
+
+    // Reset error states
+    [profileId, quantity, durationHours, expiredHours].forEach(field => {
+        field.classList.remove('border-red-500');
+        const errorElement = document.getElementById(field.id + '-error');
+        if (errorElement) {
+            errorElement.classList.add('hidden');
+        }
+    });
+
+    // Validate profile
+    if (!profileId.value) {
+        profileId.classList.add('border-red-500');
+        const errorElement = document.getElementById('profile_id-error');
+        if (errorElement) {
+            errorElement.classList.remove('hidden');
+        }
+        isValid = false;
+    }
+
+    // Validate quantity
+    if (!quantity.value || quantity.value < 1 || quantity.value > 1000) {
+        quantity.classList.add('border-red-500');
+        isValid = false;
+    }
+
+    // Validate duration
+    if (!durationHours.value || durationHours.value < 0 || durationHours.value > 8760) {
+        durationHours.classList.add('border-red-500');
+        isValid = false;
+    }
+
+    // Validate expired
+    if (!expiredHours.value || expiredHours.value < 0 || expiredHours.value > 8760) {
+        expiredHours.classList.add('border-red-500');
+        isValid = false;
+    }
+
+    return isValid;
+}
+
+// Update preview
+function updatePreview() {
+    // Implementation would go here
+    // This would generate preview vouchers based on current form settings
+}
+
+// Show preview modal
+function showPreviewModal() {
+    // Implementation would go here
+}
+
+// Close preview modal
+function closePreviewModal() {
+    document.getElementById('previewModal').classList.add('hidden');
+}
+
+// Confirm generate
+function confirmGenerate() {
+    closePreviewModal();
+    generateVouchers();
+}
+
+// Generate vouchers
+async function generateVouchers() {
+    if (!validateForm()) {
+        return;
+    }
+
+    const formData = new FormData(document.getElementById('voucherForm'));
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+        const response = await fetch('/vouchers/api/vouchers/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            generatedVoucherData = result.data;
+            showSuccessModal(result.message, result.data);
+            loadStatistics(); // Refresh statistics
+            loadRecentActivity(); // Refresh recent activity
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error generating vouchers:', error);
+        alert('Terjadi kesalahan saat generate voucher');
+    }
+}
+
+// Show success modal
+function showSuccessModal(message, vouchers) {
+    document.getElementById('successMessage').textContent = message;
+
+    if (vouchers && vouchers.length > 0) {
+        const voucherList = vouchers.slice(0, 5).map(v =>
+            `<div class="bg-slate-700 rounded px-3 py-2 font-mono text-sm">${v.code}</div>`
+        ).join('');
+
+        document.getElementById('generatedVouchers').innerHTML = `
+            <div class="space-y-2">
+                <p class="text-slate-400 text-sm">5 voucher pertama:</p>
+                <div class="space-y-1">
+                    ${voucherList}
+                </div>
+                ${vouchers.length > 5 ? `<p class="text-slate-400 text-xs mt-2">... dan ${vouchers.length - 5} voucher lagi</p>` : ''}
+            </div>
+        `;
+    } else {
+        document.getElementById('generatedVouchers').innerHTML = '';
+    }
+
+    document.getElementById('successModal').classList.remove('hidden');
+}
+
+// Close success modal
+function closeSuccessModal() {
+    document.getElementById('successModal').classList.add('hidden');
+}
+
+// Print vouchers
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'printVouchersBtn') {
+        if (generatedVoucherData && generatedVoucherData.length > 0) {
+            const printUrl = `/print/vouchers/${generatedVoucherData.map(v => v.id).join(',')}`;
+            window.open(printUrl, '_blank');
+        }
+    }
+});
+
+// Reset form
+function resetForm() {
+    document.getElementById('voucherForm').reset();
+    updateProfileInfo();
+    updateCostCalculation();
+    updatePreview();
+
+    // Hide preview card
+    document.getElementById('previewCard').style.display = 'none';
+}
+
+// Load statistics
+async function loadStatistics() {
+    try {
+        const response = await fetch('/vouchers/api/vouchers/statistics');
+        const stats = await response.json();
+
+        document.getElementById('totalVouchersStat').textContent = stats.total || 0;
+        document.getElementById('availableVouchersStat').textContent = stats.available || 0;
+        document.getElementById('todayGeneratedStat').textContent = stats.generated_today || 0;
+        document.getElementById('revenueStat').textContent = formatCurrency(stats.revenue || 0);
+    } catch (error) {
+        console.error('Error loading statistics:', error);
+        // Set default values on error
+        document.getElementById('totalVouchersStat').textContent = '0';
+        document.getElementById('availableVouchersStat').textContent = '0';
+        document.getElementById('todayGeneratedStat').textContent = '0';
+        document.getElementById('revenueStat').textContent = 'Rp 0';
+    }
+}
+
+// Load recent activity
+async function loadRecentActivity() {
+    try {
+        const response = await fetch('/vouchers/api/vouchers/recent-activity');
+        const activities = await response.json();
+
+        if (activities && activities.length > 0) {
+            const activityList = activities.slice(0, 5).map(activity => `
+                <div class="flex justify-between items-center py-2 border-b border-slate-700 last:border-b-0">
+                    <div>
+                        <div class="text-white text-sm font-medium">${activity.quantity} voucher</div>
+                        <div class="text-slate-400 text-xs">${activity.profile_name}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-green-400 text-sm">${formatCurrency(activity.total_price)}</div>
+                        <div class="text-slate-400 text-xs">${formatDate(activity.created_at)}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('recentActivity').innerHTML = `
+                <div class="space-y-1">
+                    ${activityList}
+                </div>
+            `;
+        } else {
+            document.getElementById('recentActivity').innerHTML = `
+                <div class="text-center text-slate-400 py-8">
+                    <i class="bi bi-clock-history text-4xl mb-3"></i>
+                    <p>Belum ada aktivitas</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading recent activity:', error);
+    }
+}
+
+// Utility functions
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR'
+    }).format(amount || 0);
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Baru saja';
+    if (diffMins < 60) return `${diffMins} menit lalu`;
+    if (diffHours < 24) return `${diffHours} jam lalu`;
+    if (diffDays < 7) return `${diffDays} hari lalu`;
+
+    return date.toLocaleDateString('id-ID');
+}
+</script>
+
+<%- include('../partials/footer') %>

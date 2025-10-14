@@ -1,0 +1,391 @@
+<%- include('../partials/header', { title: 'Dashboard Pelanggan', currentUrl: '/customers/dashboard' }) %>
+
+<div class="mb-4 row">
+    <div class="col-12">
+        <h1 class="mb-0 h3">Dashboard Pelanggan</h1>
+    </div>
+</div>
+
+<!-- Customer Overview Card -->
+<div class="mb-4 card">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                        <i class="bi bi-person-circle fs-1 text-primary"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1" id="customerName">-</h5>
+                        <div class="text-muted">
+                            <i class="bi bi-telephone me-1"></i>
+                            <span id="customerPhone">-</span>
+                            <span class="mx-2">•</span>
+                            <i class="bi bi-envelope me-1"></i>
+                            <span id="customerEmail">-</span>
+                        </div>
+                        <div class="mt-2">
+                            <span class="badge bg-success" id="customerStatus">Aktif</span>
+                            <span class="badge bg-info ms-2">ID: <span id="customerId">-</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-flex flex-column align-items-end">
+                    <div class="mb-2">
+                        <small class="text-muted">Saldo</small>
+                        <h4 class="text-success mb-0" id="creditBalance">Rp 0</h4>
+                    </div>
+                    <div>
+                        <small class="text-muted">Hutang</small>
+                        <h4 class="text-danger mb-0" id="debtBalance">Rp 0</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="mb-4 row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Aksi Cepat</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-outline-primary w-100" onclick="CustomerDashboard.addSubscription()">
+                            <i class="bi bi-plus-circle me-2"></i>Tambah Berlangganan
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-outline-success w-100" onclick="CustomerDashboard.topUpCredit()">
+                            <i class="bi bi-wallet2 me-2"></i>Top Up Saldo
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-outline-info w-100" onclick="CustomerDashboard.makePayment()">
+                            <i class="bi bi-cash me-2"></i>Buat Pembayaran
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-outline-warning w-100" onclick="CustomerDashboard.viewHistory()">
+                            <i class="bi bi-clock-history me-2"></i>Riwayat
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Overview -->
+<div class="mb-4 row">
+    <div class="col-md-3">
+        <div class="text-white card bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Berlangganan</h6>
+                        <h3 class="mb-0" id="totalSubscriptions">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-card-list fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Aktif</h6>
+                        <h3 class="mb-0" id="activeSubscriptions">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-check-circle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Kadaluarsa</h6>
+                        <h3 class="mb-0" id="expiredSubscriptions">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-clock-history fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-white card bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Pembayaran</h6>
+                        <h3 class="mb-0" id="totalPayments">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-cash-stack fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Subscriptions Section -->
+<div class="mb-4 card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Berlangganan Aktif</h6>
+        <div>
+            <button type="button" class="btn btn-outline-success btn-sm me-2" onclick="CustomerDashboard.addSubscription()">
+                <i class="bi bi-plus-circle"></i> Tambah
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="CustomerDashboard.refreshSubscriptions()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="subscriptionsList">
+            <div class="py-4 text-center text-muted">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Memuat data berlangganan...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Payments Section -->
+<div class="mb-4 card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Pembayaran Terbaru</h6>
+        <div>
+            <button type="button" class="btn btn-outline-success btn-sm me-2" onclick="CustomerDashboard.makePayment()">
+                <i class="bi bi-plus-circle"></i> Tambah
+            </button>
+            <button type="button" class="btn btn-outline-info btn-sm" onclick="CustomerDashboard.viewAllPayments()">
+                <i class="bi bi-eye"></i> Lihat Semua
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="recentPaymentsList">
+            <div class="py-4 text-center text-muted">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Memuat data pembayaran...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Timeline -->
+<div class="mb-4 card">
+    <div class="card-header">
+        <h6 class="mb-0">Aktivitas Terbaru</h6>
+    </div>
+    <div class="card-body">
+        <div id="activityTimeline">
+            <div class="py-4 text-center text-muted">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Memuat data aktivitas...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Subscription Modal -->
+<div class="modal fade" id="addSubscriptionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tambah Berlangganan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addSubscriptionForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="serviceType" class="form-label">Layanan</label>
+                        <select class="form-select" id="serviceType" name="service_type" required>
+                            <option value="">Pilih Layanan</option>
+                            <option value="hotspot">Hotspot</option>
+                            <option value="pppoe">PPPoE</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="profileId" class="form-label">Paket</label>
+                        <select class="form-select" id="profileId" name="profile_id" required>
+                            <option value="">Pilih Paket</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="billingCycle" class="form-label">Siklus Penagihan</label>
+                        <select class="form-select" id="billingCycle" name="billing_cycle" required>
+                            <option value="monthly">Bulanan</option>
+                            <option value="weekly">Mingguan</option>
+                            <option value="quarterly">Per 3 Bulan</option>
+                            <option value="yearly">Tahunan</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Tambah
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Top Up Credit Modal -->
+<div class="modal fade" id="topUpCreditModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Top Up Saldo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="topUpCreditForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="topUpAmount" class="form-label">Jumlah Top Up</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Rp</span>
+                            <input type="number" class="form-control" id="topUpAmount" name="amount" required min="1000" step="1000">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="topUpMethod" class="form-label">Metode Pembayaran</label>
+                        <select class="form-select" id="topUpMethod" name="payment_method" required>
+                            <option value="cash">Cash</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="duitku">DuitKu</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="topUpNote" class="form-label">Catatan</label>
+                        <textarea class="form-control" id="topUpNote" name="note" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-wallet2"></i> Top Up
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Make Payment Modal -->
+<div class="modal fade" id="makePaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Buat Pembayaran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="makePaymentForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="paymentSubscription" class="form-label">Berlangganan</label>
+                        <select class="form-select" id="paymentSubscription" name="subscription_id" required>
+                            <option value="">Pilih Berlangganan</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentAmount" class="form-label">Jumlah Pembayaran</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Rp</span>
+                            <input type="number" class="form-control" id="paymentAmount" name="amount" required min="1000" step="1000">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentMethod" class="form-label">Metode Pembayaran</label>
+                        <select class="form-select" id="paymentMethod" name="payment_method" required>
+                            <option value="cash">Cash</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="duitku">DuitKu</option>
+                            <option value="credit">Saldo Pelanggan</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentNote" class="form-label">Catatan</label>
+                        <textarea class="form-control" id="paymentNote" name="description" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-cash"></i> Bayar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard-stat-card {
+    transition: transform 0.2s ease;
+}
+.dashboard-stat-card:hover {
+    transform: translateY(-2px);
+}
+.subscription-card {
+    border-left: 4px solid #007bff;
+    margin-bottom: 1rem;
+}
+.subscription-card.expired {
+    border-left-color: #dc3545;
+}
+.subscription-card.warning {
+    border-left-color: #ffc107;
+}
+.payment-row {
+    transition: background-color 0.2s ease;
+}
+.payment-row:hover {
+    background-color: #f8f9fa;
+}
+.activity-item {
+    border-left: 3px solid #e9ecef;
+    padding-left: 1rem;
+    margin-bottom: 1rem;
+}
+.activity-item.success {
+    border-left-color: #28a745;
+}
+.activity-item.warning {
+    border-left-color: #ffc107;
+}
+.activity-item.danger {
+    border-left-color: #dc3545;
+}
+</style>
+
+<%- include('../partials/footer', { scripts: ['/public/js/customer-dashboard.js'] }) %>

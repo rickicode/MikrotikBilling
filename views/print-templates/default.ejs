@@ -1,0 +1,298 @@
+<!-- Simple Print Interface -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom no-print">
+    <h1 class="h2">
+        <i class="bi bi-printer"></i> Print Voucher
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <span class="badge bg-primary"><%= vouchers.length %> Voucher(s)</span>
+            <span class="badge bg-success">Total: <%= formatCurrency(totalRevenue) %></span>
+        </div>
+        <div class="btn-group">
+            <select class="form-select form-select-sm" id="templateType" onchange="setTemplate(this.value)">
+                <option value="a4">A4 (3 kolom)</option>
+                <option value="thermal">Thermal (80mm)</option>
+                <option value="compact">Compact (4 kolom)</option>
+            </select>
+        </div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.close()">
+                <i class="bi bi-x"></i> Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Voucher Container -->
+<div class="voucher-container <%= printMode %>" id="voucherContainer">
+    <% vouchers.forEach((voucher, index) => { %>
+    <div class="voucher">
+        <div class="voucher-watermark"><%= settings.company_name || 'Mikrotik' %></div>
+
+        <div class="voucher-header">
+            <div class="voucher-title">VOUCHER HOTSPOT</div>
+            <div class="voucher-subtitle"><%= settings.company_name || 'WiFi Hotspot' %></div>
+        </div>
+
+        <div class="voucher-code" id="code-<%= index %>">
+            <%= voucher.voucher_code %>
+        </div>
+
+        <div class="voucher-info">
+            <div class="voucher-duration">
+                <% if (voucher.duration_days > 0) { %>
+                    <%= voucher.duration_days %> Hari
+                <% } %>
+                <% if (voucher.duration_hours > 0) { %>
+                    <%= voucher.duration_hours %> Jam
+                <% } %>
+                <% if (voucher.duration_minutes > 0) { %>
+                    <%= voucher.duration_minutes %> Menit
+                <% } %>
+            </div>
+            <div class="voucher-price">
+                Rp <%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %>
+            </div>
+        </div>
+
+        <div class="voucher-footer">
+            <div>Generated: <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %></div>
+            <div>Profile: <%= voucher.profile_name %></div>
+        </div>
+    </div>
+    <% }); %>
+</div>
+
+<!-- Print Info (only visible when not printing) -->
+<div class="alert alert-info no-print mt-3">
+    <i class="bi bi-info-circle"></i>
+    <strong>Template:</strong> <span id="currentTemplateName">A4 Standard (3 kolom)</span> |
+    <strong>Vouchers:</strong> <%= vouchers.length %> |
+    <strong>Total Value:</strong> <%= formatCurrency(totalRevenue) %>
+    <div class="mt-2">
+        <small>Use Ctrl+P to print or click the Print button. Selected template will be saved for future use.</small>
+    </div>
+</div>
+
+<style>
+/* Voucher Styles */
+.voucher-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2mm;
+    padding: 5mm;
+    font-family: 'Courier New', monospace;
+    background: white;
+    color: black;
+}
+
+.voucher {
+    border: 2px solid #333;
+    padding: 4mm;
+    text-align: center;
+    position: relative;
+    background: white;
+    page-break-inside: avoid;
+}
+
+.voucher-header {
+    border-bottom: 1px solid #333;
+    padding-bottom: 2mm;
+    margin-bottom: 2mm;
+}
+
+.voucher-title {
+    font-size: 10pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 1mm;
+}
+
+.voucher-subtitle {
+    font-size: 8pt;
+    color: #666;
+}
+
+.voucher-code {
+    font-size: 14pt;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin: 3mm 0;
+    padding: 2mm;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    font-family: 'Courier New', monospace;
+}
+
+.voucher-info {
+    font-size: 8pt;
+    margin-bottom: 2mm;
+}
+
+.voucher-duration {
+    font-size: 9pt;
+    font-weight: bold;
+    color: #333;
+}
+
+.voucher-price {
+    font-size: 8pt;
+    color: #666;
+    margin-top: 1mm;
+}
+
+.voucher-footer {
+    border-top: 1px solid #333;
+    padding-top: 2mm;
+    margin-top: 2mm;
+    font-size: 7pt;
+    color: #666;
+}
+
+.voucher-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    opacity: 0.1;
+    font-size: 20pt;
+    font-weight: bold;
+    color: #333;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Thermal printer mode */
+.thermal-mode .voucher-container {
+    grid-template-columns: 1fr;
+    gap: 5mm;
+}
+
+.thermal-mode .voucher {
+    width: 80mm;
+    border: none;
+    border-bottom: 2px dashed #333;
+    padding-bottom: 5mm;
+}
+
+/* Compact mode for more vouchers per page */
+.compact-mode .voucher-container {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1mm;
+}
+
+.compact-mode .voucher {
+    padding: 2mm;
+    font-size: 7pt;
+}
+
+.compact-mode .voucher-code {
+    font-size: 10pt;
+    padding: 1mm;
+}
+
+.compact-mode .voucher-title {
+    font-size: 8pt;
+}
+
+/* Print-specific styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    .navbar,
+    .sidebar,
+    .nav-tabs,
+    .card-header,
+    .btn-toolbar,
+    .alert {
+        display: none !important;
+    }
+
+    .voucher-container {
+        margin: 0 !important;
+        padding: 2mm !important;
+    }
+
+    body {
+        background: white !important;
+    }
+
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    .card-body {
+        padding: 0 !important;
+    }
+}
+</style>
+
+<script>
+// Simple template management
+function setTemplate(templateMode) {
+    const container = document.getElementById('voucherContainer');
+    const templateNameEl = document.getElementById('currentTemplateName');
+
+    // Remove all template classes
+    container.classList.remove('thermal-mode', 'compact-mode');
+
+    // Add selected template class
+    if (templateMode === 'thermal') {
+        container.classList.add('thermal-mode');
+    } else if (templateMode === 'compact') {
+        container.classList.add('compact-mode');
+    }
+
+    // Update template name display
+    const templateNames = {
+        'a4': 'A4 Standard (3 kolom)',
+        'thermal': 'Thermal Printer 80mm',
+        'compact': 'Compact A4 (4 kolom)'
+    };
+
+    if (templateNameEl) {
+        templateNameEl.textContent = templateNames[templateMode] || 'A4 Standard';
+    }
+
+    // Store preference
+    localStorage.setItem('voucherPrintTemplate', templateMode);
+}
+
+// Load saved template preference on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const savedTemplate = localStorage.getItem('voucherPrintTemplate') || 'a4';
+    setTemplate(savedTemplate);
+
+    // Set the select dropdown to match saved template
+    const templateSelect = document.getElementById('templateType');
+    if (templateSelect) {
+        templateSelect.value = savedTemplate;
+    }
+
+    // Auto print when page loads
+    setTimeout(function() {
+        if (window.location.search.includes('auto_print=true')) {
+            window.print();
+        }
+    }, 500);
+});
+
+// Add keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+    }
+    if (e.key === 'Escape') {
+        window.close();
+    }
+});
+</script>
+
+<%- include('../partials/footer') %>

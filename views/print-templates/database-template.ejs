@@ -1,0 +1,163 @@
+<%- include('../partials/header', { title: 'Print Voucher' }) %>
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom no-print">
+    <h1 class="h2">
+        <i class="bi bi-printer"></i> Print Voucher
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <span class="badge bg-primary"><%= vouchers.length %> Voucher(s)</span>
+            <span class="badge bg-success">Total: <%= formatCurrency(totalRevenue) %></span>
+            <span class="badge bg-info"><%= templateType.toUpperCase() %> Template</span>
+        </div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.close()">
+                <i class="bi bi-x"></i> Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Voucher Display -->
+<div class="print-content">
+    <% if (templateType === 'a4') { %>
+        <!-- A4 Template Display -->
+        <div class="voucher-container">
+            <% vouchers.forEach((voucher, index) => { %>
+                <div class="voucher">
+                    <table>
+                        <tr>
+                            <td class="rotate"><span>VOUCHER</span></td>
+                            <td>
+                                <table>
+                                    <tr>
+                                        <td class="company-header" colspan="2">
+                                            <div class="company-name"><%= settings.company_name || 'WiFi Hotspot' %></div>
+                                            <div class="voucher-number">[<%= index + 1 %>]</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="voucher-code" colspan="2">
+                                            <%= voucher.voucher_code %>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="duration"><%= Math.floor(voucher.duration_hours / 24) %> Hari</td>
+                                        <td class="validity"><%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" style="font-size: 8px; text-align: center; color: #666;">
+                                            Profile: <%= voucher.profile_name %>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" style="font-size: 7px; text-align: center; color: #999;">
+                                            Created: <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            <% }); %>
+        </div>
+    <% } else if (templateType === 'thermal') { %>
+        <!-- Thermal Template Display -->
+        <div class="thermal-container">
+            <% vouchers.forEach((voucher, index) => { %>
+                <div class="voucher">
+                    <div class="header"><%= settings.company_name || 'WiFi Hotspot' %></div>
+                    <div class="code"><%= voucher.voucher_code %></div>
+                    <div class="info">Profile: <%= voucher.profile_name %></div>
+                    <div class="info">Duration: <%= Math.floor(voucher.duration_hours / 24) %> Hari</div>
+                    <div class="info">Created: <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %></div>
+                    <div class="price">Price: <%= formatCurrency(voucher.price_sell).replace('Rp', '').trim() %></div>
+                </div>
+            <% }); %>
+        </div>
+    <% } %>
+</div>
+
+<style>
+/* Print-specific styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    .navbar,
+    .sidebar,
+    .nav-tabs,
+    .card-header,
+    .btn-toolbar,
+    .alert {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    .card-body {
+        padding: 0 !important;
+    }
+}
+
+/* Voucher container styling for A4 */
+.voucher-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 5mm;
+}
+
+/* Thermal container styling */
+.thermal-container {
+    width: 80mm;
+    margin: 0 auto;
+    padding: 5mm;
+}
+
+/* Ensure template HTML displays properly */
+.print-content {
+    background: white;
+    min-height: 200px;
+}
+</style>
+
+<script>
+// Auto print when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        if (window.location.search.includes('auto_print=true')) {
+            window.print();
+        }
+    }, 500);
+});
+
+// Add keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+    }
+    if (e.key === 'Escape') {
+        window.close();
+    }
+});
+</script>
+
+<%- include('../partials/footer') %>

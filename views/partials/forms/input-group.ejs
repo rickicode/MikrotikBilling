@@ -1,0 +1,121 @@
+<%-
+  /**
+   * Input Group Component for Forms
+   * Variables:
+   * - label: Input label (string, required)
+   * - name: Input name attribute (string, required)
+   * - type: Input type (text, email, password, number, tel, url, default: 'text')
+   * - id: Input ID (string, optional, defaults to name)
+   * - placeholder: Input placeholder (string, optional)
+   * - value: Input value (string, optional)
+   * - required: Mark as required (boolean, default: false)
+   * - disabled: Disable input (boolean, default: false)
+   * - readonly: Make input readonly (boolean, default: false)
+   * - error: Error message (string, optional)
+   * - helper: Helper text (string, optional)
+   * - icon: FontAwesome icon class (string, optional)
+   * - size: Input size (sm, md, lg, default: 'md')
+   * - class: Additional CSS classes (string, optional)
+   * - autocomplete: Autocomplete attribute (string, optional)
+   * - maxlength: Maximum length (number, optional)
+   * - minlength: Minimum length (number, optional)
+   * - pattern: Input pattern (string, optional)
+   */
+
+  // Set defaults
+  const type = locals.type || 'text';
+  const size = locals.size || 'md';
+  const required = locals.required === true;
+  const disabled = locals.disabled === true;
+  const readonly = locals.readonly === true;
+  const inputId = locals.id || locals.name;
+  const error = locals.error || '';
+  const helper = locals.helper || '';
+  const icon = locals.icon || '';
+
+  // Size configurations
+  const sizeClasses = {
+    sm: {
+      input: 'px-3 py-2 text-sm',
+      label: 'text-sm',
+      icon: 'w-4 h-4 text-sm'
+    },
+    md: {
+      input: 'px-4 py-3 text-sm',
+      label: 'text-sm',
+      icon: 'w-5 h-5 text-sm'
+    },
+    lg: {
+      input: 'px-4 py-4 text-base',
+      label: 'text-base',
+      icon: 'w-5 h-5 text-base'
+    }
+  };
+
+  const currentSize = sizeClasses[size];
+
+  // State classes
+  const stateClasses = {
+    default: 'bg-dark-700 border-dark-600 text-white placeholder-dark-400 focus:border-blue-500 focus:ring-blue-500',
+    error: 'bg-dark-700 border-red-500 text-white placeholder-dark-400 focus:border-red-500 focus:ring-red-500',
+    disabled: 'bg-dark-800 border-dark-600 text-dark-400 placeholder-dark-500 cursor-not-allowed',
+    readonly: 'bg-dark-800 border-dark-600 text-white cursor-default'
+  };
+
+  const currentState = error ? 'error' : (disabled ? 'disabled' : (readonly ? 'readonly' : 'default'));
+  const inputStateClasses = stateClasses[currentState];
+
+  // Label classes
+  const labelClasses = {
+    default: 'text-dark-300',
+    error: 'text-red-400',
+    disabled: 'text-dark-500',
+    readonly: 'text-dark-300'
+  };
+
+  const labelStateClasses = labelClasses[currentState];
+%>
+
+<div class="space-y-2 <%= locals.class || '' %>">
+  <% if (locals.label) { %>
+    <label for="<%= inputId %>" class="block <%= currentSize.label %> font-medium <%= labelStateClasses %> <%= required ? 'after:content-[\"*\"] after:ml-1 after:text-red-400' : '' %>">
+      <%= locals.label %>
+    </label>
+  <% } %>
+
+  <div class="relative">
+    <% if (icon) { %>
+      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <i class="<%= icon %> <%= currentSize.icon %> <%= currentState === 'error' ? 'text-red-400' : 'text-dark-400' %>"></i>
+      </div>
+    <% } %>
+
+    <input
+      type="<%= type %>"
+      id="<%= inputId %>"
+      name="<%= locals.name %>"
+      placeholder="<%= locals.placeholder || '' %>"
+      value="<%= locals.value || '' %>"
+      <%= required ? 'required' : '' %>
+      <%= disabled ? 'disabled' : '' %>
+      <%= readonly ? 'readonly' : '' %>
+      <%= locals.autocomplete ? 'autocomplete="' + locals.autocomplete + '"' : '' %>
+      <%= locals.maxlength ? 'maxlength="' + locals.maxlength + '"' : '' %>
+      <%= locals.minlength ? 'minlength="' + locals.minlength + '"' : '' %>
+      <%= locals.pattern ? 'pattern="' + locals.pattern + '"' : '' %>
+      class="<%= icon ? 'pl-' + (size === 'sm' ? '10' : (size === 'md' ? '12' : '12')) : '' %> <%= currentSize.input %> w-full rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 <%= inputStateClasses %>"
+    >
+  </div>
+
+  <% if (error) { %>
+    <p class="text-sm text-red-400 flex items-center">
+      <i class="fas fa-exclamation-circle mr-1"></i>
+      <%= error %>
+    </p>
+  <% } else if (helper) { %>
+    <p class="text-sm text-dark-400 flex items-center">
+      <i class="fas fa-info-circle mr-1"></i>
+      <%= helper %>
+    </p>
+  <% } %>
+</div>

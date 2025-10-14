@@ -1,0 +1,189 @@
+<%-
+  /**
+   * Floating Action Button (FAB) Component
+   * Variables:
+   * - icon: FontAwesome icon class (required)
+   * - label: Button label for tooltip (string, optional)
+   * - variant: Button variant (primary, secondary, success, danger, default: 'primary')
+   * - size: Button size (sm, md, lg, default: 'md')
+   * - position: Position on screen (bottom-right, bottom-left, top-right, top-left, default: 'bottom-right')
+   * - onClick: Click handler (string, optional)
+   * - href: If provided, renders as link (string, optional)
+   * - target: Link target (string, optional)
+   * - loading: Show loading state (boolean, default: false)
+   * - disabled: Disable button (boolean, default: false)
+   * - class: Additional CSS classes (string, optional)
+   * - id: Button ID (string, optional)
+   */
+
+  // Set defaults
+  const variant = locals.variant || 'primary';
+  const size = locals.size || 'md';
+  const position = locals.position || 'bottom-right';
+  const loading = locals.loading === true;
+  const disabled = locals.disabled === true;
+  const buttonId = locals.id || 'fab-' + Math.random().toString(36).substr(2, 9);
+  const isLink = locals.href ? true : false;
+
+  // Size configurations
+  const sizeClasses = {
+    sm: {
+      button: 'w-12 h-12',
+      icon: 'text-lg'
+    },
+    md: {
+      button: 'w-14 h-14',
+      icon: 'text-xl'
+    },
+    lg: {
+      button: 'w-16 h-16',
+      icon: 'text-2xl'
+    }
+  };
+
+  const currentSize = sizeClasses[size];
+
+  // Position configurations
+  const positionClasses = {
+    'bottom-right': 'bottom-6 right-6',
+    'bottom-left': 'bottom-6 left-6',
+    'top-right': 'top-6 right-6',
+    'top-left': 'top-6 left-6'
+  };
+
+  // Variant configurations
+  const variantClasses = {
+    primary: {
+      default: 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl',
+      disabled: 'bg-blue-800 text-blue-300 shadow-lg cursor-not-allowed',
+      loading: 'bg-blue-600 text-white shadow-lg cursor-wait'
+    },
+    secondary: {
+      default: 'bg-dark-700 hover:bg-dark-600 text-white shadow-lg hover:shadow-xl',
+      disabled: 'bg-dark-800 text-dark-400 shadow-lg cursor-not-allowed',
+      loading: 'bg-dark-700 text-white shadow-lg cursor-wait'
+    },
+    success: {
+      default: 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl',
+      disabled: 'bg-green-800 text-green-300 shadow-lg cursor-not-allowed',
+      loading: 'bg-green-600 text-white shadow-lg cursor-wait'
+    },
+    danger: {
+      default: 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl',
+      disabled: 'bg-red-800 text-red-300 shadow-lg cursor-not-allowed',
+      loading: 'bg-red-600 text-white shadow-lg cursor-wait'
+    }
+  };
+
+  const currentState = loading ? 'loading' : (disabled ? 'disabled' : 'default');
+  const variantStateClasses = variantClasses[variant][currentState];
+
+  // Base button classes
+  const baseClasses = [
+    'fixed',
+    'z-50',
+    'flex',
+    'items-center',
+    'justify-center',
+    'rounded-full',
+    'transition-all',
+    'duration-300',
+    'focus:outline-none',
+    'focus:ring-4',
+    'focus:ring-blue-500/20',
+    'hover:scale-110',
+    'active:scale-95',
+    currentSize.button,
+    variantStateClasses,
+    positionClasses[position],
+    locals.class || ''
+  ].filter(Boolean).join(' ');
+%>
+
+<% if (isLink) { %>
+  <a
+    href="<%= locals.href %>"
+    <%= locals.target ? 'target="' + locals.target + '"' : '' %>
+    id="<%= buttonId %>"
+    class="<%= baseClasses %>"
+    <%= locals.onClick ? 'onclick="' + locals.onClick + '"' : '' %>
+    <%= locals.label ? 'title="' + locals.label + '"' : '' %>
+  >
+    <%= renderFabContent(locals, currentSize, loading) %>
+  </a>
+<% } else { %>
+  <button
+    id="<%= buttonId %>"
+    <%= disabled || loading ? 'disabled' : '' %>
+    class="<%= baseClasses %>"
+    <%= locals.onClick ? 'onclick="' + locals.onClick + '"' : '' %>
+    <%= locals.label ? 'title="' + locals.label + '"' : '' %>
+  >
+    <%= renderFabContent(locals, currentSize, loading) %>
+  </button>
+<% } %>
+
+<%
+  function renderFabContent(locals, size, isLoading) {
+    const icon = locals.icon;
+
+    if (isLoading) {
+      return `<span class="animate-spin rounded-full h-5 w-5 border-2 border-current border-t-transparent"></span>`;
+    } else if (icon) {
+      return `<i class="${icon} ${size.icon}"></i>`;
+    }
+    return '';
+  }
+%>
+
+<% if (locals.label && !locals.loading) { %>
+  <!-- Tooltip -->
+  <style>
+    #<%= buttonId %>[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: 100%;
+      <%= position.includes('right') ? 'right: 0' : 'left: 0' %>;
+      transform: translateY(-8px);
+      background-color: #1f2937;
+      color: #f9fafb;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      white-space: nowrap;
+      z-index: 1000;
+      pointer-events: none;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    #<%= buttonId %>[title]:hover::before {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      <%= position.includes('right') ? 'right: 16px' : 'left: 16px' %>;
+      transform: translateY(-2px);
+      border: 4px solid transparent;
+      border-top-color: #1f2937;
+      z-index: 1000;
+      pointer-events: none;
+    }
+  </style>
+<% } %>
+
+<% if (locals.loading) { %>
+  <script>
+    (function() {
+      const button = document.getElementById('<%= buttonId %>');
+      if (button) {
+        // Prevent interaction during loading
+        button.addEventListener('click', function(e) {
+          if (this.classList.contains('cursor-wait')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        });
+      }
+    })();
+  </script>
+<% } %>

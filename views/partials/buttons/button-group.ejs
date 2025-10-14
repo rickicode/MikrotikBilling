@@ -1,0 +1,164 @@
+<%-
+  /**
+   * Button Group Component
+   * Variables:
+   * - buttons: Array of button objects [{text: string, variant: string, icon: string, active: boolean, disabled: boolean}]
+   * - size: Button size (sm, md, lg, xl, default: 'md')
+   * - variant: Default variant for all buttons (default: 'outline')
+   * - orientation: Group orientation (horizontal, vertical, default: 'horizontal')
+   * - fullWidth: Make group full width (boolean, default: false)
+   * - class: Additional CSS classes (string, optional)
+   * - id: Group ID (string, optional)
+   */
+
+  // Set defaults
+  const buttons = locals.buttons || [];
+  const size = locals.size || 'md';
+  const variant = locals.variant || 'outline';
+  const orientation = locals.orientation || 'horizontal';
+  const fullWidth = locals.fullWidth === true;
+  const groupId = locals.id || 'btn-group-' + Math.random().toString(36).substr(2, 9);
+
+  // Size configurations
+  const sizeClasses = {
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base',
+    xl: 'text-lg'
+  };
+
+  // Orientation classes
+  const orientationClasses = {
+    horizontal: {
+      container: 'flex flex-row',
+      button: 'rounded-none first:rounded-l-lg last:rounded-r-lg border-l-0 first:border-l'
+    },
+    vertical: {
+      container: 'flex flex-col',
+      button: 'rounded-none first:rounded-t-lg last:rounded-b-lg border-t-0 first:border-t'
+    }
+  };
+
+  const currentOrientation = orientationClasses[orientation];
+%>
+
+<div id="<%= groupId %>" class="inline-flex <%= currentOrientation.container %> <%= fullWidth ? 'w-full' : '' %> <%= locals.class || '' %>" role="group">
+  <% buttons.forEach((button, index) => { %>
+    <%
+      const isActive = button.active === true;
+      const isDisabled = button.disabled === true;
+      const buttonVariant = button.variant || variant;
+
+      // Build variant classes
+      let variantClasses = '';
+      if (isActive) {
+        // Active state
+        switch (buttonVariant) {
+          case 'primary':
+            variantClasses = 'bg-blue-600 text-white border-blue-600';
+            break;
+          case 'secondary':
+            variantClasses = 'bg-dark-600 text-white border-dark-600';
+            break;
+          default:
+            variantClasses = 'bg-dark-600 text-white border-dark-600';
+        }
+      } else {
+        // Inactive state
+        switch (buttonVariant) {
+          case 'primary':
+            variantClasses = 'bg-transparent hover:bg-blue-600 hover:text-white text-blue-400 border-blue-600';
+            break;
+          case 'secondary':
+            variantClasses = 'bg-transparent hover:bg-dark-600 hover:text-white text-dark-300 border-dark-600';
+            break;
+          case 'outline':
+            variantClasses = 'bg-transparent hover:bg-dark-700 hover:text-white text-dark-300 border-dark-600';
+            break;
+          default:
+            variantClasses = 'bg-transparent hover:bg-dark-700 hover:text-white text-dark-300 border-dark-600';
+        }
+      }
+
+      if (isDisabled) {
+        variantClasses = 'bg-transparent text-dark-500 border-dark-700 cursor-not-allowed';
+      }
+
+      const baseClasses = [
+        'inline-flex',
+        'items-center',
+        'justify-center',
+        'border',
+        'px-4',
+        'py-2',
+        'font-medium',
+        'transition-all',
+        'duration-200',
+        'focus:outline-none',
+        'focus:ring-2',
+        'focus:ring-blue-500',
+        'focus:ring-offset-2',
+        'focus:ring-offset-dark-900',
+        sizeClasses[size],
+        variantClasses,
+        currentOrientation.button,
+        isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'
+      ].filter(Boolean).join(' ');
+    %>
+    <button
+      type="button"
+      class="<%= baseClasses %>"
+      <%= isDisabled ? 'disabled' : '' %>
+      <%= button.onclick ? 'onclick="' + button.onclick + '"' : '' %>
+      <%= button.dataAttributes ? Object.entries(button.dataAttributes).map(([k, v]) => `data-${k}="${v}"`).join(' ') : '' %>
+    >
+      <% if (button.icon) { %>
+        <i class="<%= button.icon %> <%= button.text ? 'mr-2' : %>"></i>
+      <% } %>
+      <% if (button.text) { %>
+        <%= button.text %>
+      <% } %>
+    </button>
+  <% }); %>
+</div>
+
+<% if (buttons.length > 0) { %>
+  <script>
+    (function() {
+      const group = document.getElementById('<%= groupId %>');
+      if (!group) return;
+
+      const buttons = group.querySelectorAll('button');
+
+      // Handle radio button behavior (only one active at a time)
+      buttons.forEach(button => {
+        button.addEventListener('click', function() {
+          // Only handle if not disabled
+          if (this.disabled) return;
+
+          // Remove active state from all buttons
+          buttons.forEach(btn => {
+            if (!btn.disabled) {
+              btn.classList.remove('bg-blue-600', 'bg-dark-600', 'text-white');
+              btn.classList.add('bg-transparent', 'text-dark-300');
+            }
+          });
+
+          // Add active state to clicked button
+          this.classList.remove('bg-transparent', 'text-dark-300');
+          this.classList.add('bg-dark-600', 'text-white');
+
+          // Trigger change event
+          const event = new CustomEvent('buttonGroupChange', {
+            detail: {
+              groupId: '<%= groupId %>',
+              button: this,
+              index: Array.from(buttons).indexOf(this)
+            }
+          });
+          document.dispatchEvent(event);
+        });
+      });
+    })();
+  </script>
+<% } %>

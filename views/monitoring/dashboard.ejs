@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitoring - HIJINETWORK</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #16a34a;
+            --warning-color: #ea580c;
+            --danger-color: #dc2626;
+            --info-color: #0891b2;
+        }
+
+        body {
+            background-color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .metric-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .metric-label {
+            color: #64748b;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .alert-card {
+            border-left: 4px solid;
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert-critical {
+            border-left-color: var(--danger-color);
+        }
+
+        .alert-warning {
+            border-left-color: var(--warning-color);
+        }
+
+        .alert-info {
+            border-left-color: var(--info-color);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .status-online {
+            background-color: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-offline {
+            background-color: var(--danger-color);
+        }
+
+        .status-degraded {
+            background-color: var(--warning-color);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        .metric-trend {
+            font-size: 0.875rem;
+            margin-left: 0.5rem;
+        }
+
+        .trend-up {
+            color: var(--success-color);
+        }
+
+        .trend-down {
+            color: var(--danger-color);
+        }
+
+        .time-range-selector {
+            background: white;
+            border-radius: 8px;
+            padding: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .time-range-selector .btn {
+            border: none;
+            background: transparent;
+            color: #64748b;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .time-range-selector .btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .system-status {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .service-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .service-status:last-child {
+            border-bottom: none;
+        }
+
+        .alert-severity {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .severity-critical {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .severity-warning {
+            background: #fed7aa;
+            color: #ea580c;
+        }
+
+        .severity-info {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .refresh-indicator {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .refresh-indicator:hover {
+            transform: scale(1.1);
+        }
+
+        .refresh-indicator.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-network-wired me-2"></i>
+                HIJINETWORK
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-tachometer-alt me-1"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/monitoring">
+                            <i class="fas fa-chart-line me-1"></i>
+                            Monitoring
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/backup">
+                            <i class="fas fa-shield-alt me-1"></i>
+                            Backup
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            Admin
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/settings">Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout">Logout</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Page Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-1">System Monitoring</h1>
+                        <p class="text-muted mb-0">Real-time system health and performance metrics</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <div class="time-range-selector">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm active" data-range="1h">1H</button>
+                                <button type="button" class="btn btn-sm" data-range="6h">6H</button>
+                                <button type="button" class="btn btn-sm" data-range="24h">24H</button>
+                                <button type="button" class="btn btn-sm" data-range="7d">7D</button>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-primary" onclick="exportMetrics()">
+                            <i class="fas fa-download me-1"></i>
+                            Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status Overview -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="system-status">
+                    <h5 class="mb-3">System Status</h5>
+                    <div id="systemStatus">
+                        <div class="service-status">
+                            <div>
+                                <span class="status-indicator status-online"></span>
+                                <strong>Application</strong>
+                                <span class="text-muted ms-2">Online</span>
+                            </div>
+                            <span class="badge bg-success">Operational</span>
+                        </div>
+                        <div class="service-status">
+                            <div>
+                                <span class="status-indicator status-online"></span>
+                                <strong>Database</strong>
+                                <span class="text-muted ms-2">Connected</span>
+                            </div>
+                            <span class="badge bg-success">Operational</span>
+                        </div>
+                        <div class="service-status">
+                            <div>
+                                <span class="status-indicator status-online"></span>
+                                <strong>Redis Cache</strong>
+                                <span class="text-muted ms-2">Connected</span>
+                            </div>
+                            <span class="badge bg-success">Operational</span>
+                        </div>
+                        <div class="service-status">
+                            <div>
+                                <span class="status-indicator status-online"></span>
+                                <strong>Mikrotik Router</strong>
+                                <span class="text-muted ms-2">Connected</span>
+                            </div>
+                            <span class="badge bg-success">Operational</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h5 class="mb-3">Key Metrics</h5>
+                <div class="metric-grid">
+                    <div class="card metric-card">
+                        <div class="card-body">
+                            <div class="metric-label">Active Users</div>
+                            <div class="metric-value text-primary" id="activeUsers">0</div>
+                            <div class="text-muted">
+                                <small>Hotspot + PPPoE</small>
+                                <span class="metric-trend trend-up">
+                                    <i class="fas fa-arrow-up"></i> 12%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="card-body">
+                            <div class="metric-label">Response Time</div>
+                            <div class="metric-value text-success" id="responseTime">0ms</div>
+                            <div class="text-muted">
+                                <small>Average</small>
+                                <span class="metric-trend trend-down">
+                                    <i class="fas fa-arrow-down"></i> 8%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="card-body">
+                            <div class="metric-label">Memory Usage</div>
+                            <div class="metric-value text-warning" id="memoryUsage">0%</div>
+                            <div class="text-muted">
+                                <small>Available: <span id="availableMemory">0MB</span></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="card-body">
+                            <div class="metric-label">CPU Usage</div>
+                            <div class="metric-value text-info" id="cpuUsage">0%</div>
+                            <div class="text-muted">
+                                <small>System Load</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="card-body">
+                            <div class="metric-label">Total Vouchers</div>
+                            <div class="metric-value text-primary" id="totalVouchers">0</div>
+                            <div class="text-muted">
+                                <small>Available: <span id="availableVouchers">0</span></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="card-body">
+                            <div class="metric-label">Revenue Today</div>
+                            <div class="metric-value text-success" id="revenueToday">Rp 0</div>
+                            <div class="text-muted">
+                                <small>Transactions: <span id="transactionsToday">0</span></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Alerts Row -->
+        <div class="row mb-4">
+            <!-- Performance Chart -->
+            <div class="col-lg-8 mb-4">
+                <div class="card metric-card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Performance Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Alerts -->
+            <div class="col-lg-4 mb-4">
+                <div class="card metric-card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Active Alerts</h5>
+                        <span class="badge bg-danger" id="alertCount">0</span>
+                    </div>
+                    <div class="card-body" id="alertsContainer">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                            <p>No active alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Business Metrics -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card metric-card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Business Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value text-primary" id="totalCustomers">0</div>
+                                    <div class="metric-label">Total Customers</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value text-success" id="activeCustomers">0</div>
+                                    <div class="metric-label">Active Customers</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value text-warning" id="monthlyRevenue">Rp 0</div>
+                                    <div class="metric-label">Monthly Revenue</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value text-info" id="successRate">0%</div>
+                                    <div class="metric-label">Success Rate</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Refresh Indicator -->
+    <div class="refresh-indicator" id="refreshIndicator" onclick="refreshData()">
+        <i class="fas fa-sync-alt"></i>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Global variables
+        let performanceChart;
+        let refreshInterval;
+
+        // Initialize monitoring dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeChart();
+            startMonitoring();
+            setupEventListeners();
+        });
+
+        // Initialize performance chart
+        function initializeChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Response Time (ms)',
+                        data: [],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'CPU Usage (%)',
+                        data: [],
+                        borderColor: '#ea580c',
+                        backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Memory Usage (%)',
+                        data: [],
+                        borderColor: '#16a34a',
+                        backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        // Start monitoring
+        function startMonitoring() {
+            refreshData();
+            refreshInterval = setInterval(refreshData, 30000); // Refresh every 30 seconds
+        }
+
+        // Refresh all data
+        async function refreshData() {
+            try {
+                const indicator = document.getElementById('refreshIndicator');
+                indicator.classList.add('spinning');
+
+                await Promise.all([
+                    updateMetrics(),
+                    updateSystemStatus(),
+                    updateAlerts(),
+                    updatePerformanceChart()
+                ]);
+
+                indicator.classList.remove('spinning');
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                showToast('Error refreshing monitoring data', 'error');
+            }
+        }
+
+        // Update metrics
+        async function updateMetrics() {
+            try {
+                const response = await fetch('/api/monitoring/metrics');
+                const result = await response.json();
+
+                if (result.success) {
+                    const metrics = result.data;
+
+                    document.getElementById('activeUsers').textContent = metrics.users?.active || 0;
+                    document.getElementById('totalVouchers').textContent = metrics.users?.vouchers || 0;
+                    document.getElementById('availableVouchers').textContent = metrics.users?.vouchers || 0;
+                    document.getElementById('revenueToday').textContent = formatCurrency(metrics.payments?.amount || 0);
+                    document.getElementById('transactionsToday').textContent = metrics.payments?.transactions || 0;
+                }
+            } catch (error) {
+                console.error('Error updating metrics:', error);
+            }
+        }
+
+        // Update system status
+        async function updateSystemStatus() {
+            try {
+                const response = await fetch('/api/monitoring/status');
+                const result = await response.json();
+
+                if (result.success) {
+                    const status = result.data;
+
+                    // Update service status indicators
+                    updateServiceStatus('database', status.services.database.connected);
+                    updateServiceStatus('redis', status.services.redis.connected);
+                    updateServiceStatus('mikrotik', status.services.mikrotik.connected);
+
+                    // Update system metrics
+                    const memoryPercent = Math.round((status.system.memory.used / status.system.memory.total) * 100);
+                    document.getElementById('memoryUsage').textContent = memoryPercent + '%';
+                    document.getElementById('availableMemory').textContent = formatBytes(status.system.memory.total - status.system.memory.used);
+
+                    // CPU usage would need to be calculated from process.cpuUsage()
+                    document.getElementById('cpuUsage').textContent = '25%'; // Placeholder
+                }
+            } catch (error) {
+                console.error('Error updating system status:', error);
+            }
+        }
+
+        // Update service status indicator
+        function updateServiceStatus(service, isConnected) {
+            const statusElement = document.querySelector(`#${service}Status`);
+            if (statusElement) {
+                const indicator = statusElement.querySelector('.status-indicator');
+                const statusText = statusElement.querySelector('.text-muted');
+                const badge = statusElement.querySelector('.badge');
+
+                if (isConnected) {
+                    indicator.className = 'status-indicator status-online';
+                    statusText.textContent = 'Connected';
+                    badge.className = 'badge bg-success';
+                    badge.textContent = 'Operational';
+                } else {
+                    indicator.className = 'status-indicator status-offline';
+                    statusText.textContent = 'Disconnected';
+                    badge.className = 'badge bg-danger';
+                    badge.textContent = 'Offline';
+                }
+            }
+        }
+
+        // Update alerts
+        async function updateAlerts() {
+            try {
+                const response = await fetch('/api/monitoring/alerts');
+                const result = await response.json();
+
+                if (result.success) {
+                    const alerts = result.data;
+                    const alertCount = document.getElementById('alertCount');
+                    const alertsContainer = document.getElementById('alertsContainer');
+
+                    alertCount.textContent = alerts.length;
+
+                    if (alerts.length === 0) {
+                        alertsContainer.innerHTML = `
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                                <p>No active alerts</p>
+                            </div>
+                        `;
+                    } else {
+                        alertsContainer.innerHTML = alerts.map(alert => `
+                            <div class="alert-card alert-${alert.severity}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">${alert.name}</h6>
+                                        <p class="mb-1 text-muted">${alert.description}</p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>
+                                            ${new Date(alert.triggeredAt).toLocaleString()}
+                                        </small>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end">
+                                        <span class="alert-severity severity-${alert.severity}">${alert.severity}</span>
+                                        ${!alert.acknowledged ? `<button class="btn btn-sm btn-outline-primary mt-2" onclick="acknowledgeAlert('${alert.id}')">Acknowledge</button>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating alerts:', error);
+            }
+        }
+
+        // Update performance chart
+        async function updatePerformanceChart() {
+            try {
+                const response = await fetch('/api/monitoring/performance?timeRange=1h');
+                const result = await response.json();
+
+                if (result.success) {
+                    const metrics = result.data.metrics;
+                    const now = new Date().toLocaleTimeString();
+
+                    // Add new data point
+                    if (performanceChart.data.labels.length > 20) {
+                        performanceChart.data.labels.shift();
+                        performanceChart.data.datasets.forEach(dataset => dataset.data.shift());
+                    }
+
+                    performanceChart.data.labels.push(now);
+                    performanceChart.data.datasets[0].data.push(metrics.responseTime?.average || 0);
+                    performanceChart.data.datasets[1].data.push(25); // Placeholder CPU
+                    performanceChart.data.datasets[2].data.push(35); // Placeholder Memory
+
+                    performanceChart.update();
+                }
+            } catch (error) {
+                console.error('Error updating performance chart:', error);
+            }
+        }
+
+        // Acknowledge alert
+        async function acknowledgeAlert(alertId) {
+            try {
+                const response = await fetch(`/api/monitoring/alerts/${alertId}/acknowledge`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ reason: 'Acknowledged by admin' })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Alert acknowledged successfully', 'success');
+                    updateAlerts();
+                } else {
+                    showToast(result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error acknowledging alert:', error);
+                showToast('Error acknowledging alert', 'error');
+            }
+        }
+
+        // Export metrics
+        function exportMetrics() {
+            const format = prompt('Export format (json/csv):', 'json');
+            if (format) {
+                window.location.href = `/api/monitoring/export?format=${format}`;
+            }
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Time range selector
+            document.querySelectorAll('.time-range-selector .btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.time-range-selector .btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Refresh data with new time range
+                    refreshData();
+                });
+            });
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', () => {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                }
+            });
+        }
+
+        // Utility functions
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showToast(message, type = 'info') {
+            // Simple toast notification (could be enhanced with a proper toast library)
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type} position-fixed`;
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<%- include('../partials/layout', {
+    title: 'Admin Dashboard',
+    currentUrl: '/dashboard'
+}) %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
+    <div>
+      <a href="/mikrotik-config" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2">
+        <i class="bi bi-gear"></i> Mikrotik Configuration
+      </a>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow-md border-l-4 border-blue-500 p-6 transform hover:scale-105 transition-transform duration-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-blue-600 uppercase mb-1">Total Customers</p>
+          <p class="text-2xl font-bold text-gray-800"><%= stats.totalCustomers %></p>
+        </div>
+        <div class="bg-blue-100 bg-opacity-50 rounded-full p-3">
+          <i class="bi bi-people text-2xl text-blue-600"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md border-l-4 border-green-500 p-6 transform hover:scale-105 transition-transform duration-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-green-600 uppercase mb-1">Active Subscriptions</p>
+          <p class="text-2xl font-bold text-gray-800"><%= stats.activeSubscriptions %></p>
+        </div>
+        <div class="bg-green-100 bg-opacity-50 rounded-full p-3">
+          <i class="bi bi-clipboard-check text-2xl text-green-600"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md border-l-4 border-cyan-500 p-6 transform hover:scale-105 transition-transform duration-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-cyan-600 uppercase mb-1">Today's Revenue</p>
+          <p class="text-2xl font-bold text-gray-800">Rp <%= Number(stats.todayRevenue).toLocaleString('id-ID') %></p>
+        </div>
+        <div class="bg-cyan-100 bg-opacity-50 rounded-full p-3">
+          <i class="bi bi-currency-dollar text-2xl text-cyan-600"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md border-l-4 border-amber-500 p-6 transform hover:scale-105 transition-transform duration-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-amber-600 uppercase mb-1">Pending Payments</p>
+          <p class="text-2xl font-bold text-gray-800"><%= stats.pendingPayments %></p>
+        </div>
+        <div class="bg-amber-100 bg-opacity-50 rounded-full p-3">
+          <i class="bi bi-clock-history text-2xl text-amber-600"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+      <!-- Recent Activities and Quick Actions -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Recent Activities -->
+    <div class="bg-white rounded-lg shadow-md">
+      <div class="border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">Recent Activities</h3>
+      </div>
+      <div class="p-6">
+        <% if (recentActivities && recentActivities.length > 0) { %>
+          <div class="space-y-4">
+            <% recentActivities.forEach(activity => { %>
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0">
+                  <div class="w-3 h-3 bg-blue-500 rounded-full mt-2"></div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-medium text-gray-900"><%= activity.admin_name %></p>
+                    <p class="text-xs text-gray-500"><%= new Date(activity.created_at).toLocaleString('id-ID') %></p>
+                  </div>
+                  <p class="text-sm text-gray-600">
+                    <%= activity.action %>
+                    <% if (activity.target_type) { %>
+                      - <span class="font-medium"><%= activity.target_type %></span> #<%= activity.target_id %>
+                    <% } %>
+                  </p>
+                </div>
+              </div>
+              <% if (recentActivities.indexOf(activity) < recentActivities.length - 1) { %>
+                <div class="ml-1.5 border-l-2 border-gray-200 h-4"></div>
+              <% } %>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <div class="text-center py-8">
+            <i class="bi bi-clock-history text-4xl text-gray-300 mb-2"></i>
+            <p class="text-gray-500">No recent activities</p>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-lg shadow-md">
+      <div class="border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">Quick Actions</h3>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-2 gap-4">
+          <a href="/customers/create" class="px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-2 text-sm font-medium">
+            <i class="bi bi-person-plus"></i> Add Customer
+          </a>
+          <a href="/vouchers/create" class="px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200 flex items-center justify-center gap-2 text-sm font-medium">
+            <i class="bi bi-ticket-perforated"></i> Generate Vouchers
+          </a>
+          <a href="/pppoe/create" class="px-4 py-3 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors duration-200 flex items-center justify-center gap-2 text-sm font-medium">
+            <i class="bi bi-ethernet"></i> Create PPPoE User
+          </a>
+          <a href="/customers" class="px-4 py-3 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors duration-200 flex items-center justify-center gap-2 text-sm font-medium">
+            <i class="bi bi-people"></i> View Customers
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

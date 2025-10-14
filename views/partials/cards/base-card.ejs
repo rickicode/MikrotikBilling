@@ -1,0 +1,107 @@
+<%-
+  /**
+   * Base Card Component for Dark Theme
+   * Variables:
+   * - title: Card title (string, optional)
+   * - subtitle: Card subtitle (string, optional)
+   * - footer: Card footer content (string, optional)
+   * - variant: Card variant ('default', 'stat', 'chart', 'table', 'form')
+   * - size: Card size ('sm', 'md', 'lg')
+   * - hover: Enable hover effect (boolean, default: true)
+   * - border: Show border (boolean, default: true)
+   * - shadow: Shadow level ('none', 'sm', 'md', 'lg', default: 'md')
+   * - padding: Padding level ('none', 'sm', 'md', 'lg', default: 'md')
+   * - rounded: Border radius (boolean, default: true)
+   * - class: Additional CSS classes (string, optional)
+   * - id: Card ID (string, optional)
+   */
+
+  // Set defaults
+  const variant = locals.variant || 'default';
+  const size = locals.size || 'md';
+  const hover = locals.hover !== false;
+  const border = locals.border !== false;
+  const shadow = locals.shadow || 'md';
+  const padding = locals.padding || 'md';
+  const rounded = locals.rounded !== false;
+  const cardId = locals.id || 'card-' + Math.random().toString(36).substr(2, 9);
+
+  // Size classes
+  const sizeClasses = {
+    sm: 'p-4',
+    md: 'p-6',
+    lg: 'p-8'
+  };
+
+  // Shadow classes
+  const shadowClasses = {
+    none: '',
+    sm: 'shadow-sm',
+    md: 'shadow-lg',
+    lg: 'shadow-xl'
+  };
+
+  // Variant-specific classes
+  const variantClasses = {
+    default: 'bg-dark-800',
+    stat: 'bg-dark-800 border-l-4',
+    chart: 'bg-dark-800',
+    table: 'bg-dark-800 overflow-hidden',
+    form: 'bg-dark-800'
+  };
+
+  // Hover classes
+  const hoverClasses = hover ? 'hover:shadow-xl transition-shadow duration-300' : '';
+
+  // Border classes
+  const borderClasses = border ? 'border border-dark-700' : '';
+
+  // Rounded classes
+  const roundedClasses = rounded ? 'rounded-lg' : '';
+
+  // Build card classes
+  const cardClasses = [
+    variantClasses[variant],
+    borderClasses,
+    shadowClasses[shadow],
+    hoverClasses,
+    roundedClasses,
+    locals.class || ''
+  ].filter(Boolean).join(' ');
+
+  // Padding classes
+  const paddingClasses = padding === 'none' ? '' : sizeClasses[padding];
+
+  // Header classes
+  const headerClasses = variant === 'stat' ? 'pb-4' : 'pb-6 border-b border-dark-700 mb-6';
+
+  // Footer classes
+  const footerClasses = 'pt-4 mt-4 border-t border-dark-700';
+%>
+
+<div id="<%= cardId %>" class="<%= cardClasses %>">
+  <% if (locals.title || locals.subtitle) { %>
+    <div class="<%= headerClasses %>">
+      <% if (locals.title) { %>
+        <h3 class="text-lg font-semibold text-white <%= locals.subtitle ? 'mb-1' : '' %>">
+          <%= locals.title %>
+        </h3>
+      <% } %>
+      <% if (locals.subtitle) { %>
+        <p class="text-sm text-dark-400">
+          <%= locals.subtitle %>
+        </p>
+      <% } %>
+    </div>
+  <% } %>
+
+  <div class="<%= paddingClasses %>">
+    <%- body %>
+  </div>
+
+  <% if (locals.footer) { %>
+    <div class="<%= footerClasses %>">
+      <%- locals.footer %>
+    </div>
+  <% } %>
+</div>

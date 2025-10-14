@@ -1,0 +1,355 @@
+<%- include('../partials/header', { title: 'Notifikasi', currentUrl: '/notifications' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">📱 WhatsApp Notifications</h1>
+            <p class="text-slate-400">Kelola notifikasi WhatsApp dan antrean pesan</p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex flex-wrap gap-3">
+            <button id="refreshNotificationsBtn" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                <i class="fas fa-sync-alt mr-2"></i> Refresh
+            </button>
+            <button id="testNotificationBtn" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200">
+                <i class="fab fa-whatsapp mr-2"></i> Test WhatsApp
+            </button>
+            <button id="viewQueueBtn" onclick="showQueueModal()" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                <i class="fas fa-list mr-2"></i> View Queue
+            </button>
+            <a href="/whatsapp/settings" class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                <i class="fas fa-cog mr-2"></i> WhatsApp Settings
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total WhatsApp Messages -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Total WhatsApp Messages</p>
+                <p class="text-3xl font-bold text-white" id="totalNotifications">
+                    <i class="fas fa-spinner fa-spin text-slate-400"></i>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
+                    <i class="fab fa-whatsapp text-green-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Sent -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">WhatsApp Sent</p>
+                <p class="text-3xl font-bold text-white" id="sentNotifications">
+                    <i class="fas fa-spinner fa-spin text-slate-400"></i>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
+                    <i class="fas fa-check-circle text-green-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Queued -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-yellow-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">WhatsApp Queued</p>
+                <p class="text-3xl font-bold text-white" id="queuedNotifications">
+                    <i class="fas fa-spinner fa-spin text-slate-400"></i>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
+                    <i class="fas fa-clock text-yellow-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Failed -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">WhatsApp Failed</p>
+                <p class="text-3xl font-bold text-white" id="failedNotifications">
+                    <i class="fas fa-spinner fa-spin text-slate-400"></i>
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-red-500/10 rounded-xl flex items-center justify-center border border-red-500/20">
+                    <i class="fas fa-times-circle text-red-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+            <label for="filterStatus" class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+            <select id="filterStatus" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Semua Status</option>
+                <option value="sent">Berhasil</option>
+                <option value="queued">Antrian</option>
+                <option value="failed">Gagal</option>
+                <option value="pending">Pending</option>
+            </select>
+        </div>
+        <div>
+            <label for="filterType" class="block text-sm font-medium text-slate-300 mb-2">Tipe</label>
+            <select id="filterType" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="whatsapp" selected>WhatsApp Only</option>
+            </select>
+        </div>
+        <div>
+            <label for="filterDate" class="block text-sm font-medium text-slate-300 mb-2">Tanggal</label>
+            <input type="date" id="filterDate" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">&nbsp;</label>
+            <button id="applyFilterBtn" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                <i class="fas fa-filter mr-2"></i> Filter
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Notifications Table -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <h6 class="text-lg font-semibold text-green-400">📱 WhatsApp Message History</h6>
+        <div class="flex items-center mt-2 sm:mt-0">
+            <select class="px-3 py-1 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <span class="text-slate-400 ml-2 text-sm">per halaman</span>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full" id="notificationsTable">
+            <thead class="bg-slate-900">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Waktu</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Type</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Recipient</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Message</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="notificationsTableBody" class="divide-y divide-slate-700">
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-slate-400">
+                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                        Memuat data...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="px-6 py-4 border-t border-slate-700">
+        <nav aria-label="Page navigation">
+            <ul class="flex justify-center space-x-2" id="notificationsPagination">
+                <!-- Pagination will be inserted here -->
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<!-- Test Notification Modal -->
+<div id="testNotificationModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 relative">
+            <div class="flex justify-between items-center mb-6">
+                <h5 class="text-xl font-semibold text-white">Test Kirim Notifikasi</h5>
+                <button type="button" onclick="closeTestModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="testNotificationForm">
+                <div class="mb-4">
+                    <label for="testNotificationRecipient" class="block text-sm font-medium text-slate-300 mb-2">WhatsApp Number</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-slate-400">📱</span>
+                        </div>
+                        <input type="tel" id="testNotificationRecipient"
+                               placeholder="628123456789" pattern="[0-9]{10,14}" required
+                               class="w-full pl-10 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">Format: 628123456789 (without +)</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Message Type</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="messageType" id="directMessage" value="direct" checked class="mr-2">
+                            <span class="text-slate-300">Direct Message</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="messageType" id="templateMessage" value="template" class="mr-2">
+                            <span class="text-slate-300">Use Template</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-4" id="directMessageContainer">
+                    <label for="testNotificationMessage" class="block text-sm font-medium text-slate-300 mb-2">WhatsApp Message</label>
+                    <textarea id="testNotificationMessage" rows="3"
+                              placeholder="Type your message here..." required
+                              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+
+                <div class="mb-6 hidden" id="templateMessageContainer">
+                    <label for="testNotificationTemplate" class="block text-sm font-medium text-slate-300 mb-2">WhatsApp Template</label>
+                    <select id="testNotificationTemplate" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select Template</option>
+                        <!-- Templates will be loaded dynamically -->
+                    </select>
+                </div>
+            </form>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeTestModal()" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors">
+                    Batal
+                </button>
+                <button type="button" id="sendTestNotificationBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+                    <i class="fas fa-paper-plane mr-2"></i> Kirim Test
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Queue Status Modal -->
+<div id="queueModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h5 class="text-xl font-semibold text-white">📋 Message Queue Status</h5>
+                <button type="button" onclick="closeQueueModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Queue Statistics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-yellow-400" id="queuePendingCount">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                    <div class="text-sm text-slate-300 mt-1">Pending</div>
+                </div>
+                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-green-400" id="queueSentCount">0</div>
+                    <div class="text-sm text-slate-300 mt-1">Sent</div>
+                </div>
+                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-red-400" id="queueFailedCount">0</div>
+                    <div class="text-sm text-slate-300 mt-1">Failed</div>
+                </div>
+            </div>
+
+            <!-- Refresh Button -->
+            <div class="mb-4">
+                <button onclick="refreshQueueStatus()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                    <i class="fas fa-sync-alt mr-2"></i> Refresh Queue
+                </button>
+            </div>
+
+            <!-- Pending Messages Table -->
+            <div class="bg-slate-900/50 rounded-lg overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-700">
+                    <h6 class="text-lg font-medium text-white">📤 Pending Messages</h6>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-800">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">ID</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">Recipient</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">Message</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">Priority</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">Status</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queueMessagesBody" class="divide-y divide-slate-700">
+                            <tr>
+                                <td colspan="6" class="px-4 py-4 text-center text-slate-400">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                                    Loading queue data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="queueEmptyState" class="text-center py-8 hidden">
+                <div class="text-slate-400">
+                    <i class="fas fa-inbox text-6xl mb-4"></i>
+                    <p class="text-lg">No pending messages in queue</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Modal functions
+function showQueueModal() {
+    document.getElementById('queueModal').classList.remove('hidden');
+    refreshQueueStatus();
+}
+
+function closeQueueModal() {
+    document.getElementById('queueModal').classList.add('hidden');
+}
+
+function closeTestModal() {
+    document.getElementById('testNotificationModal').classList.add('hidden');
+}
+
+// Test notification modal trigger
+document.getElementById('testNotificationBtn').addEventListener('click', function() {
+    document.getElementById('testNotificationModal').classList.remove('hidden');
+});
+
+// Message type toggle
+document.querySelectorAll('input[name="messageType"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const directContainer = document.getElementById('directMessageContainer');
+        const templateContainer = document.getElementById('templateMessageContainer');
+
+        if (this.value === 'direct') {
+            directContainer.classList.remove('hidden');
+            templateContainer.classList.add('hidden');
+        } else {
+            directContainer.classList.add('hidden');
+            templateContainer.classList.remove('hidden');
+        }
+    });
+});
+</script>
+
+<%- include('../partials/footer', { scripts: ['/public/js/notifications.js'] }) %>

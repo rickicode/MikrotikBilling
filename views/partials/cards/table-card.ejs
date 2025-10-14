@@ -1,0 +1,255 @@
+<%-
+  /**
+   * Table Card Component for Data Tables
+   * Variables:
+   * - title: Table title (string, required)
+   * - subtitle: Table subtitle (string, optional)
+   * - showSearch: Show search bar (boolean, default: false)
+   * - searchPlaceholder: Search placeholder text (string, default: 'Cari...')
+   * - showFilter: Show filter dropdown (boolean, default: false)
+   * - filterOptions: Filter options array, format: [{label: string, value: string}]
+   * - showExport: Show export button (boolean, default: false)
+   * - showRefresh: Show refresh button (boolean, default: false)
+   * - loading: Show loading state (boolean, default: false)
+   * - empty: Show empty state (boolean, default: false)
+   * - emptyMessage: Empty state message (string, default: 'Tidak ada data')
+   * - emptyIcon: Empty state icon class (string, default: 'fas fa-inbox')
+   * - class: Additional CSS classes (string, optional)
+   * - id: Card ID (string, optional)
+   */
+
+  // Set defaults
+  const showSearch = locals.showSearch === true;
+  const showFilter = locals.showFilter === true;
+  const showExport = locals.showExport === true;
+  const showRefresh = locals.showRefresh === true;
+  const loading = locals.loading || false;
+  const empty = locals.empty || false;
+  const searchPlaceholder = locals.searchPlaceholder || 'Cari...';
+  const emptyMessage = locals.emptyMessage || 'Tidak ada data';
+  const emptyIcon = locals.emptyIcon || 'fas fa-inbox';
+  const cardId = locals.id || 'table-card-' + Math.random().toString(36).substr(2, 9);
+%>
+
+<div id="<%= cardId %>" class="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden <%= locals.class || '' %>">
+  <!-- Header -->
+  <div class="px-6 py-4 border-b border-dark-700">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <% if (locals.title) { %>
+          <h3 class="text-lg font-semibold text-white mb-1">
+            <%= locals.title %>
+          </h3>
+        <% } %>
+        <% if (locals.subtitle) { %>
+          <p class="text-sm text-dark-400">
+            <%= locals.subtitle %>
+          </p>
+        <% } %>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <% if (showSearch) { %>
+          <div class="relative">
+            <input
+              type="text"
+              placeholder="<%= searchPlaceholder %>"
+              class="table-search bg-dark-700 border border-dark-600 text-dark-200 text-sm rounded-lg pl-9 pr-3 py-2 w-48 sm:w-64 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              data-table-id="<%= cardId %>"
+            >
+            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-dark-400 text-sm"></i>
+          </div>
+        <% } %>
+
+        <% if (showFilter && locals.filterOptions) { %>
+          <select class="table-filter bg-dark-700 border border-dark-600 text-dark-200 text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" data-table-id="<%= cardId %>">
+            <option value="">Semua</option>
+            <% locals.filterOptions.forEach(option => { %>
+              <option value="<%= option.value %>">
+                <%= option.label %>
+              </option>
+            <% }); %>
+          </select>
+        <% } %>
+
+        <% if (showExport) { %>
+          <button class="table-export bg-dark-700 hover:bg-dark-600 text-dark-200 border border-dark-600 text-sm rounded-lg px-3 py-2 transition-colors duration-200 flex items-center" data-table-id="<%= cardId %>">
+            <i class="fas fa-download mr-2"></i>
+            Export
+          </button>
+        <% } %>
+
+        <% if (showRefresh) { %>
+          <button class="table-refresh bg-dark-700 hover:bg-dark-600 text-dark-200 border border-dark-600 text-sm rounded-lg px-3 py-2 transition-colors duration-200" data-table-id="<%= cardId %>">
+            <i class="fas fa-sync-alt"></i>
+          </button>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table Container -->
+  <div class="overflow-x-auto">
+    <% if (loading) { %>
+      <!-- Loading State -->
+      <div class="p-8">
+        <div class="flex items-center justify-center">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
+            <p class="text-dark-400">Memuat data...</p>
+          </div>
+        </div>
+      </div>
+    <% } else if (empty) { %>
+      <!-- Empty State -->
+      <div class="p-8">
+        <div class="text-center">
+          <i class="<%= emptyIcon %> text-4xl text-dark-600 mb-4"></i>
+          <p class="text-dark-400 text-lg"><%= emptyMessage %></p>
+        </div>
+      </div>
+    <% } else { %>
+      <!-- Table Content -->
+      <div class="table-content">
+        <%- body %>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Table Footer (Pagination) -->
+  <% if (!loading && !empty && locals.showPagination) { %>
+    <div class="px-6 py-4 border-t border-dark-700">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="text-sm text-dark-400">
+          Menampilkan <span class="font-medium text-white">1</span> hingga <span class="font-medium text-white">10</span> dari <span class="font-medium text-white">50</span> data
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="pagination-prev bg-dark-700 hover:bg-dark-600 text-dark-200 border border-dark-600 text-sm rounded-lg px-3 py-1 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <button class="bg-dark-700 hover:bg-dark-600 text-white border border-dark-600 text-sm rounded-lg px-3 py-1 transition-colors duration-200">1</button>
+          <button class="bg-dark-700 hover:bg-dark-600 text-dark-200 border border-dark-600 text-sm rounded-lg px-3 py-1 transition-colors duration-200">2</button>
+          <button class="bg-dark-700 hover:bg-dark-600 text-dark-200 border border-dark-600 text-sm rounded-lg px-3 py-1 transition-colors duration-200">3</button>
+          <button class="pagination-next bg-dark-700 hover:bg-dark-600 text-dark-200 border border-dark-600 text-sm rounded-lg px-3 py-1 transition-colors duration-200">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<!-- Table Interaction Script -->
+<script>
+  (function() {
+    const tableId = '<%= cardId %>';
+
+    // Search functionality
+    const searchInput = document.querySelector(`.table-search[data-table-id="${tableId}"]`);
+    if (searchInput) {
+      searchInput.addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const table = document.querySelector(`#${tableId} table`);
+        if (!table) return;
+
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+          const text = row.textContent.toLowerCase();
+          row.style.display = text.includes(searchTerm) ? '' : 'none';
+        });
+
+        // Trigger search event
+        const event = new CustomEvent('tableSearch', {
+          detail: {
+            tableId: tableId,
+            searchTerm: searchTerm
+          }
+        });
+        document.dispatchEvent(event);
+      });
+    }
+
+    // Filter functionality
+    const filterSelect = document.querySelector(`.table-filter[data-table-id="${tableId}"]`);
+    if (filterSelect) {
+      filterSelect.addEventListener('change', function(e) {
+        const filterValue = e.target.value;
+
+        // Trigger filter event
+        const event = new CustomEvent('tableFilter', {
+          detail: {
+            tableId: tableId,
+            filterValue: filterValue
+          }
+        });
+        document.dispatchEvent(event);
+      });
+    }
+
+    // Export functionality
+    const exportButton = document.querySelector(`.table-export[data-table-id="${tableId}"]`);
+    if (exportButton) {
+      exportButton.addEventListener('click', function() {
+        // Trigger export event
+        const event = new CustomEvent('tableExport', {
+          detail: {
+            tableId: tableId
+          }
+        });
+        document.dispatchEvent(event);
+      });
+    }
+
+    // Refresh functionality
+    const refreshButton = document.querySelector(`.table-refresh[data-table-id="${tableId}"]`);
+    if (refreshButton) {
+      refreshButton.addEventListener('click', function() {
+        const icon = this.querySelector('i');
+        icon.classList.add('fa-spin');
+
+        // Trigger refresh event
+        const event = new CustomEvent('tableRefresh', {
+          detail: {
+            tableId: tableId
+          }
+        });
+        document.dispatchEvent(event);
+
+        // Stop spinning after 2 seconds
+        setTimeout(() => {
+          icon.classList.remove('fa-spin');
+        }, 2000);
+      });
+    }
+
+    // Pagination functionality
+    const prevButton = document.querySelector(`#${tableId} .pagination-prev`);
+    const nextButton = document.querySelector(`#${tableId} .pagination-next`);
+
+    if (prevButton) {
+      prevButton.addEventListener('click', function() {
+        // Trigger pagination event
+        const event = new CustomEvent('tablePagination', {
+          detail: {
+            tableId: tableId,
+            direction: 'prev'
+          }
+        });
+        document.dispatchEvent(event);
+      });
+    }
+
+    if (nextButton) {
+      nextButton.addEventListener('click', function() {
+        // Trigger pagination event
+        const event = new CustomEvent('tablePagination', {
+          detail: {
+            tableId: tableId,
+            direction: 'next'
+          }
+        });
+        document.dispatchEvent(event);
+      });
+    }
+  })();
+</script>

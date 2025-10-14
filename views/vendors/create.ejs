@@ -1,0 +1,301 @@
+<%- include('../partials/header', { title: 'Tambah Vendor', currentUrl: '/vendors/create' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Tambah Vendor</h1>
+            <p class="text-slate-400">Tambahkan vendor atau supplier baru ke sistem</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="/vendors" class="inline-flex items-center px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors duration-200">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Kembali
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Main Form -->
+    <div class="lg:col-span-2">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <!-- Form Header -->
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h2 class="text-xl font-semibold text-white">Informasi Vendor</h2>
+            </div>
+
+            <!-- Form Content -->
+            <div class="p-6">
+                <% if (typeof error !== 'undefined' && error) { %>
+                    <div class="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg" role="alert">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-triangle text-red-400 mr-3"></i>
+                            <span class="text-red-200"><%= error %></span>
+                        </div>
+                    </div>
+                <% } %>
+
+                <form id="vendorForm" method="POST" novalidate class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Nama Vendor -->
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-slate-300 mb-2">
+                                Nama Vendor <span class="text-red-400">*</span>
+                            </label>
+                            <input type="text" id="name" name="name"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.name : '' %>" required
+                                   placeholder="Masukkan nama vendor"
+                                   class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                            <p class="mt-1 text-xs text-red-400 hidden" id="nameError">Nama vendor harus diisi</p>
+                        </div>
+
+                        <!-- Status -->
+                        <div>
+                            <label for="status" class="block text-sm font-medium text-slate-300 mb-2">
+                                Status <span class="text-red-400">*</span>
+                            </label>
+                            <select id="status" name="status" required class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                                <option value="active" <%= (typeof formData === 'undefined' || !formData || formData.status === 'active') ? 'selected' : '' %>>Aktif</option>
+                                <option value="inactive" <%= (typeof formData !== 'undefined' && formData && formData.status === 'inactive') ? 'selected' : '' %>>Tidak Aktif</option>
+                            </select>
+                            <p class="mt-1 text-xs text-red-400 hidden" id="statusError">Status harus dipilih</p>
+                        </div>
+
+                        <!-- Kontak Person -->
+                        <div>
+                            <label for="contact_person" class="block text-sm font-medium text-slate-300 mb-2">Kontak Person</label>
+                            <input type="text" id="contact_person" name="contact_person"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.contact_person : '' %>"
+                                   placeholder="Nama kontak person"
+                                   class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                        </div>
+
+                        <!-- Telepon -->
+                        <div>
+                            <label for="phone" class="block text-sm font-medium text-slate-300 mb-2">Telepon</label>
+                            <input type="tel" id="phone" name="phone"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.phone : '' %>"
+                                   placeholder="08xxxxxxxxxx"
+                                   class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                        </div>
+
+                        <!-- Email -->
+                        <div class="md:col-span-2">
+                            <label for="email" class="block text-sm font-medium text-slate-300 mb-2">Email</label>
+                            <input type="email" id="email" name="email"
+                                   value="<%= typeof formData !== 'undefined' && formData ? formData.email : '' %>"
+                                   placeholder="vendor@example.com"
+                                   class="w-full h-10 px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2">
+                            <p class="mt-1 text-xs text-red-400 hidden" id="emailError">Format email tidak valid</p>
+                        </div>
+
+                        <!-- Alamat -->
+                        <div class="md:col-span-2">
+                            <label for="address" class="block text-sm font-medium text-slate-300 mb-2">Alamat</label>
+                            <textarea id="address" name="address" rows="4"
+                                      placeholder="Masukkan alamat lengkap vendor"
+                                      class="w-full px-4 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-green-500 focus:ring-green-500 focus:outline-none focus:ring-2"><%= typeof formData !== 'undefined' && formData ? formData.address : '' %></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 border-t border-slate-700">
+                        <a href="/vendors" class="inline-flex items-center px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors duration-200">
+                            <i class="fas fa-times-circle mr-2"></i>
+                            Batal
+                        </a>
+                        <button type="submit" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                            <i class="fas fa-save mr-2"></i>
+                            Simpan Vendor
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- Help Card -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">
+                    <i class="fas fa-info-circle mr-2 text-blue-400"></i>
+                    Panduan
+                </h3>
+            </div>
+            <div class="p-6">
+                <h4 class="font-semibold text-white mb-4">Menambah Vendor</h4>
+                <ul class="space-y-3 text-sm text-slate-300">
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-400 mt-1 mr-3 flex-shrink-0"></i>
+                        <span>Nama vendor harus unik dan tidak boleh sama dengan vendor yang sudah ada</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-400 mt-1 mr-3 flex-shrink-0"></i>
+                        <span>Status vendor akan menentukan apakah vendor muncul di pilihan voucher</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-400 mt-1 mr-3 flex-shrink-0"></i>
+                        <span>Vendor dengan status "Tidak Aktif" tidak akan muncul di dropdown pembuatan voucher</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-400 mt-1 mr-3 flex-shrink-0"></i>
+                        <span>Informasi kontak person, telepon, dan email bersifat opsional</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-yellow-400 mt-1 mr-3 flex-shrink-0"></i>
+                        <span>Vendor yang sudah memiliki voucher tidak dapat dihapus</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg">
+            <div class="px-6 py-4 border-b border-slate-700 bg-slate-900/30">
+                <h3 class="text-lg font-semibold text-white">
+                    <i class="fas fa-chart-bar mr-2 text-purple-400"></i>
+                    Statistik Vendor
+                </h3>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
+                        <span class="text-sm text-slate-300">Total Vendor</span>
+                        <span class="font-bold text-white" id="totalVendors">-</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
+                        <span class="text-sm text-slate-300">Vendor Aktif</span>
+                        <span class="font-bold text-green-400" id="activeVendors">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form validation
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('vendorForm');
+
+    form.addEventListener('submit', function(event) {
+        if (!validateForm()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    });
+
+    function validateForm() {
+        let isValid = true;
+
+        // Reset error states
+        document.querySelectorAll('.text-red-400').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('input, select').forEach(el => {
+            el.classList.remove('border-red-500', 'focus:ring-red-500');
+            el.classList.add('border-slate-600', 'focus:ring-green-500');
+        });
+
+        // Validate name
+        const nameInput = document.getElementById('name');
+        if (!nameInput.value.trim()) {
+            showFieldError(nameInput, 'nameError');
+            isValid = false;
+        }
+
+        // Validate status
+        const statusInput = document.getElementById('status');
+        if (!statusInput.value) {
+            showFieldError(statusInput, 'statusError');
+            isValid = false;
+        }
+
+        // Validate email if provided
+        const emailInput = document.getElementById('email');
+        if (emailInput.value && !isValidEmail(emailInput.value)) {
+            showFieldError(emailInput, 'emailError');
+            isValid = false;
+        }
+
+        return isValid;
+    }
+
+    function showFieldError(input, errorId) {
+        input.classList.remove('border-slate-600', 'focus:ring-green-500');
+        input.classList.add('border-red-500', 'focus:ring-red-500');
+        document.getElementById(errorId).classList.remove('hidden');
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    // Load vendor statistics
+    fetch('/api/vendors/stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('totalVendors').textContent = data.total || 0;
+            document.getElementById('activeVendors').textContent = data.active || 0;
+        })
+        .catch(error => {
+            console.error('Failed to load vendor statistics:', error);
+            document.getElementById('totalVendors').textContent = '0';
+            document.getElementById('activeVendors').textContent = '0';
+        });
+
+    // Real-time name validation
+    const nameInput = document.getElementById('name');
+    let nameCheckTimeout;
+
+    nameInput.addEventListener('input', function() {
+        clearTimeout(nameCheckTimeout);
+        const nameError = document.getElementById('nameError');
+
+        if (!this.value.trim()) {
+            nameError.textContent = 'Nama vendor harus diisi';
+            return;
+        }
+
+        nameCheckTimeout = setTimeout(() => {
+            checkNameAvailability(this.value.trim());
+        }, 500);
+    });
+
+    function checkNameAvailability(name) {
+        fetch(`/api/vendors/check-name?name=${encodeURIComponent(name)}`)
+            .then(response => response.json())
+            .then(data => {
+                const nameError = document.getElementById('nameError');
+                if (data.exists) {
+                    nameError.textContent = 'Nama vendor sudah digunakan';
+                    nameError.classList.remove('hidden');
+                    nameInput.classList.add('border-red-500', 'focus:ring-red-500');
+                } else {
+                    nameError.classList.add('hidden');
+                    nameInput.classList.remove('border-red-500', 'focus:ring-red-500');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to check vendor name:', error);
+            });
+    }
+
+    // Email validation on blur
+    const emailInput = document.getElementById('email');
+    emailInput.addEventListener('blur', function() {
+        const emailError = document.getElementById('emailError');
+        if (this.value && !isValidEmail(this.value)) {
+            emailError.textContent = 'Format email tidak valid';
+            emailError.classList.remove('hidden');
+            this.classList.add('border-red-500', 'focus:ring-red-500');
+        } else {
+            emailError.classList.add('hidden');
+            this.classList.remove('border-red-500', 'focus:ring-red-500');
+        }
+    });
+});
+</script>
+
+<%- include('../partials/footer') %>

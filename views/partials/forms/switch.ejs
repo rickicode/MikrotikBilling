@@ -1,0 +1,164 @@
+<%-
+  /**
+   * Shadcn-style Switch Component
+   * Variables:
+   * - name: Input name attribute (string, required)
+   * - id: Switch ID (string, optional, defaults to name)
+   * - label: Switch label (string, optional)
+   * - description: Additional description text (string, optional)
+   * - checked: Whether switch is checked (boolean, default: false)
+   * - required: Mark as required (boolean, default: false)
+   * - disabled: Disable switch (boolean, default: false)
+   * - error: Error message (string, optional)
+   * - size: Switch size (sm, md, lg, default: 'md')
+   * - class: Additional CSS classes (string, optional)
+   * - value: Switch value when checked (string, default: 'true')
+   */
+
+  // Set defaults
+  const size = locals.size || 'md';
+  const required = locals.required === true;
+  const disabled = locals.disabled === true;
+  const checked = locals.checked === true;
+  const inputId = locals.id || locals.name;
+  const error = locals.error || '';
+  const value = locals.value || 'true';
+  const label = locals.label || '';
+  const description = locals.description || '';
+
+  // Size configurations
+  const sizeVariants = {
+    sm: {
+      switch: 'h-5 w-9',
+      thumb: 'h-4 w-4',
+      translate: 'translate-x-4'
+    },
+    md: {
+      switch: 'h-6 w-11',
+      thumb: 'h-5 w-5',
+      translate: 'translate-x-5'
+    },
+    lg: {
+      switch: 'h-7 w-13',
+      thumb: 'h-6 w-6',
+      translate: 'translate-x-6'
+    }
+  };
+
+  const currentSize = sizeVariants[size] || sizeVariants.md;
+
+  // State classes
+  const stateClasses = {
+    default: {
+      track: 'bg-slate-700 peer-checked:bg-blue-600',
+      thumb: 'bg-white peer-checked:translate-x-5'
+    },
+    error: {
+      track: 'bg-red-900 peer-checked:bg-red-600',
+      thumb: 'bg-white peer-checked:translate-x-5'
+    },
+    disabled: {
+      track: 'bg-slate-800 peer-checked:bg-slate-600',
+      thumb: 'bg-slate-400 peer-checked:translate-x-5'
+    }
+  };
+
+  const currentState = error ? 'error' : (disabled ? 'disabled' : 'default');
+  const stateClass = stateClasses[currentState];
+
+  // Label classes
+  const labelClasses = {
+    default: 'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-300',
+    error: 'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-red-400',
+    disabled: 'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-500'
+  };
+
+  const currentLabelClass = error ? labelClasses.error : (disabled ? labelClasses.disabled : labelClasses.default);
+%>
+
+<div class="flex items-center space-x-3 <%= locals.class || '' %>">
+  <% if (label && description) { %>
+    <div class="flex flex-col space-y-1">
+      <label
+        for="<%= inputId %>"
+        class="<%= currentLabelClass %> <%= required ? 'after:content-[\"*\"] after:ml-1 after:text-red-400' : '' %>"
+      >
+        <%= label %>
+      </label>
+      <% if (description) { %>
+        <p class="text-xs text-slate-400"><%= description %></p>
+      <% } %>
+      <% if (error) { %>
+        <p class="text-xs text-red-400 flex items-center gap-1">
+          <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <%= error %>
+        </p>
+      <% } %>
+    </div>
+  <% } else if (label) { %>
+    <label
+      for="<%= inputId %>"
+      class="<%= currentLabelClass %> <%= required ? 'after:content-[\"*\"] after:ml-1 after:text-red-400' : '' %>"
+    >
+      <%= label %>
+    </label>
+    <% if (error) { %>
+      <p class="text-xs text-red-400 flex items-center gap-1">
+        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <%= error %>
+      </p>
+    <% } %>
+  <% } %>
+
+  <div class="relative inline-flex items-center">
+    <input
+      type="checkbox"
+      id="<%= inputId %>"
+      name="<%= locals.name %>"
+      value="<%= value %>"
+      <%= checked ? 'checked' : '' %>
+      <%= required ? 'required' : '' %>
+      <%= disabled ? 'disabled' : '' %>
+      class="sr-only peer"
+    />
+    <div
+      class="<%= currentSize.switch %> peer peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 peer-focus:ring-opacity-50 rounded-full peer transition-colors duration-200 ease-in-out <%= stateClass.track %>"
+    >
+      <div
+        class="<%= currentSize.thumb %> bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out <%= currentSize.translate %> peer-checked:translate-x-5"
+      ></div>
+    </div>
+  </div>
+
+  <% if (!label && description) { %>
+    <p class="text-xs text-slate-400"><%= description %></p>
+    <% if (error) { %>
+      <p class="text-xs text-red-400 flex items-center gap-1">
+        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <%= error %>
+      </p>
+    <% } %>
+  <% } %>
+</div>
+
+<script>
+  (function() {
+    const switchInput = document.getElementById('<%= inputId %>');
+    if (switchInput) {
+      switchInput.addEventListener('change', function() {
+        const thumb = this.nextElementSibling.querySelector('div');
+        if (this.checked) {
+          thumb.style.transform = 'translateX(<%= parseInt(currentSize.translate.replace('translate-x-', '')) * 2 %>px)';
+        } else {
+          thumb.style.transform = 'translateX(0)';
+        }
+      });
+    }
+  })();
+</script>
