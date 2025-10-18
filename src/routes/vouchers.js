@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const AuthMiddleware = require('../middleware/auth');
 const { db } = require('../database/DatabaseManager');
 const MikrotikClient = require('../services/MikrotikClient');
+const { ApiErrorHandler } = require('../middleware/apiErrorHandler');
 
 // Helper functions for detailed error handling
 function logDetailedError(fastify, error, request, context = {}) {
@@ -675,243 +676,227 @@ async function voucherRoutes(fastify, options) {
 
   // API Routes for dynamic content
   // API: Get vouchers with JSON response
-  fastify.get('/api/vouchers', {}, async (request, reply) => {
-    try {
-      const page = parseInt(request.query.page) || 1;
-      const pageSize = parseInt(request.query.page_size) || 10;
-      const offset = (page - 1) * pageSize;
-      const search = request.query.search || '';
-      const profile = request.query.profile || '';
-      const status = request.query.status || '';
-      const dateRange = request.query.dateRange || '';
-      const vendor = request.query.vendor || '';
-      const batchId = request.query.batch_id || '';
+  fastify.get('/api/vouchers', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const page = parseInt(request.query.page) || 1;
+    const pageSize = parseInt(request.query.page_size) || 10;
+    const offset = (page - 1) * pageSize;
+    const search = request.query.search || '';
+    const profile = request.query.profile || '';
+    const status = request.query.status || '';
+    const dateRange = request.query.dateRange || '';
+    const vendor = request.query.vendor || '';
+    const batchId = request.query.batch_id || '';
 
-      let whereClause = 'WHERE 1=1';
-      const params = [];
+    let whereClause = 'WHERE 1=1';
+    const params = [];
 
-      if (search) {
-        whereClause += ' AND (v.code LIKE $1 OR v.batch_id LIKE $2)';
-        params.push(`%${search}%`, `%${search}%`);
-      }
-
-      if (profile) {
-        whereClause += ` AND p.name = $${params.length + 1}`;
-        params.push(profile);
-      }
-
-      if (status) {
-        whereClause += ` AND v.status = $${params.length + 1}`;
-        params.push(status);
-      }
-
-      if (dateRange) {
-        whereClause += ` AND DATE(v.created_at) = $${params.length + 1}`;
-        params.push(dateRange);
-      }
-
-      if (vendor) {
-        whereClause += ` AND v.vendor_id = $${params.length + 1}`;
-        params.push(vendor);
-      }
-
-      if (batchId) {
-        whereClause += ` AND v.batch_id = $${params.length + 1}`;
-        params.push(batchId);
-      }
-
-      const vouchersResult = await db.query(`
-        SELECT v.*, p.name as profileName,
-               NULL as batchQuantity, NULL as batchCreatedAt,
-               NULL as createdByUsername,
-               vd.name as vendorName
-        FROM vouchers v
-        JOIN profiles p ON v.profile_id = p.id
-        LEFT JOIN vendors vd ON v.vendor_id = vd.id
-        ${whereClause}
-        ORDER BY v.created_at DESC
-        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-      `, [...params, pageSize, offset]);
-      const vouchers = vouchersResult.rows || [];
-
-      const totalResult = await db.query(`
-        SELECT COUNT(*) as count FROM vouchers v JOIN profiles p ON v.profile_id = p.id
-        LEFT JOIN vendors vd ON v.vendor_id = vd.id
-        ${whereClause}
-      `, params);
-      const total = totalResult.rows && totalResult.rows.length > 0 ? parseInt(totalResult.rows[0].count) : 0;
-
-      // Calculate statistics
-      const statsResult = await db.query(`
-        SELECT
-          COUNT(*) as total,
-          SUM(CASE WHEN v.status = 'available' THEN 1 ELSE 0 END) as available,
-          SUM(CASE WHEN v.status = 'used' THEN 1 ELSE 0 END) as used,
-          SUM(CASE WHEN v.status = 'expired' THEN 1 ELSE 0 END) as expired,
-          SUM(CASE WHEN v.status = 'used' THEN v.price_sell ELSE 0 END) as revenue
-        FROM vouchers v JOIN profiles p ON v.profile_id = p.id
-        ${whereClause}
-      `, params);
-      const stats = statsResult.rows && statsResult.rows.length > 0 ? statsResult.rows[0] : {};
-
-      return reply.send({
-        vouchers: vouchers.map(v => ({
-          id: v.id,
-          code: v.code,
-          profileName: v.profileName,
-          vendorName: v.vendorName,
-          priceSell: v.price_sell,
-          priceCost: v.price_cost,
-          expiredDays: v.duration_hours ? Math.ceil(v.duration_hours / 24) : 0,
-          expiredHours: v.expired_hours || 0,
-          expiredMinutes: v.expired_minutes || 0,
-          status: v.status,
-          createdAt: v.created_at,
-          usedAt: v.used_at,
-          expiresAt: v.expires_at,
-          batchId: v.batch_id
-        })),
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize)
-        },
-        statistics: {
-          total: stats.total || 0,
-          available: stats.available || 0,
-          used: stats.used || 0,
-          expired: stats.expired || 0,
-          revenue: stats.revenue || 0
-        }
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      throw error;
+    if (search) {
+      whereClause += ' AND (v.code LIKE $1 OR v.batch_id LIKE $2)';
+      params.push(`%${search}%`, `%${search}%`);
     }
-  });
+
+    if (profile) {
+      whereClause += ` AND p.name = $${params.length + 1}`;
+      params.push(profile);
+    }
+
+    if (status) {
+      whereClause += ` AND v.status = $${params.length + 1}`;
+      params.push(status);
+    }
+
+    if (dateRange) {
+      whereClause += ` AND DATE(v.created_at) = $${params.length + 1}`;
+      params.push(dateRange);
+    }
+
+    if (vendor) {
+      whereClause += ` AND v.vendor_id = $${params.length + 1}`;
+      params.push(vendor);
+    }
+
+    if (batchId) {
+      whereClause += ` AND v.batch_id = $${params.length + 1}`;
+      params.push(batchId);
+    }
+
+    const vouchersResult = await db.query(`
+      SELECT v.*, p.name as profileName,
+             NULL as batchQuantity, NULL as batchCreatedAt,
+             NULL as createdByUsername,
+             vd.name as vendorName
+      FROM vouchers v
+      JOIN profiles p ON v.profile_id = p.id
+      LEFT JOIN vendors vd ON v.vendor_id = vd.id
+      ${whereClause}
+      ORDER BY v.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `, [...params, pageSize, offset]);
+    const vouchers = vouchersResult.rows || [];
+
+    const totalResult = await db.query(`
+      SELECT COUNT(*) as count FROM vouchers v JOIN profiles p ON v.profile_id = p.id
+      LEFT JOIN vendors vd ON v.vendor_id = vd.id
+      ${whereClause}
+    `, params);
+    const total = totalResult.rows && totalResult.rows.length > 0 ? parseInt(totalResult.rows[0].count) : 0;
+
+    // Calculate statistics
+    const statsResult = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN v.status = 'available' THEN 1 ELSE 0 END) as available,
+        SUM(CASE WHEN v.status = 'used' THEN 1 ELSE 0 END) as used,
+        SUM(CASE WHEN v.status = 'expired' THEN 1 ELSE 0 END) as expired,
+        SUM(CASE WHEN v.status = 'used' THEN v.price_sell ELSE 0 END) as revenue
+      FROM vouchers v JOIN profiles p ON v.profile_id = p.id
+      ${whereClause}
+    `, params);
+    const stats = statsResult.rows && statsResult.rows.length > 0 ? statsResult.rows[0] : {};
+
+    return reply.send({
+      vouchers: vouchers.map(v => ({
+        id: v.id,
+        code: v.code,
+        profileName: v.profileName,
+        vendorName: v.vendorName,
+        priceSell: v.price_sell,
+        priceCost: v.price_cost,
+        expiredDays: v.duration_hours ? Math.ceil(v.duration_hours / 24) : 0,
+        expiredHours: v.expired_hours || 0,
+        expiredMinutes: v.expired_minutes || 0,
+        status: v.status,
+        createdAt: v.created_at,
+        usedAt: v.used_at,
+        expiresAt: v.expires_at,
+        batchId: v.batch_id
+      })),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize)
+      },
+      statistics: {
+        total: stats.total || 0,
+        available: stats.available || 0,
+        used: stats.used || 0,
+        expired: stats.expired || 0,
+        revenue: stats.revenue || 0
+      }
+    });
+  }));
 
   // API: Export vouchers
   fastify.get('/api/vouchers/export', {
     preHandler: [auth.requireRole(['admin'])]
-  }, async (request, reply) => {
-    try {
-      const search = request.query.search || '';
-      const profile = request.query.profile || '';
-      const status = request.query.status || '';
-      const dateRange = request.query.dateRange || '';
-      const vendor = request.query.vendor || '';
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const search = request.query.search || '';
+    const profile = request.query.profile || '';
+    const status = request.query.status || '';
+    const dateRange = request.query.dateRange || '';
+    const vendor = request.query.vendor || '';
 
-      let whereClause = 'WHERE 1=1';
-      const params = [];
+    let whereClause = 'WHERE 1=1';
+    const params = [];
 
-      if (search) {
-        whereClause += ' AND (v.code LIKE $1 OR v.batch_id LIKE $2)';
-        params.push(`%${search}%`, `%${search}%`);
-      }
-
-      if (profile) {
-        whereClause += ` AND p.name = $${params.length + 1}`;
-        params.push(profile);
-      }
-
-      if (status) {
-        whereClause += ` AND v.status = $${params.length + 1}`;
-        params.push(status);
-      }
-
-      if (dateRange) {
-        whereClause += ` AND DATE(v.created_at) = $${params.length + 1}`;
-        params.push(dateRange);
-      }
-
-      if (vendor) {
-        whereClause += ` AND v.vendor_id = $${params.length + 1}`;
-        params.push(vendor);
-      }
-
-      const vouchersResult = await db.query(`
-        SELECT v.code, p.name as profile_name, v.price_sell, v.price_cost,
-               v.status, v.created_at, v.used_at, v.expires_at
-        FROM vouchers v JOIN profiles p ON v.profile_id = p.id
-        ${whereClause}
-        ORDER BY v.created_at DESC
-      `, params);
-      const vouchers = vouchersResult.rows || [];
-
-      // Generate CSV
-      const headers = ['Kode Voucher', 'Profile', 'Harga Jual', 'Harga Modal', 'Status', 'Dibuat', 'Digunakan', 'Kadaluarsa'];
-      const csvContent = [
-        headers.join(','),
-        ...vouchers.map(v => [
-          v.code,
-          v.profile_name,
-          v.price_sell,
-          v.price_cost,
-          v.status,
-          v.created_at,
-          v.used_at || '',
-          v.expires_at || ''
-        ].map(field => `"${field}"`).join(','))
-      ].join('\n');
-
-      reply.header('Content-Type', 'text/csv');
-      reply.header('Content-Disposition', `attachment; filename="vouchers_${new Date().toISOString().split('T')[0]}.csv"`);
-      return reply.send(csvContent);
-    } catch (error) {
-      fastify.log.error(error);
-      throw error;
+    if (search) {
+      whereClause += ' AND (v.code LIKE $1 OR v.batch_id LIKE $2)';
+      params.push(`%${search}%`, `%${search}%`);
     }
-  });
+
+    if (profile) {
+      whereClause += ` AND p.name = $${params.length + 1}`;
+      params.push(profile);
+    }
+
+    if (status) {
+      whereClause += ` AND v.status = $${params.length + 1}`;
+      params.push(status);
+    }
+
+    if (dateRange) {
+      whereClause += ` AND DATE(v.created_at) = $${params.length + 1}`;
+      params.push(dateRange);
+    }
+
+    if (vendor) {
+      whereClause += ` AND v.vendor_id = $${params.length + 1}`;
+      params.push(vendor);
+    }
+
+    const vouchersResult = await db.query(`
+      SELECT v.code, p.name as profile_name, v.price_sell, v.price_cost,
+             v.status, v.created_at, v.used_at, v.expires_at
+      FROM vouchers v JOIN profiles p ON v.profile_id = p.id
+      ${whereClause}
+      ORDER BY v.created_at DESC
+    `, params);
+    const vouchers = vouchersResult.rows || [];
+
+    // Generate CSV
+    const headers = ['Kode Voucher', 'Profile', 'Harga Jual', 'Harga Modal', 'Status', 'Dibuat', 'Digunakan', 'Kadaluarsa'];
+    const csvContent = [
+      headers.join(','),
+      ...vouchers.map(v => [
+        v.code,
+        v.profile_name,
+        v.price_sell,
+        v.price_cost,
+        v.status,
+        v.created_at,
+        v.used_at || '',
+        v.expires_at || ''
+      ].map(field => `"${field}"`).join(','))
+    ].join('\n');
+
+    reply.header('Content-Type', 'text/csv');
+    reply.header('Content-Disposition', `attachment; filename="vouchers_${new Date().toISOString().split('T')[0]}.csv"`);
+    return reply.send(csvContent);
+  }));
 
   // API: Get recent voucher activity
   fastify.get('/api/vouchers/recent-activity', {
     preHandler: [auth.requireRole(['admin', 'superadmin'])]
-  }, async (request, reply) => {
-    try {
-      const limit = parseInt(request.query.limit) || 10;
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const limit = parseInt(request.query.limit) || 10;
 
-      // Get recent batch activity from vouchers since batch table doesn't exist
-      const activitiesResult = await db.query(`
-        SELECT
-          v.batch_id,
-          COUNT(*) as quantity,
-          MAX(v.created_at) as created_at,
-          p.name as profile_name,
-          SUM(v.price_sell) as total_revenue,
-          SUM(v.price_cost) as total_cost,
-          (SUM(v.price_sell) - SUM(v.price_cost)) as total_profit,
-          NULL as created_by_username
-        FROM vouchers v
-        JOIN profiles p ON v.profile_id = p.id
-        GROUP BY v.batch_id, p.name
-        ORDER BY created_at DESC
-        LIMIT $1
-      `, [limit]);
-      const activities = activitiesResult.rows || [];
+    // Get recent batch activity from vouchers since batch table doesn't exist
+    const activitiesResult = await db.query(`
+      SELECT
+        v.batch_id,
+        COUNT(*) as quantity,
+        MAX(v.created_at) as created_at,
+        p.name as profile_name,
+        SUM(v.price_sell) as total_revenue,
+        SUM(v.price_cost) as total_cost,
+        (SUM(v.price_sell) - SUM(v.price_cost)) as total_profit,
+        NULL as created_by_username
+      FROM vouchers v
+      JOIN profiles p ON v.profile_id = p.id
+      GROUP BY v.batch_id, p.name
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [limit]);
+    const activities = activitiesResult.rows || [];
 
-      return reply.send(activities.map(activity => ({
-        batch_id: activity.batch_id,
-        quantity: activity.quantity,
-        profile_name: activity.profile_name,
-        total_revenue: activity.total_revenue,
-        total_cost: activity.total_cost,
-        total_profit: activity.total_profit,
-        created_at: activity.created_at,
-        created_by_username: activity.created_by_username
-      })));
-    } catch (error) {
-      fastify.log.error(error);
-      throw error;
-    }
-  });
+    return reply.send(activities.map(activity => ({
+      batch_id: activity.batch_id,
+      quantity: activity.quantity,
+      profile_name: activity.profile_name,
+      total_revenue: activity.total_revenue,
+      total_cost: activity.total_cost,
+      total_profit: activity.total_profit,
+      created_at: activity.created_at,
+      created_by_username: activity.created_by_username
+    })));
+  }));
 
   // API: Get single voucher details
   fastify.get('/api/vouchers/:id', {
     preHandler: [auth.requireRole(['admin', 'superadmin'])]
-  }, async (request, reply) => {
-    try {
-      const voucherResult = await db.query(
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const voucherResult = await db.query(
 `
         SELECT v.*, p.name as profileName,
                v.batch_id, NULL as batchQuantity,
@@ -921,31 +906,27 @@ async function voucherRoutes(fastify, options) {
         WHERE v.id = $1
       `, [request.params.id]
 );
-      const voucher = voucherResult.rows && voucherResult.rows.length > 0 ? voucherResult.rows[0] : null;
+    const voucher = voucherResult.rows && voucherResult.rows.length > 0 ? voucherResult.rows[0] : null;
 
-      if (!voucher) {
-        return reply.code(404).send({ error: 'Voucher not found' });
-      }
-
-      return reply.send({
-        id: voucher.id,
-        code: voucher.code,
-        profileName: voucher.profileName,
-        priceSell: voucher.price_sell,
-        priceCost: voucher.price_cost,
-        expiredDays: voucher.duration_hours ? Math.ceil(voucher.duration_hours / 24) : 0,
-        status: voucher.status,
-        createdAt: voucher.created_at,
-        usedAt: voucher.used_at,
-        expiresAt: voucher.expires_at,
-        batchId: voucher.batch_id,
-        comment: voucher.comment
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      throw error;
+    if (!voucher) {
+      return ApiErrorHandler.notFoundError(reply, 'Voucher not found');
     }
-  });
+
+    return reply.send({
+      id: voucher.id,
+      code: voucher.code,
+      profileName: voucher.profileName,
+      priceSell: voucher.price_sell,
+      priceCost: voucher.price_cost,
+      expiredDays: voucher.duration_hours ? Math.ceil(voucher.duration_hours / 24) : 0,
+      status: voucher.status,
+      createdAt: voucher.created_at,
+      usedAt: voucher.used_at,
+      expiresAt: voucher.expires_at,
+      batchId: voucher.batch_id,
+      comment: voucher.comment
+    });
+  }));
 
   // API: Print selected vouchers
   fastify.post('/api/vouchers/print', {
@@ -1282,110 +1263,105 @@ async function voucherRoutes(fastify, options) {
   // API: Generate vouchers
   fastify.post('/api/vouchers/generate', {
     preHandler: [auth.requireRole(['admin'])]
-  }, async (request, reply) => {
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
     const { profile_id, vendor_id, quantity, prefix, price_sell, price_cost, code_length, duration_days, duration_hours, duration_minutes, expired_hours } = request.body;
 
-    try {
-      // Get profile details
-      const profileResult = await db.query(
+    // Get profile details
+    const profileResult = await db.query(
 'SELECT * FROM profiles WHERE id = $1',
-        [profile_id]
+      [profile_id]
 );
-      const profile = profileResult.rows && profileResult.rows.length > 0 ? profileResult.rows[0] : null;
+    const profile = profileResult.rows && profileResult.rows.length > 0 ? profileResult.rows[0] : null;
 
-      if (!profile) {
-        return reply.code(400).send({ error: 'Profile not found' });
-      }
-
-      // Generate batch ID
-      const batchId = `VC-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-
-      // Calculate totals
-      const finalPriceSell = price_sell || profile.price_sell;
-      const finalPriceCost = price_cost || profile.price_cost;
-      const finalDurationHours = duration_hours || 0; // Duration must come from form, NOT from profile
-      const totalCost = finalPriceCost * quantity;
-      const totalRevenue = finalPriceSell * quantity;
-
-      // Create batch record - using batchId directly since voucher_batches table doesn't exist
-      const batchResult = batchId;
-
-      // Generate voucher codes
-      const vouchers = [];
-      const createdDate = new Date();
-
-      for (let i = 0; i < quantity; i++) {
-        const voucherCode = generateVoucherCode(prefix, i + 1, code_length, request.body.case_format);
-
-        // Calculate expires_at based on duration hours
-        let expiresAt = null;
-        if (finalDurationHours && finalDurationHours > 0) {
-          const expiryDate = new Date(createdDate);
-          expiryDate.setHours(expiryDate.getHours() + parseInt(finalDurationHours));
-          expiresAt = expiryDate.toISOString();
-        }
-
-        vouchers.push([
-          batchId,
-          voucherCode,
-          profile_id,
-          finalPriceSell,
-          finalPriceCost,
-          finalDurationHours,
-          expired_hours || 0,
-          expiresAt,
-          vendor_id || 1
-        ]);
-      }
-
-      // Insert vouchers
-      for (const voucher of vouchers) {
-        await db.query(`
-          INSERT INTO vouchers (batch_id, code, profile_id, price_sell, price_cost, duration_hours, expired_hours, expires_at, vendor_id, mikrotik_synced)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
-        `, voucher);
-      }
-
-      // Get created vouchers for response
-      const createdVouchersResult = await db.query(`
-        SELECT id, code, profile_id, price_sell, price_cost, expired_hours, created_at
-        FROM vouchers
-        WHERE batch_id = $1
-        ORDER BY created_at
-      `, [batchId]);
-      const createdVouchers = createdVouchersResult.rows || [];
-
-      // Log activity
-      await auth.logActivity(
-        request.admin.id,
-        'create_vouchers',
-        'voucher_batch',
-        batchResult,
-        {
-          batch_id: batchId,
-          profile: profile.name,
-          quantity,
-          total_cost: totalCost,
-          total_revenue: totalRevenue
-        },
-        request
-      );
-
-      return reply.send({
-        success: true,
-        batch_id: batchId,
-        quantity: quantity,
-        profile_name: profile.name,
-        total_revenue: totalRevenue,
-        total_cost: totalCost,
-        total_profit: totalRevenue - totalCost,
-        vouchers: createdVouchers
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      throw error;
+    if (!profile) {
+      return ApiErrorHandler.validationError(reply, 'Profile not found');
     }
-  });
+
+    // Generate batch ID
+    const batchId = `VC-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+
+    // Calculate totals
+    const finalPriceSell = price_sell || profile.price_sell;
+    const finalPriceCost = price_cost || profile.price_cost;
+    const finalDurationHours = duration_hours || 0; // Duration must come from form, NOT from profile
+    const totalCost = finalPriceCost * quantity;
+    const totalRevenue = finalPriceSell * quantity;
+
+    // Create batch record - using batchId directly since voucher_batches table doesn't exist
+    const batchResult = batchId;
+
+    // Generate voucher codes
+    const vouchers = [];
+    const createdDate = new Date();
+
+    for (let i = 0; i < quantity; i++) {
+      const voucherCode = generateVoucherCode(prefix, i + 1, code_length, request.body.case_format);
+
+      // Calculate expires_at based on duration hours
+      let expiresAt = null;
+      if (finalDurationHours && finalDurationHours > 0) {
+        const expiryDate = new Date(createdDate);
+        expiryDate.setHours(expiryDate.getHours() + parseInt(finalDurationHours));
+        expiresAt = expiryDate.toISOString();
+      }
+
+      vouchers.push([
+        batchId,
+        voucherCode,
+        profile_id,
+        finalPriceSell,
+        finalPriceCost,
+        finalDurationHours,
+        expired_hours || 0,
+        expiresAt,
+        vendor_id || 1
+      ]);
+    }
+
+    // Insert vouchers
+    for (const voucher of vouchers) {
+      await db.query(`
+        INSERT INTO vouchers (batch_id, code, profile_id, price_sell, price_cost, duration_hours, expired_hours, expires_at, vendor_id, mikrotik_synced)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
+      `, voucher);
+    }
+
+    // Get created vouchers for response
+    const createdVouchersResult = await db.query(`
+      SELECT id, code, profile_id, price_sell, price_cost, expired_hours, created_at
+      FROM vouchers
+      WHERE batch_id = $1
+      ORDER BY created_at
+    `, [batchId]);
+    const createdVouchers = createdVouchersResult.rows || [];
+
+    // Log activity
+    await auth.logActivity(
+      request.admin.id,
+      'create_vouchers',
+      'voucher_batch',
+      batchResult,
+      {
+        batch_id: batchId,
+        profile: profile.name,
+        quantity,
+        total_cost: totalCost,
+        total_revenue: totalRevenue
+      },
+      request
+    );
+
+    return reply.send({
+      success: true,
+      batch_id: batchId,
+      quantity: quantity,
+      profile_name: profile.name,
+      total_revenue: totalRevenue,
+      total_cost: totalCost,
+      total_profit: totalRevenue - totalCost,
+      vouchers: createdVouchers
+    });
+  }));
 
   // API: Sync vouchers with Mikrotik
   fastify.post('/api/vouchers/sync', {
@@ -1690,76 +1666,63 @@ async function voucherRoutes(fastify, options) {
   });
 
   // Get voucher statistics
-  fastify.get('/api/vouchers/statistics', {}, async (request, reply) => {
-    try {
-      // Get basic statistics
-      const totalResult = await db.query('SELECT COUNT(*) as count FROM vouchers');
-      const availableResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['available']);
-      const usedResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['used']);
-      const expiredResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['expired']);
-      const generatedTodayResult = await db.query(`
-        SELECT COUNT(*) as count
-        FROM vouchers
-        WHERE DATE(created_at) = CURRENT_DATE
-      `);
-      const revenueResult = await db.query(`
-        SELECT COALESCE(SUM(price_sell), 0) as total
-        FROM vouchers
-        WHERE status = $1
-      `, ['used']);
+  fastify.get('/api/vouchers/statistics', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    // Get basic statistics
+    const totalResult = await db.query('SELECT COUNT(*) as count FROM vouchers');
+    const availableResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['available']);
+    const usedResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['used']);
+    const expiredResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['expired']);
+    const generatedTodayResult = await db.query(`
+      SELECT COUNT(*) as count
+      FROM vouchers
+      WHERE DATE(created_at) = CURRENT_DATE
+    `);
+    const revenueResult = await db.query(`
+      SELECT COALESCE(SUM(price_sell), 0) as total
+      FROM vouchers
+      WHERE status = $1
+    `, ['used']);
 
-      const statistics = {
-        total: totalResult.rows && totalResult.rows.length > 0 ? totalResult.rows[0].count : 0,
-        available: availableResult.rows && availableResult.rows.length > 0 ? availableResult.rows[0].count : 0,
-        used: usedResult.rows && usedResult.rows.length > 0 ? usedResult.rows[0].count : 0,
-        expired: expiredResult.rows && expiredResult.rows.length > 0 ? expiredResult.rows[0].count : 0,
-        generated_today: generatedTodayResult.rows && generatedTodayResult.rows.length > 0 ? generatedTodayResult.rows[0].count : 0,
-        revenue: revenueResult.rows && revenueResult.rows.length > 0 ? revenueResult.rows[0].total : 0
-      };
+    const statistics = {
+      total: totalResult.rows && totalResult.rows.length > 0 ? totalResult.rows[0].count : 0,
+      available: availableResult.rows && availableResult.rows.length > 0 ? availableResult.rows[0].count : 0,
+      used: usedResult.rows && usedResult.rows.length > 0 ? usedResult.rows[0].count : 0,
+      expired: expiredResult.rows && expiredResult.rows.length > 0 ? expiredResult.rows[0].count : 0,
+      generated_today: generatedTodayResult.rows && generatedTodayResult.rows.length > 0 ? generatedTodayResult.rows[0].count : 0,
+      revenue: revenueResult.rows && revenueResult.rows.length > 0 ? revenueResult.rows[0].total : 0
+    };
 
-      // Get statistics by profile
-      const byProfileResult = await db.query(`
-        SELECT p.name as profile_name,
-               COUNT(v.id) as count,
-               COALESCE(SUM(v.price_sell), 0) as revenue
-        FROM vouchers v
-        LEFT JOIN profiles p ON v.profile_id = p.id
-        GROUP BY p.id, p.name
-        ORDER BY count DESC
-      `);
-      const byProfile = byProfileResult.rows || [];
+    // Get statistics by profile
+    const byProfileResult = await db.query(`
+      SELECT p.name as profile_name,
+             COUNT(v.id) as count,
+             COALESCE(SUM(v.price_sell), 0) as revenue
+      FROM vouchers v
+      LEFT JOIN profiles p ON v.profile_id = p.id
+      GROUP BY p.id, p.name
+      ORDER BY count DESC
+    `);
+    const byProfile = byProfileResult.rows || [];
 
-      // Get recent activity (last 7 days)
-      const recentActivityResult = await db.query(`
-        SELECT
-          DATE(created_at) as date,
-          COUNT(*) as created,
-          SUM(CASE WHEN status = 'used' THEN 1 ELSE 0 END) as used
-        FROM vouchers
-        WHERE created_at >= NOW() - INTERVAL '7 days'
-        GROUP BY DATE(created_at)
-        ORDER BY date DESC
-      `);
-      const recentActivity = recentActivityResult.rows || [];
+    // Get recent activity (last 7 days)
+    const recentActivityResult = await db.query(`
+      SELECT
+        DATE(created_at) as date,
+        COUNT(*) as created,
+        SUM(CASE WHEN status = 'used' THEN 1 ELSE 0 END) as used
+      FROM vouchers
+      WHERE created_at >= NOW() - INTERVAL '7 days'
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+    `);
+    const recentActivity = recentActivityResult.rows || [];
 
-      return reply.send({
-        statistics,
-        byProfile,
-        recentActivity
-      });
-    } catch (error) {
-      logDetailedError(fastify, error, request, {
-        operation: 'Get Voucher Statistics',
-        errorTitle: 'Database Query Failed'
-      });
-      return sendDetailedError(reply, error, request, {
-        errorTitle: 'Failed to Load Voucher Statistics',
-        details: {
-          query_section: 'statistics_aggregation'
-        }
-      });
-    }
-  });
+    return reply.send({
+      statistics,
+      byProfile,
+      recentActivity
+    });
+  }));
 }
 
 // Helper function to generate voucher codes

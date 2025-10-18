@@ -239,7 +239,8 @@ class MonitorManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({})
             });
 
             const result = await response.json();
@@ -273,7 +274,8 @@ class MonitorManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({})
             });
 
             const result = await response.json();
@@ -305,7 +307,8 @@ class MonitorManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({})
             });
 
             const result = await response.json();
@@ -423,40 +426,16 @@ Disabled PPPoE Users,${stats.disabledPPPoEUsers},${stats.timestamp}
     }
 
     showNotification(message, type = 'info') {
-        // Create toast notification
-        const toast = document.createElement('div');
-        toast.className = `toast align-items-center text-white bg-${type} border-0`;
-        toast.setAttribute('role', 'alert');
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        `;
-
-        // Add to container
-        const container = document.querySelector('.toast-container') || this.createToastContainer();
-        container.appendChild(toast);
-
-        // Show toast
-        const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: 5000 });
-        bsToast.show();
-
-        // Remove after hidden
-        toast.addEventListener('hidden.bs.toast', () => {
-            toast.remove();
-        });
+        // Use the existing showToast function from footer.ejs
+        if (typeof showToast === 'function') {
+            showToast(message, type, 5000);
+        } else {
+            // Fallback: Create simple notification if showToast is not available
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
     }
 
-    createToastContainer() {
-        const container = document.createElement('div');
-        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        document.body.appendChild(container);
-        return container;
-    }
-
+    
     formatDateTime(dateString) {
         if (!dateString) return '-';
         try {

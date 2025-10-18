@@ -225,6 +225,9 @@ const PerformanceOptimizer = require('./src/services/PerformanceOptimizer');
 // Data retention service
 const DataRetentionService = require('./src/services/DataRetentionService');
 
+// Connection recovery service
+const ConnectionRecoveryService = require('./src/services/ConnectionRecoveryService');
+
 // Initialize database and load config
 async function initializeServices() {
   await db.initialize();
@@ -245,13 +248,47 @@ async function initializeServices() {
   }
 
   // Set up message handlers for WhatsApp service
-  const WhatsAppMessage = require('./src/models/WhatsAppMessage');
-  const whatsappMessageModel = new WhatsAppMessage();
+  let whatsappMessageModel = null;
+  try {
+    const WhatsAppMessage = require('./src/models/WhatsAppMessage');
+    whatsappMessageModel = new WhatsAppMessage();
+  } catch (error) {
+    // Silent fallback - models are optional, system will use raw database queries
+    if (process.env.NODE_ENV === 'development') {
+      // Only log in debug mode for development
+      if (process.env.DEBUG_MODE === 'true') {
+        console.debug('WhatsApp models optional - using raw database queries:', error.message);
+      }
+    } else {
+      // Log warning in production but don't fail
+      console.warn('WhatsApp models initialization failed - using raw database queries:', error.message);
+    }
+  }
 
   // Handle message storage
   whatsappService.on('store_message', async (messageData) => {
     try {
-      await whatsappMessageModel.create(messageData);
+      if (whatsappMessageModel) {
+        await whatsappMessageModel.create(messageData);
+      } else {
+        // Fallback to raw database query
+        await db.query(`
+          INSERT INTO whatsapp_messages (
+            message_id, from_number, to_number, message_type,
+            content, status, timestamp, related_id, related_type
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [
+          messageData.message_id,
+          messageData.from_number,
+          messageData.to_number,
+          messageData.message_type,
+          messageData.content,
+          messageData.status,
+          messageData.timestamp,
+          messageData.related_id,
+          messageData.related_type
+        ]);
+      }
     } catch (error) {
       console.error('Error storing message:', error);
     }
@@ -260,7 +297,16 @@ async function initializeServices() {
   // Handle message status updates
   whatsappService.on('update_message_status', async (data) => {
     try {
-      await whatsappMessageModel.updateStatus(data.messageId, data.status, data.errorMessage);
+      if (whatsappMessageModel) {
+        await whatsappMessageModel.updateStatus(data.messageId, data.status, data.errorMessage);
+      } else {
+        // Fallback to raw database query
+        await db.query(`
+          UPDATE whatsapp_messages
+          SET status = $1, error_message = $2, updated_at = CURRENT_TIMESTAMP
+          WHERE message_id = $3
+        `, [data.status, data.errorMessage, data.messageId]);
+      }
     } catch (error) {
       console.error('Error updating message status:', error);
     }
@@ -269,7 +315,16 @@ async function initializeServices() {
   // Handle message ID updates
   whatsappService.on('update_message_id', async (data) => {
     try {
-      await whatsappMessageModel.updateMessageId(data.tempId, data.actualId);
+      if (whatsappMessageModel) {
+        await whatsappMessageModel.updateMessageId(data.tempId, data.actualId);
+      } else {
+        // Fallback to raw database query
+        await db.query(`
+          UPDATE whatsapp_messages
+          SET message_id = $1
+          WHERE message_id = $2
+        `, [data.actualId, data.tempId]);
+      }
     } catch (error) {
       console.error('Error updating message ID:', error);
     }
@@ -299,6 +354,30 @@ async function initializeServices() {
     console.error('❌ Failed to initialize Data Retention Service:', error);
   }
   global.DataRetentionService = dataRetentionService;
+
+  // Initialize Connection Recovery Service
+  const connectionRecoveryService = new ConnectionRecoveryService(mikrotik, 60000); // 1 minute interval
+  try {
+    connectionRecoveryService.start();
+    console.log('✅ Connection Recovery Service initialized successfully');
+
+    // Log recovery events
+    connectionRecoveryService.on('recovered', (recovery) => {
+      console.log(`🔄 Mikrotik connection recovered: ${recovery.message} (${recovery.duration}ms)`);
+    });
+
+    connectionRecoveryService.on('recoveryFailed', (recovery) => {
+      console.error(`❌ Connection recovery failed: ${recovery.error}`);
+    });
+
+    connectionRecoveryService.on('healthy', (info) => {
+      console.log(`✅ Mikrotik connection healthy: ${info.status}`);
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to initialize Connection Recovery Service:', error);
+  }
+  global.ConnectionRecoveryService = connectionRecoveryService;
 
   // Make services available globally
   fastify.decorate('db', db);

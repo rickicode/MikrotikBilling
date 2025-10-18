@@ -14,7 +14,7 @@
             </button>
             <button id="saveSettingsBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
                 <i class="fas fa-save mr-2"></i>
-                Simpan
+                Simpan Semua Pengaturan
             </button>
         </div>
     </div>
@@ -63,16 +63,7 @@
                 <i class="fas fa-bell mr-2"></i>
                 Notifikasi
             </button>
-            <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-                    id="payment-tab"
-                    data-tab="payment"
-                    role="tab"
-                    aria-selected="false"
-                    aria-controls="payment-panel">
-                <i class="fas fa-credit-card mr-2"></i>
-                Pembayaran
-            </button>
-            <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                <button class="settings-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
                     id="system-tab"
                     data-tab="system"
                     role="tab"
@@ -150,14 +141,7 @@
                     </div>
                 </div>
 
-                <!-- General Save Button -->
-                <div class="mt-6 flex justify-end">
-                    <button type="button" id="saveGeneralBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
-                        <i class="fas fa-save mr-2"></i>
-                        Simpan
-                    </button>
-                </div>
-            </form>
+              </form>
         </div>
 
         <!-- Mikrotik Settings Panel -->
@@ -286,31 +270,23 @@
                     </div>
                 </div>
 
-                <!-- Mikrotik Save Button -->
-                <div class="mt-6 flex justify-end">
-                    <button type="button" id="saveMikrotikBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
-                        <i class="fas fa-save mr-2"></i>
-                        Simpan
-                    </button>
-                </div>
-            </form>
+               </form>
         </div>
 
         <!-- Database Settings Panel -->
         <div id="database-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="database-tab">
             <form id="databaseSettingsForm" class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="databaseType" class="block text-sm font-medium text-slate-300 mb-2">
-                            Database Type
-                        </label>
-                        <select id="databaseType"
-                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
-                            <option value="sqlite" <%= settings?.database_type === 'sqlite' ? 'selected' : '' %>>SQLite</option>
-                            <option value="postgresql" <%= settings?.database_type === 'postgresql' ? 'selected' : '' %>>PostgreSQL</option>
-                            <option value="supabase" <%= settings?.database_type === 'supabase' ? 'selected' : '' %>>Supabase</option>
-                        </select>
+                <div class="bg-blue-900/20 border border-blue-700/30 rounded-lg p-4 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-database text-blue-400 mr-3"></i>
+                        <div>
+                            <h3 class="text-sm font-medium text-white">PostgreSQL Database</h3>
+                            <p class="text-xs text-slate-400">Sistem menggunakan PostgreSQL dengan Supabase hosting</p>
+                        </div>
                     </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-1 gap-6">
                     <div>
                         <label for="backupInterval" class="block text-sm font-medium text-slate-300 mb-2">
                             Backup Interval (menit)
@@ -320,6 +296,7 @@
                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                                value="<%= settings?.backup_interval || 60 %>"
                                min="5">
+                        <p class="mt-1 text-xs text-slate-500">Interval otomatis untuk backup database</p>
                     </div>
                 </div>
                 <div class="space-y-4">
@@ -343,14 +320,7 @@
                     </div>
                 </div>
 
-                <!-- Database Save Button -->
-                <div class="mt-6 flex justify-end">
-                    <button type="button" id="saveDatabaseBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
-                        <i class="fas fa-save mr-2"></i>
-                        Simpan
-                    </button>
-                </div>
-            </form>
+                </form>
         </div>
 
         <!-- Notification Settings Panel -->
@@ -412,81 +382,10 @@
                     </div>
                 </div>
 
-                <!-- Notification Save Button -->
-                <div class="mt-6 flex justify-end">
-                    <button type="button" id="saveNotificationBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
-                        <i class="fas fa-save mr-2"></i>
-                        Simpan
-                    </button>
-                </div>
-            </form>
+                  </form>
         </div>
 
-        <!-- Payment Settings Panel -->
-        <div id="payment-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="payment-tab">
-            <form id="paymentSettingsForm" class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="duitkuMerchantCode" class="block text-sm font-medium text-slate-300 mb-2">
-                            DuitKu Merchant Code
-                        </label>
-                        <input type="text"
-                               id="duitkuMerchantCode"
-                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                               value="<%= settings?.duitku_merchant_code || '' %>">
-                    </div>
-                    <div>
-                        <label for="duitkuApiKey" class="block text-sm font-medium text-slate-300 mb-2">
-                            DuitKu API Key
-                        </label>
-                        <input type="password"
-                               id="duitkuApiKey"
-                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                               value="<%= settings?.duitku_api_key || '' %>">
-                    </div>
-                    <div>
-                        <label for="duitkuEnvironment" class="block text-sm font-medium text-slate-300 mb-2">
-                            DuitKu Environment
-                        </label>
-                        <select id="duitkuEnvironment"
-                                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
-                            <option value="sandbox" <%= settings?.duitku_environment === 'sandbox' ? 'selected' : '' %>>Sandbox</option>
-                            <option value="production" <%= settings?.duitku_environment === 'production' ? 'selected' : '' %>>Production</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="duitkuCallbackUrl" class="block text-sm font-medium text-slate-300 mb-2">
-                            Callback URL
-                        </label>
-                        <input type="url"
-                               id="duitkuCallbackUrl"
-                               class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                               value="<%= settings?.duitku_callback_url || '' %>"
-                               placeholder="https://yourdomain.com/api/duitku/callback">
-                    </div>
-                </div>
-                <div>
-                    <div class="flex items-center">
-                        <input type="checkbox"
-                               id="enableDuitku"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded bg-slate-700"
-                               <%= settings?.enable_duitku ? 'checked' : '' %>>
-                        <label for="enableDuitku" class="ml-2 block text-sm text-slate-300">
-                            Enable DuitKu Payment
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Payment Save Button -->
-                <div class="mt-6 flex justify-end">
-                    <button type="button" id="savePaymentBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
-                        <i class="fas fa-save mr-2"></i>
-                        Simpan
-                    </button>
-                </div>
-            </form>
-        </div>
-
+  
         <!-- System Settings Panel -->
         <div id="system-panel" class="settings-panel hidden" role="tabpanel" aria-labelledby="system-tab">
             <form id="systemSettingsForm" class="space-y-6">
@@ -595,14 +494,7 @@
                     </div>
                 </div>
 
-                <!-- System Save Button -->
-                <div class="mt-6 flex justify-end">
-                    <button type="button" id="saveSystemBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
-                        <i class="fas fa-save mr-2"></i>
-                        Simpan
-                    </button>
-                </div>
-            </form>
+                </form>
         </div>
     </div>
 
@@ -619,17 +511,11 @@
                     Export
                 </button>
             </div>
-            <div class="flex flex-wrap gap-3">
-                  <button id="saveAllSettingsBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800" disabled>
-                    <i class="fas fa-check mr-2"></i>
-                    Simpan Semua
-                </button>
-            </div>
-
+    
   
 <!-- Test Connection Modal -->
 <div id="testConnectionModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-md w-full mx-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-md w-full mx-4 transform -translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2">
         <div class="px-6 py-4 border-b border-slate-700">
             <div class="flex items-center justify-between">
                 <h3 id="modal-title" class="text-lg font-semibold text-white">Test Koneksi Mikrotik</h3>

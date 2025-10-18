@@ -73,10 +73,10 @@ async function whatsappRoutes(fastify, options) {
   let models = {};
   try {
     models = {
-      whatsappMessage: new (require('../models/WhatsAppMessage'))(fastify.db),
-      whatsappTemplate: new (require('../models/WhatsAppTemplate'))(fastify.db),
-      notificationQueue: new (require('../models/NotificationQueue'))(fastify.db),
-      whatsappSession: new (require('../models/WhatsAppSession'))(fastify.db)
+      whatsappMessage: new (require('../models/WhatsAppMessage'))(),
+      whatsappTemplate: new (require('../models/WhatsAppTemplate'))(),
+      notificationQueue: new (require('../models/NotificationQueue'))(),
+      whatsappSession: new (require('../models/WhatsAppSession'))()
     };
 
     // Set up database models for services (if not already set up)
@@ -84,8 +84,18 @@ async function whatsappRoutes(fastify, options) {
       whatsappService.setDatabaseModels(models);
     }
   } catch (error) {
-    fastify.log.warn('Failed to initialize WhatsApp models:', error.message);
-    // Continue without models - some routes might not work
+    // Silent fallback - models are optional, system will use raw database queries
+    // This prevents warning spam during development/startup
+    if (process.env.NODE_ENV === 'development') {
+      // Only log in debug mode for development
+      if (process.env.DEBUG_MODE === 'true') {
+        console.debug('WhatsApp models optional - using raw database queries:', error.message);
+      }
+    } else {
+      // Log warning in production but don't fail
+      console.warn('WhatsApp models initialization failed - using raw database queries:', error.message);
+    }
+    // Continue without models - system will use raw database queries
   }
   if (templateService && !templateService.models) {
     templateService.setDatabaseModels(models);

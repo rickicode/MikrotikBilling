@@ -66,7 +66,7 @@ class WhatsAppService extends EventEmitter {
             for (const template of templates) {
                 this.templates.set(template.name, {
                     ...template,
-                    variables: JSON.parse(template.variables || '{}')
+                    variables: template.variables || []
                 });
             }
 

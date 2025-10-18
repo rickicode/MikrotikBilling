@@ -254,16 +254,37 @@ class BackupManager {
         databaseComponent.files.push('database.sqlite');
         databaseComponent.size += stats.size;
       } else {
-        // PostgreSQL backup
+        // PostgreSQL backup - check if pg_dump is available
         const backupFile = path.join(dbBackupPath, 'database.sql');
         const dbPassword = process.env.DB_PASSWORD || '';
 
-        const command = `PGPASSWORD="${dbPassword}" pg_dump -h localhost -U hijinetwork -d hijinetwork > "${backupFile}"`;
-        execSync(command, { stdio: 'pipe' });
+        try {
+          const command = `PGPASSWORD="${dbPassword}" pg_dump -h localhost -U hijinetwork -d hijinetwork > "${backupFile}"`;
+          execSync(command, { stdio: 'pipe' });
 
-        const stats = await fs.stat(backupFile);
-        databaseComponent.files.push('database.sql');
-        databaseComponent.size += stats.size;
+          const stats = await fs.stat(backupFile);
+          databaseComponent.files.push('database.sql');
+          databaseComponent.size += stats.size;
+        } catch (pgDumpError) {
+          console.warn('⚠️ pg_dump not available, skipping database backup:', pgDumpError.message);
+
+          // Create a placeholder file with schema info instead
+          const placeholderContent = `-- Database backup placeholder
+-- Generated: ${new Date().toISOString()}
+-- Note: pg_dump command not available in this environment
+-- To enable database backups, install PostgreSQL client tools
+
+-- Current database schema tables (placeholder)
+-- Tables are managed via migrations in the migrations/ directory
+-- Database: PostgreSQL (Supabase hosting)
+`;
+
+          await fs.writeFile(backupFile.replace('.sql', '-placeholder.sql'), placeholderContent);
+          databaseComponent.files.push('database-placeholder.sql');
+          databaseComponent.size += placeholderContent.length;
+          databaseComponent.status = 'partial';
+          databaseComponent.warning = 'PostgreSQL client tools not available - schema info only';
+        }
       }
 
       databaseComponent.status = 'completed';

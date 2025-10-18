@@ -9,7 +9,7 @@ const { Client } = require('pg');
 class Migrator {
     constructor(pool) {
         this.pool = pool;
-        this.migrationsPath = path.join(__dirname, 'migrations');
+        this.migrationsPath = path.join(__dirname, '../../migrations');
     }
 
     /**

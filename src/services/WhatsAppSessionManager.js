@@ -75,7 +75,7 @@ class WhatsAppSessionManager {
         try {
             const sessions = await this.query.getMany(`
                 SELECT * FROM whatsapp_sessions
-                WHERE is_active = true
+                WHERE status IN ('connected', 'connecting', 'scanning')
                 ORDER BY priority DESC, session_name
             `);
 

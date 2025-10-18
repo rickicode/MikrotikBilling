@@ -143,7 +143,7 @@ const PaymentManager = {
                 sort_order: this.sortOrder
             });
 
-            const response = await fetch(`/api/payments?${params}`);
+            const response = await fetch(`/payments/payments/api/payments?${params}`);
             const result = await response.json();
 
             if (result.success) {
@@ -355,7 +355,7 @@ const PaymentManager = {
 
     async loadStatistics() {
         try {
-            const response = await fetch('/api/payments/statistics');
+            const response = await fetch('/payments/api/payments/statistics');
             const result = await response.json();
 
             if (result.success) {
@@ -371,7 +371,7 @@ const PaymentManager = {
 
     async loadTodaySummary() {
         try {
-            const response = await fetch('/api/payments/today-summary');
+            const response = await fetch('/payments/api/payments/today-summary');
             const result = await response.json();
 
             if (result.success) {
@@ -387,7 +387,7 @@ const PaymentManager = {
         if (!confirm('Apakah Anda yakin ingin menyetujui pembayaran ini?')) return;
 
         try {
-            const response = await fetch(`/api/payments/${paymentId}/approve`, {
+            const response = await fetch(`/payments/api/payments/${paymentId}/approve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -412,7 +412,7 @@ const PaymentManager = {
         if (!confirm('Apakah Anda yakin ingin menolak pembayaran ini?')) return;
 
         try {
-            const response = await fetch(`/api/payments/${paymentId}/reject`, {
+            const response = await fetch(`/payments/api/payments/${paymentId}/reject`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -435,7 +435,7 @@ const PaymentManager = {
 
     async checkDuitKuStatus(paymentId) {
         try {
-            const response = await fetch(`/api/payments/${paymentId}/check-duitku`, {
+            const response = await fetch(`/payments/api/payments/${paymentId}/check-duitku`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -465,7 +465,7 @@ const PaymentManager = {
         if (!confirm(`Apakah Anda yakin ingin menyetujui ${this.selectedPayments.size} pembayaran?`)) return;
 
         try {
-            const response = await fetch('/api/payments/bulk-approve', {
+            const response = await fetch('/payments/api/payments/bulk-approve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: Array.from(this.selectedPayments) })
@@ -497,7 +497,7 @@ const PaymentManager = {
         if (!confirm(`Apakah Anda yakin ingin menolak ${this.selectedPayments.size} pembayaran?`)) return;
 
         try {
-            const response = await fetch('/api/payments/bulk-reject', {
+            const response = await fetch('/payments/api/payments/bulk-reject', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: Array.from(this.selectedPayments) })
@@ -522,7 +522,7 @@ const PaymentManager = {
 
     async showProcessDuitKuModal() {
         try {
-            const response = await fetch('/api/payments/duitku-pending');
+            const response = await fetch('/payments/api/payments/duitku-pending');
             const result = await response.json();
 
             if (result.success) {
@@ -595,7 +595,7 @@ const PaymentManager = {
         }
 
         try {
-            const response = await fetch('/api/payments/bulk-check-duitku', {
+            const response = await fetch('/payments/api/payments/bulk-check-duitku', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: paymentIds })
@@ -628,7 +628,7 @@ const PaymentManager = {
         const formData = new FormData(form);
 
         try {
-            const response = await fetch('/api/payments/generate-report', {
+            const response = await fetch('/payments/api/payments/generate-report', {
                 method: 'POST',
                 body: formData
             });
@@ -653,7 +653,7 @@ const PaymentManager = {
 
     async checkOverduePayments() {
         try {
-            const response = await fetch('/api/payments/check-overdue', {
+            const response = await fetch('/payments/api/payments/check-overdue', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -676,7 +676,7 @@ const PaymentManager = {
         if (!confirm('Apakah Anda yakin ingin merekonsiliasi semua pembayaran?')) return;
 
         try {
-            const response = await fetch('/api/payments/reconcile', {
+            const response = await fetch('/payments/api/payments/reconcile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -697,7 +697,7 @@ const PaymentManager = {
 
     async autoReconcile() {
         try {
-            const response = await fetch('/api/payments/auto-reconcile', {
+            const response = await fetch('/payments/api/payments/auto-reconcile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -735,7 +735,7 @@ const PaymentManager = {
                 end_date: this.endDate
             });
 
-            window.open(`/api/payments/export?${params}`, '_blank');
+            window.open(`/payments/api/payments/export?${params}`, '_blank');
         } catch (error) {
             console.error('Error exporting payments:', error);
             this.showAlert('danger', 'Gagal mengekspor pembayaran');
@@ -749,7 +749,7 @@ const PaymentManager = {
         }
 
         try {
-            const response = await fetch('/api/payments/bulk-export', {
+            const response = await fetch('/payments/api/payments/bulk-export', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: Array.from(this.selectedPayments) })

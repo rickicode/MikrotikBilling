@@ -1,15 +1,16 @@
-const DatabaseManager = require('../database/DatabaseManager');
+const { db } = require('../database/DatabaseManager');
 const auth = require('../middleware/auth');
 const CarryOverService = require('../services/CarryOverService');
+const { ApiErrorHandler } = require('../middleware/apiErrorHandler');
 
 const paymentRoutes = (fastify, options, done) => {
-    // Initialize CarryOverService
-    const carryOverService = new CarryOverService();
+    // Initialize CarryOverService with database pool
+    const carryOverService = new CarryOverService(fastify.db?.getPool?.() || null);
 
     // Payment Management Page
     fastify.get('/', { preHandler: auth.verifyToken }, async (request, reply) => {
         try {
-            const db = DatabaseManager.getInstance();
+            // Use the singleton db instance directly
 
             // Get basic statistics for the page
             const stats = {
@@ -62,19 +63,20 @@ const paymentRoutes = (fastify, options, done) => {
             }
 
             return reply.view('payments/index', {
+                admin: request.admin,
                 stats,
                 todaySummary
             });
         } catch (error) {
+            console.error('DETAILED ERROR loading payments page:', error);
+            console.error('ERROR STACK:', error.stack);
             fastify.log.error('Error loading payments page:', error);
-            reply.code(500).view('error', { error: 'Internal Server Error', detail: error.message });
+            return reply.code(500).view('error', { error: 'Internal Server Error', detail: error.message });
         }
     });
 
     // Get payments with pagination and filtering
-    fastify.get('/api/payments', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
+    fastify.get('/api/payments', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 page = 1,
                 limit = 20,
@@ -100,7 +102,7 @@ const paymentRoutes = (fastify, options, done) => {
                      c.nama ILIKE $${paramIndex + 1} OR
                      c.nomor_hp ILIKE $${paramIndex + 2} OR
                      pr.name ILIKE $${paramIndex + 3} OR
-                     p.description ILIKE $${paramIndex + 4})
+                     p.notes ILIKE $${paramIndex + 4})
                 `);
                 const searchPattern = `%${search}%`;
                 queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
@@ -183,20 +185,10 @@ const paymentRoutes = (fastify, options, done) => {
                     pagination
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error getting payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get payment statistics
-    fastify.get('/api/payments/statistics', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
+    fastify.get('/api/payments/statistics', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const statsQuery = `
                 SELECT
                     COUNT(*) as total_count,
@@ -220,20 +212,10 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: stats
             });
-        } catch (error) {
-            fastify.log.error('Error getting payment statistics:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get payment statistics',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get today's summary
-    fastify.get('/api/payments/today-summary', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
+    fastify.get('/api/payments/today-summary', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const query = `
                 SELECT
                     COUNT(*) as count,
@@ -250,21 +232,11 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: summary
             });
-        } catch (error) {
-            fastify.log.error('Error getting today summary:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get today summary',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Approve payment
-    fastify.post('/api/payments/:id/approve', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { id } = request.params;
+    fastify.post('/api/payments/:id/approve', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { id } = request.params;
 
             // Get payment details
             const payment = await db.getOne('payments', { id });
@@ -345,8 +317,8 @@ const paymentRoutes = (fastify, options, done) => {
                     // Sync with Mikrotik
                     try {
                         await fastify.mikrotik.extendSubscription(subscription.username, daysExtension);
-                    } catch (error) {
-                        fastify.log.error('Error extending subscription in Mikrotik:', error);
+                    } catch (mikrotikError) {
+                        fastify.log.error('Error extending subscription in Mikrotik:', mikrotikError);
                     }
                 }
             } else if (payment.customer_id && payment.amount > 0) {
@@ -384,21 +356,11 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 message: 'Payment approved successfully'
             });
-        } catch (error) {
-            fastify.log.error('Error approving payment:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to approve payment',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Reject payment
-    fastify.post('/api/payments/:id/reject', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { id } = request.params;
+    fastify.post('/api/payments/:id/reject', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { id } = request.params;
 
             // Get payment details
             const payment = await db.getOne('payments', { id });
@@ -442,21 +404,11 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 message: 'Payment rejected successfully'
             });
-        } catch (error) {
-            fastify.log.error('Error rejecting payment:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to reject payment',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Check DuitKu payment status
-    fastify.post('/api/payments/:id/check-duitku', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { id } = request.params;
+    fastify.post('/api/payments/:id/check-duitku', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { id } = request.params;
 
             // Get payment details
             const payment = await db.getOne('payments', {
@@ -472,7 +424,7 @@ const paymentRoutes = (fastify, options, done) => {
                 });
             }
 
-            if (!payment.duitku_reference) {
+            if (!payment.transaction_id) {
                 return reply.code(400).send({
                     success: false,
                     message: 'No DuitKu reference found',
@@ -511,21 +463,11 @@ const paymentRoutes = (fastify, options, done) => {
                     status: newStatus
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error checking DuitKu status:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to check DuitKu status',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get DuitKu pending payments
-    fastify.get('/api/payments/duitku-pending', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const query = `
+    fastify.get('/api/payments/duitku-pending', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const query = `
                 SELECT
                     p.*,
                     c.nama as customer_name,
@@ -543,21 +485,11 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: result
             });
-        } catch (error) {
-            fastify.log.error('Error getting DuitKu pending payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get DuitKu pending payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Bulk approve payments
-    fastify.post('/api/payments/bulk-approve', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { payment_ids } = request.body;
+    fastify.post('/api/payments/bulk-approve', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { payment_ids } = request.body;
 
             if (!Array.isArray(payment_ids) || payment_ids.length === 0) {
                 return reply.code(400).send({
@@ -616,7 +548,7 @@ const paymentRoutes = (fastify, options, done) => {
                         processedCount++;
                     }
                 } catch (error) {
-                    fastify.log.error(`Error approving payment ${paymentId}:`, error);
+                    fastify.log.error('Error processing payment:', error);
                 }
             }
 
@@ -637,21 +569,11 @@ const paymentRoutes = (fastify, options, done) => {
                     total_requested: payment_ids.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error bulk approving payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to bulk approve payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Bulk reject payments
-    fastify.post('/api/payments/bulk-reject', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { payment_ids } = request.body;
+    fastify.post('/api/payments/bulk-reject', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { payment_ids } = request.body;
 
             if (!Array.isArray(payment_ids) || payment_ids.length === 0) {
                 return reply.code(400).send({
@@ -691,21 +613,11 @@ const paymentRoutes = (fastify, options, done) => {
                     total_requested: payment_ids.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error bulk rejecting payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to bulk reject payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Bulk check DuitKu status
-    fastify.post('/api/payments/bulk-check-duitku', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { payment_ids } = request.body;
+    fastify.post('/api/payments/bulk-check-duitku', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { payment_ids } = request.body;
 
             if (!Array.isArray(payment_ids) || payment_ids.length === 0) {
                 return reply.code(400).send({
@@ -743,7 +655,7 @@ const paymentRoutes = (fastify, options, done) => {
                         processedCount++;
                     }
                 } catch (error) {
-                    fastify.log.error(`Error checking DuitKu payment ${paymentId}:`, error);
+                    fastify.log.error('Error processing payment:', error);
                 }
             }
 
@@ -754,21 +666,11 @@ const paymentRoutes = (fastify, options, done) => {
                     total_requested: payment_ids.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error bulk checking DuitKu payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to bulk check DuitKu payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Export payments
-    fastify.get('/api/payments/export', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const {
+    fastify.get('/api/payments/export', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const {
                 search = '',
                 status = '',
                 method = '',
@@ -788,7 +690,7 @@ const paymentRoutes = (fastify, options, done) => {
                      c.nama ILIKE $${paramIndex + 1} OR
                      c.nomor_hp ILIKE $${paramIndex + 2} OR
                      pr.name ILIKE $${paramIndex + 3} OR
-                     p.description ILIKE $${paramIndex + 4})
+                     p.notes ILIKE $${paramIndex + 4})
                 `);
                 const searchPattern = `%${search}%`;
                 queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
@@ -828,8 +730,8 @@ const paymentRoutes = (fastify, options, done) => {
                     p.amount,
                     p.method,
                     p.status,
-                    p.duitku_reference,
-                    p.description,
+                    p.transaction_id as duitku_reference,
+                    p.notes as description,
                     p.created_at,
                     c.nama as customer_name,
                     c.nomor_hp as customer_phone,
@@ -877,19 +779,10 @@ const paymentRoutes = (fastify, options, done) => {
                     data: result
                 });
             }
-        } catch (error) {
-            fastify.log.error('Error exporting payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to export payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Generate payment report
-    fastify.post('/api/payments/generate-report', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/payments/generate-report', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 report_type = 'summary',
                 period = 'month',
@@ -949,8 +842,7 @@ const paymentRoutes = (fastify, options, done) => {
             }
 
             // Log report generation
-            const db = DatabaseManager.getInstance();
-            await db.insert('system_logs', {
+                        await db.insert('system_logs', {
                 level: 'INFO',
                 module: 'payments',
                 message: `Generated ${report_type} report`,
@@ -969,21 +861,11 @@ const paymentRoutes = (fastify, options, done) => {
                     generated_at: new Date().toISOString()
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error generating payment report:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to generate payment report',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Check overdue payments
-    fastify.post('/api/payments/check-overdue', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            // Find subscriptions that are expired but don't have recent payments
+    fastify.post('/api/payments/check-overdue', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        // Find subscriptions that are expired but don't have recent payments
             const query = `
                 SELECT
                     s.*,
@@ -1020,21 +902,11 @@ const paymentRoutes = (fastify, options, done) => {
                     overdue_subscriptions: overdueSubscriptions
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error checking overdue payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to check overdue payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Reconcile payments
-    fastify.post('/api/payments/reconcile', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            // Find payments that should be reconciled
+    fastify.post('/api/payments/reconcile', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        // Find payments that should be reconciled
             const reconcileQuery = `
                 SELECT COUNT(*) as total,
                        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid,
@@ -1067,21 +939,11 @@ const paymentRoutes = (fastify, options, done) => {
                     stats
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error reconciling payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to reconcile payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Auto-reconcile payments
-    fastify.post('/api/payments/auto-reconcile', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            let reconciledCount = 0;
+    fastify.post('/api/payments/auto-reconcile', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        let reconciledCount = 0;
 
             // Auto-approve successful DuitKu payments
             const duitKuResult = await db.query(`
@@ -1125,19 +987,10 @@ const paymentRoutes = (fastify, options, done) => {
                     reconciled_count: reconciledCount
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error auto-reconciling payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to auto-reconcile payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get customer carry over balances
-    fastify.get('/api/carry-over/:customerId', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.get('/api/carry-over/:customerId', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const { customerId } = request.params;
 
             const balances = await carryOverService.getAvailableBalances(parseInt(customerId));
@@ -1151,19 +1004,10 @@ const paymentRoutes = (fastify, options, done) => {
                     count: balances.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error getting carry over balances:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get carry over balances',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Apply carry over to invoice/subscription
-    fastify.post('/api/carry-over/apply', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/carry-over/apply', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 customerId,
                 invoiceAmount,
@@ -1182,19 +1026,10 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: result
             });
-        } catch (error) {
-            fastify.log.error('Error applying carry over:', error);
-            return reply.code(500).send({
-                success: false,
-                message: error.message || 'Failed to apply carry over',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get carry over statistics
-    fastify.get('/api/carry-over/statistics', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.get('/api/carry-over/statistics', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const { customerId } = request.query;
 
             const stats = await carryOverService.getStatistics(
@@ -1205,19 +1040,10 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: stats
             });
-        } catch (error) {
-            fastify.log.error('Error getting carry over statistics:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get carry over statistics',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Transfer carry over between subscriptions
-    fastify.post('/api/carry-over/transfer', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/carry-over/transfer', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 fromSubscriptionId,
                 toSubscriptionId,
@@ -1234,19 +1060,10 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: result
             });
-        } catch (error) {
-            fastify.log.error('Error transferring carry over:', error);
-            return reply.code(500).send({
-                success: false,
-                message: error.message || 'Failed to transfer carry over',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Clean up expired carry over balances (admin only)
-    fastify.post('/api/carry-over/cleanup', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/carry-over/cleanup', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const cleanedCount = await carryOverService.cleanupExpiredBalances();
 
             return reply.send({
@@ -1254,15 +1071,7 @@ const paymentRoutes = (fastify, options, done) => {
                 message: `Cleaned up ${cleanedCount} expired carry over balances`,
                 cleanedCount
             });
-        } catch (error) {
-            fastify.log.error('Error cleaning up carry over balances:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to cleanup carry over balances',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     done();
 };

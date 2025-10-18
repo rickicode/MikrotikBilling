@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 
 // Koneksi ke database Supabase
 const client = new Client({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres.hvylyfmdhrruzlyclkgw:p1kunPISAN@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres'
+    connectionString: process.env.DATABASE_URL || 'postgresql://postgres.qdtnjvppmqtmjbdlmkyz:p1kunPISAN@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres'
 });
 
 async function createDefaultAdmin() {
@@ -23,7 +23,7 @@ async function createDefaultAdmin() {
 
             // Insert default admin user
             await client.query(`
-                INSERT INTO admin_users (username, password, name, email, role, status, created_at, updated_at)
+                INSERT INTO admin_users (username, password_hash, full_name, email, role, is_active, created_at, updated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
             `, [
                 'admin',
@@ -31,7 +31,7 @@ async function createDefaultAdmin() {
                 'Administrator',
                 'admin@mikrotik.com',
                 'super_admin',
-                'active'
+                true
             ]);
 
             console.log('✓ Default admin user created: admin/admin123');

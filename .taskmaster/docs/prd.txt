@@ -1,0 +1,30 @@
+# Project Requirements Document
+
+## Project Overview
+[Describe your project goals and objectives]
+
+## Features
+1. [Feature 1 description]
+2. [Feature 2 description]
+3. [Feature 3 description]
+
+## Technical Requirements
+- [Technical requirement 1]
+- [Technical requirement 2]
+
+## Acceptance Criteria
+- [ ] [Criteria 1]
+- [ ] [Criteria 2]
+
+## Notes
+[Additional notes and considerations]
+
+## Getting Started
+After editing this PRD, run:
+```bash
+# If you have task-master CLI installed:
+task-master parse-prd .taskmaster/docs/prd.txt
+
+# Or use Claude Code:
+claude "Use @task-orchestrator to generate tasks from this PRD"
+```

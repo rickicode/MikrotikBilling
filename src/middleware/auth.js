@@ -1,18 +1,41 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const SecurityConfig = require('../config/security');
 
 class AuthMiddleware {
   constructor(fastify) {
     this.fastify = fastify;
-    this.JWT_SECRET = process.env.JWT_SECRET || 'default-secret';
+    this.securityConfig = new SecurityConfig();
+    this.JWT_SECRET = this.securityConfig.JWT_SECRET;
+    this.loginAttempts = new Map(); // Track login attempts per IP
   }
 
-  // Verify JWT token
+  // Check rate limiting for login attempts
+  checkLoginRateLimit(ip) {
+    const now = Date.now();
+    const attempts = this.loginAttempts.get(ip) || { count: 0, resetTime: now + 15 * 60 * 1000 };
+
+    if (now > attempts.resetTime) {
+      // Reset attempts after 15 minutes
+      attempts.count = 0;
+      attempts.resetTime = now + 15 * 60 * 1000;
+    }
+
+    if (attempts.count >= 5) {
+      return { allowed: false, resetTime: attempts.resetTime };
+    }
+
+    attempts.count++;
+    this.loginAttempts.set(ip, attempts);
+    return { allowed: true, remainingAttempts: 5 - attempts.count };
+  }
+
+  // Verify JWT token with enhanced security
   async verifyToken(request, reply) {
     try {
       const token = request.cookies.token || request.headers.authorization?.split(' ')[1];
 
-  
       if (!token) {
         if (global.securityLogger) {
           global.securityLogger.logAuthentication('token_missing', {
@@ -27,10 +50,11 @@ class AuthMiddleware {
         return reply.redirect('/login');
       }
 
-      const decoded = jwt.verify(token, this.JWT_SECRET);
+      // Verify token with additional security checks
+      const decoded = jwt.verify(token, this.JWT_SECRET, { algorithms: ['HS256'] });
       let admin = null;
       try {
-        const adminRows = await this.fastify.db.query('SELECT id, username, role, permissions FROM admin_users WHERE id = $1', [decoded.id]);
+        const adminRows = await this.fastify.db.query('SELECT id, username, role FROM admin_users WHERE id = $1', [decoded.id]);
         admin = adminRows.rows && adminRows.rows.length > 0 ? adminRows.rows[0] : null;
       } catch (dbError) {
         console.error('Database error in verifyToken:', dbError);
@@ -119,7 +143,7 @@ class AuthMiddleware {
       const decoded = jwt.verify(token, this.JWT_SECRET);
       let admin = null;
       try {
-        const adminRows = await this.fastify.db.query('SELECT id, username, role, permissions FROM admin_users WHERE id = $1', [decoded.id]);
+        const adminRows = await this.fastify.db.query('SELECT id, username, role FROM admin_users WHERE id = $1', [decoded.id]);
         admin = adminRows.rows && adminRows.rows.length > 0 ? adminRows.rows[0] : null;
       } catch (dbError) {
         console.error('Database error in verifyToken:', dbError);
@@ -232,18 +256,27 @@ class AuthMiddleware {
     }
   }
 
-  // Generate JWT token
+  // Generate secure JWT token with additional security features
   generateToken(admin) {
-    return jwt.sign(
-      { id: admin.id, username: admin.username, role: admin.role },
-      this.JWT_SECRET,
-      { expiresIn: '30d' }
-    );
+    const payload = {
+      id: admin.id,
+      username: admin.username,
+      role: admin.role,
+      iat: Math.floor(Date.now() / 1000),
+      jti: this.securityConfig.generateSecureToken(16) // JWT ID for token revocation
+    };
+
+    return jwt.sign(payload, this.JWT_SECRET, {
+      expiresIn: '30d',
+      algorithm: 'HS256',
+      issuer: 'mikrotik-billing',
+      audience: 'mikrotik-billing-users'
+    });
   }
 
-  // Generate session ID for security logging
+  // Generate secure session ID
   generateSessionId() {
-    return 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return this.securityConfig.generateSessionId();
   }
 
   // Hash password
@@ -256,20 +289,45 @@ class AuthMiddleware {
     return await bcrypt.compare(password, hash);
   }
 
-  // Login handler
+  // Enhanced login handler with rate limiting and security
   async login(request, reply) {
     const { username, password } = request.body;
+
+    // Input validation and sanitization
+    if (!username || !password) {
+      return reply.view('auth/login', {
+        error: 'Username and password are required',
+        username: ''
+      });
+    }
+
+    // Sanitize input
+    const sanitizedUsername = this.securityConfig.sanitizeInput(username.trim());
+
+    // Check rate limiting
+    const rateLimitCheck = this.checkLoginRateLimit(request.ip);
+    if (!rateLimitCheck.allowed) {
+      const resetTime = new Date(rateLimitCheck.resetTime).toLocaleTimeString();
+      return reply.view('auth/login', {
+        error: `Too many login attempts. Please try again after ${resetTime}.`,
+        username: sanitizedUsername
+      });
+    }
 
     try {
       let admin = null;
       try {
-        const adminResult = await this.fastify.db.query('SELECT * FROM admin_users WHERE username = $1', [username]);
+        // Use parameterized query to prevent SQL injection
+        const adminResult = await this.fastify.db.query(
+          'SELECT * FROM admin_users WHERE username = $1 AND active = true',
+          [sanitizedUsername]
+        );
         admin = adminResult.rows && adminResult.rows.length > 0 ? adminResult.rows[0] : null;
       } catch (dbError) {
         console.error('Database error in login:', dbError);
         return reply.view('auth/login', {
           error: 'Database error. Please try again.',
-          username
+          username: sanitizedUsername
         });
       }
 

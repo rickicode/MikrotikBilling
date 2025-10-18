@@ -1,0 +1,85 @@
+{
+  "models": {
+    "main": "claude-3-5-sonnet-20241022",
+    "research": "perplexity-llama-3.1-sonar-large-128k-online",
+    "fallback": "gpt-4o-mini"
+  },
+  "rules": [
+    "cursor",
+    "claude"
+  ],
+  "project": {
+    "name": "MikrotikBilling",
+    "type": "enterprise-billing-system",
+    "complexity": 8,
+    "domain": "telecom-infrastructure",
+    "initialized": "2025-10-18T07:25:32.048Z",
+    "last_updated": "2025-10-18T14:30:00.000Z",
+    "features": [
+      "voucher-management",
+      "pppoe-user-management",
+      "payment-gateway-plugins",
+      "whatsapp-integration",
+      "mikrotik-api-integration",
+      "multi-location-support",
+      "backup-management",
+      "plugin-ecosystem"
+    ]
+  },
+  "agent_system": {
+    "total_agents": 19,
+    "core_agents": [
+      "@software-engineering-expert",
+      "@code-reviewer",
+      "@orchestrator",
+      "@vibe-coding-coordinator",
+      "@security-specialist",
+      "@documentation-specialist",
+      "@git-expert"
+    ],
+    "specialist_agents": [
+      "@nodejs-expert",
+      "@database-admin",
+      "@api-architect",
+      "@payment-systems-expert",
+      "@messaging-specialist",
+      "@network-engineer",
+      "@plugin-developer",
+      "@frontend-optimization-expert",
+      "@devops-engineer",
+      "@performance-optimizer",
+      "@test-automation-expert",
+      "@testing-coordinator",
+      "@deployment-specialist"
+    ],
+    "workflow_agents": [
+      "@exponential-planner",
+      "@session-manager"
+    ]
+  },
+  "mcp_integration": {
+    "active_servers": 8,
+    "servers": [
+      "task-master",
+      "basic-memory",
+      "context7",
+      "sequential-thinking",
+      "zen",
+      "playwright",
+      "github",
+      "prisma",
+      "filesystem",
+      "browser-tools",
+      "web-search-prime"
+    ]
+  },
+  "quality_standards": {
+    "commit_format": "type(scope): description - @agent1 @agent2",
+    "mandatory_attribution": true,
+    "code_review_required": true,
+    "specialist_approval_required": true,
+    "testing_coverage_minimum": 80,
+    "security_scan_required": true,
+    "performance_testing": true
+  }
+}
