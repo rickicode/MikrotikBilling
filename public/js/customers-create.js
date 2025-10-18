@@ -108,24 +108,30 @@ function validateField(field) {
         return false;
     }
 
+    let fieldValid = true;
+
     if (field.type === 'email' && value && !isValidEmail(value)) {
+        // Email validation relaxed - allow any format or leave empty
         field.classList.remove('border-gray-600', 'bg-gray-700');
-        field.classList.add('border-red-500', 'bg-red-900');
-        updateFieldFeedback(field, 'Format email tidak valid');
-        return false;
+        field.classList.add('border-yellow-500', 'bg-yellow-900');
+        updateFieldFeedback(field, 'Format email mungkin tidak valid, namun akan diteruskan');
+        // Don't fail validation - just warn user
+        fieldValid = true;
+    } else if (field.name === 'nomor_hp' && value && !isValidPhone(value)) {
+        // Phone validation relaxed - allow any format for flexibility
+        field.classList.remove('border-gray-600', 'bg-gray-700');
+        field.classList.add('border-yellow-500', 'bg-yellow-900');
+        updateFieldFeedback(field, 'Format nomor HP tidak standar, namun akan diteruskan');
+        // Don't fail validation - just warn user
+        fieldValid = true;
+    } else {
+        // Field is valid
+        field.classList.remove('border-gray-600', 'bg-gray-700');
+        field.classList.add('border-green-500', 'bg-green-900');
+        clearFieldFeedback(field);
     }
 
-    if (field.name === 'nomor_hp' && value && !isValidPhone(value)) {
-        field.classList.remove('border-gray-600', 'bg-gray-700');
-        field.classList.add('border-red-500', 'bg-red-900');
-        updateFieldFeedback(field, 'Format nomor HP harus: 81234567890');
-        return false;
-    }
-
-    field.classList.remove('border-gray-600', 'bg-gray-700');
-    field.classList.add('border-green-500', 'bg-green-900');
-    clearFieldFeedback(field);
-    return true;
+    return fieldValid;
 }
 
 // Update field feedback message
