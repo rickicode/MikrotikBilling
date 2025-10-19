@@ -1,11 +1,122 @@
 const { db } = require('../database/DatabaseManager');
 const auth = require('../middleware/auth');
 const CarryOverService = require('../services/CarryOverService');
+const PaymentPluginManager = require('../services/PaymentPluginManager');
+const WhatsAppService = require('../services/WhatsAppService');
 const { ApiErrorHandler } = require('../middleware/apiErrorHandler');
 
 const paymentRoutes = (fastify, options, done) => {
-    // Initialize CarryOverService with database pool
+    // Initialize services
     const carryOverService = new CarryOverService(fastify.db?.getPool?.() || null);
+    const paymentPluginManager = new PaymentPluginManager(db);
+    const whatsappService = new WhatsAppService();
+
+    // Initialize WhatsApp service if database pool is available
+    try {
+        if (fastify.db && fastify.db.getPool) {
+            whatsappService.initialize(fastify.db.getPool());
+        }
+    } catch (error) {
+        fastify.log.warn('Failed to initialize WhatsApp service:', error.message);
+    }
+
+    // WhatsApp notification functions
+    async function sendPaymentNotification(customer, payment, type = 'confirmation') {
+        try {
+            if (!customer || !customer.nomor_hp) {
+                fastify.log.warn('No phone number available for WhatsApp notification');
+                return false;
+            }
+
+            const phoneNumber = customer.nomor_hp.replace(/^0/, '+62');
+            let message = '';
+
+            switch (type) {
+                case 'confirmation':
+                    message = `*🎉 PEMBAYARAN BERHASIL*\n\n` +
+                        `Kode: ${payment.transaction_id}\n` +
+                        `Jumlah: Rp ${Number(payment.amount).toLocaleString('id-ID')}\n` +
+                        `Metode: ${payment.method}\n` +
+                        `Tanggal: ${new Date().toLocaleString('id-ID')}\n\n` +
+                        `Terima kasih atas pembayaran Anda! 🙏\n` +
+                        `HIJINETWORK Mikrotik Billing`;
+                    break;
+
+                case 'pending':
+                    message = `*⏳ MENUNGGU PEMBAYARAN*\n\n` +
+                        `Kode: ${payment.transaction_id}\n` +
+                        `Jumlah: Rp ${Number(payment.amount).toLocaleString('id-ID')}\n` +
+                        `Metode: ${payment.method}\n\n` +
+                        `Silakan selesaikan pembayaran Anda.\n` +
+                        `HIJINETWORK Mikrotik Billing`;
+                    break;
+
+                case 'reminder':
+                    message = `*🔔 PENGINGAT PEMBAYARAN*\n\n` +
+                        `Halo ${customer.nama},\n\n` +
+                        `Pembayaran Anda masih menunggu:\n` +
+                        `Kode: ${payment.transaction_id}\n` +
+                        `Jumlah: Rp ${Number(payment.amount).toLocaleString('id-ID')}\n` +
+                        `Metode: ${payment.method}\n\n` +
+                        `Silakan selesaikan pembayaran segera.\n` +
+                        `HIJINETWORK Mikrotik Billing`;
+                    break;
+            }
+
+            const result = await whatsappService.sendMessageWithSession(phoneNumber, message, {
+                priority: 'normal'
+            });
+
+            if (result.success) {
+                fastify.log.info(`WhatsApp notification sent to ${customer.nama}: ${type}`);
+                return true;
+            } else {
+                fastify.log.warn(`Failed to send WhatsApp notification: ${result.message}`);
+                return false;
+            }
+
+        } catch (error) {
+            fastify.log.error('Error sending WhatsApp notification:', error);
+            return false;
+        }
+    }
+
+    async function sendPaymentLinkNotification(customer, paymentLink) {
+        try {
+            if (!customer || !customer.nomor_hp) {
+                fastify.log.warn('No phone number available for WhatsApp payment link notification');
+                return false;
+            }
+
+            const phoneNumber = customer.nomor_hp.replace(/^0/, '+62');
+
+            const message = `*💳 LINK PEMBAYARAN*\n\n` +
+                `Halo ${customer.nama},\n\n` +
+                `Berikut link pembayaran untuk Anda:\n` +
+                `Kode: ${paymentLink.invoice_number}\n` +
+                `Jumlah: Rp ${Number(paymentLink.amount).toLocaleString('id-ID')}\n` +
+                `Berlaku hingga: ${new Date(paymentLink.expiry_date).toLocaleString('id-ID')}\n\n` +
+                `Link: ${paymentLink.payment_url}\n\n` +
+                `Klik link untuk melakukan pembayaran.\n` +
+                `HIJINETWORK Mikrotik Billing`;
+
+            const result = await whatsappService.sendMessageWithSession(phoneNumber, message, {
+                priority: 'normal'
+            });
+
+            if (result.success) {
+                fastify.log.info(`WhatsApp payment link sent to ${customer.nama}`);
+                return true;
+            } else {
+                fastify.log.warn(`Failed to send WhatsApp payment link: ${result.message}`);
+                return false;
+            }
+
+        } catch (error) {
+            fastify.log.error('Error sending WhatsApp payment link:', error);
+            return false;
+        }
+    }
 
     // Payment Management Page
     fastify.get('/', { preHandler: auth.verifyToken }, async (request, reply) => {
@@ -72,6 +183,330 @@ const paymentRoutes = (fastify, options, done) => {
             console.error('ERROR STACK:', error.stack);
             fastify.log.error('Error loading payments page:', error);
             return reply.code(500).view('error', { error: 'Internal Server Error', detail: error.message });
+        }
+    });
+
+    // Create Payment Page
+    fastify.get('/create', { preHandler: auth.verifyToken }, async (request, reply) => {
+        try {
+            // Get available payment methods from plugins
+            const activePlugins = paymentPluginManager.getActivePlugins();
+            const paymentMethods = [];
+
+            // Add built-in methods
+            paymentMethods.push(
+                { code: 'cash', name: 'Cash', description: 'Tunai langsung' },
+                { code: 'transfer', name: 'Transfer Bank', description: 'Transfer manual ke rekening' }
+            );
+
+            // Add plugin methods
+            for (const plugin of activePlugins) {
+                const methods = plugin.instance.getSupportedMethods?.() || [];
+                for (const method of methods) {
+                    paymentMethods.push({
+                        code: method,
+                        name: plugin.instance.name,
+                        description: `${plugin.instance.name} - ${method}`,
+                        plugin: plugin.name
+                    });
+                }
+            }
+
+            // Get customers for selection
+            const customers = await db.query(`
+                SELECT id, nama, nomor_hp, email
+                FROM customers
+                ORDER BY nama ASC
+                LIMIT 100
+            `);
+
+            // Get active subscriptions
+            const subscriptions = await db.query(`
+                SELECT s.*, c.nama as customer_name, p.name as profile_name
+                FROM subscriptions s
+                JOIN customers c ON s.customer_id = c.id
+                JOIN profiles p ON s.profile_id = p.id
+                WHERE s.status IN ('active', 'expired')
+                ORDER BY s.expiry_date ASC
+                LIMIT 50
+            `);
+
+            return reply.view('payments/create', {
+                admin: request.admin,
+                paymentMethods,
+                customers,
+                subscriptions
+            });
+        } catch (error) {
+            fastify.log.error('Error loading create payment page:', error);
+            return reply.code(500).view('error', { error: 'Internal Server Error', detail: error.message });
+        }
+    });
+
+    // Create Payment API
+    fastify.post('/api/create', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+        const {
+            customer_id,
+            subscription_id,
+            amount,
+            method,
+            payment_method_code,
+            bank_code,
+            description,
+            customer_email,
+            customer_phone,
+            payment_details = {}
+        } = request.body;
+
+        try {
+            // Validate required fields
+            if (!amount || amount <= 0) {
+                return reply.code(400).send({
+                    success: false,
+                    message: 'Amount is required and must be greater than 0'
+                });
+            }
+
+            if (!method) {
+                return reply.code(400).send({
+                    success: false,
+                    message: 'Payment method is required'
+                });
+            }
+
+            // Get customer information
+            let customer = null;
+            if (customer_id) {
+                customer = await db.getOne('customers', { id: customer_id });
+                if (!customer) {
+                    return reply.code(404).send({
+                        success: false,
+                        message: 'Customer not found'
+                    });
+                }
+            }
+
+            // Generate payment reference
+            const paymentReference = 'PAY' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase();
+
+            let paymentResult = null;
+
+            // Handle payment creation based on method
+            if (method === 'plugin' && payment_method_code) {
+                // Use payment plugin
+                const paymentData = {
+                    method: payment_method_code,
+                    amount: parseFloat(amount),
+                    customer_id: customer_id,
+                    customer_name: customer?.nama || 'Guest',
+                    customer_email: customer_email || customer?.email || '',
+                    customer_phone: customer_phone || customer?.nomor_hp || '',
+                    description: description || `Payment ${paymentReference}`,
+                    bank_code: bank_code,
+                    ...payment_details
+                };
+
+                try {
+                    // Initialize plugin manager if not already initialized
+                    if (paymentPluginManager.plugins.size === 0) {
+                        await paymentPluginManager.initialize();
+                    }
+
+                    paymentResult = await paymentPluginManager.createPayment(paymentData);
+                } catch (pluginError) {
+                    fastify.log.error('Payment plugin error:', pluginError);
+                    return reply.code(400).send({
+                        success: false,
+                        message: `Payment processing failed: ${pluginError.message}`
+                    });
+                }
+            } else {
+                // Handle manual/cash payments
+                paymentResult = {
+                    success: true,
+                    reference: paymentReference,
+                    payment_type: method,
+                    status: method === 'cash' ? 'SUCCESS' : 'PENDING',
+                    amount: parseFloat(amount),
+                    currency: 'IDR',
+                    fee: 0,
+                    total_amount: parseFloat(amount),
+                    instructions: {
+                        type: method,
+                        steps: method === 'cash'
+                            ? ['1. Receive cash payment', '2. Record in system', '3. Provide receipt']
+                            : ['1. Wait for transfer confirmation', '2. Verify in bank account', '3. Record payment']
+                    }
+                };
+            }
+
+            if (!paymentResult.success) {
+                return reply.code(400).send({
+                    success: false,
+                    message: paymentResult.message || 'Payment creation failed'
+                });
+            }
+
+            // Create payment record in database
+            const paymentRecord = {
+                customer_id: customer_id || null,
+                subscription_id: subscription_id || null,
+                amount: parseFloat(amount),
+                method: method === 'plugin' ? payment_method_code : method,
+                status: paymentResult.status.toLowerCase() === 'success' ? 'paid' : 'pending',
+                transaction_id: paymentResult.reference,
+                notes: description || `Payment ${paymentReference}`,
+                created_at: new Date(),
+                updated_at: new Date()
+            };
+
+            // Add plugin-specific data
+            if (method === 'plugin' && paymentResult.metadata) {
+                paymentRecord.plugin_data = JSON.stringify(paymentResult.metadata);
+            }
+
+            const insertedPayment = await db.insert('payments', paymentRecord);
+
+            // Handle subscription extension if applicable
+            if (subscription_id && paymentResult.status === 'SUCCESS') {
+                const subscription = await db.getOne('subscriptions', { id: subscription_id });
+                if (subscription) {
+                    const daysExtension = Math.floor((parseFloat(amount) / subscription.price_sell) * 30);
+                    const now = new Date();
+                    const currentExpiry = new Date(subscription.expiry_date);
+                    const newExpiryDate = currentExpiry > now
+                        ? new Date(currentExpiry.getTime() + daysExtension * 24 * 60 * 60 * 1000)
+                        : new Date(now.getTime() + daysExtension * 24 * 60 * 60 * 1000);
+
+                    await db.update('subscriptions',
+                        {
+                            expiry_date: newExpiryDate.toISOString().split('T')[0],
+                            status: 'active',
+                            updated_at: new Date()
+                        },
+                        { id: subscription_id }
+                    );
+                }
+            }
+
+            // Send WhatsApp notification if customer has phone number
+            if (customer && customer.nomor_hp) {
+                try {
+                    const notificationType = paymentResult.status === 'SUCCESS' ? 'confirmation' : 'pending';
+                    await sendPaymentNotification(customer, {
+                        ...paymentRecord,
+                        transaction_id: paymentResult.reference,
+                        amount: parseFloat(amount),
+                        method: paymentRecord.method
+                    }, notificationType);
+                } catch (whatsappError) {
+                    fastify.log.error('WhatsApp notification failed:', whatsappError);
+                    // Don't fail the payment creation if WhatsApp fails
+                }
+            }
+
+            // Log system event
+            await db.insert('system_logs', {
+                level: 'INFO',
+                module: 'payments',
+                message: `Payment created: ${paymentResult.reference}`,
+                user_id: request.user?.id || null,
+                ip_address: request.ip,
+                created_at: new Date()
+            });
+
+            return reply.send({
+                success: true,
+                data: {
+                    payment: {
+                        id: insertedPayment.id,
+                        ...paymentRecord,
+                        customer_name: customer?.nama || 'Guest',
+                        customer_phone: customer?.nomor_hp || ''
+                    },
+                    payment_result: paymentResult
+                },
+                message: 'Payment created successfully'
+            });
+
+        } catch (error) {
+            fastify.log.error('Error creating payment:', error);
+            return reply.code(500).send({
+                success: false,
+                message: 'Failed to create payment',
+                error: error.message
+            });
+        }
+    }));
+
+    // Payment Webhook Handler
+    fastify.post('/webhook/:plugin', async (request, reply) => {
+        try {
+            const { plugin } = request.params;
+            const callbackData = request.body;
+
+            fastify.log.info(`Received webhook from ${plugin}`, callbackData);
+
+            // Initialize plugin manager if not already initialized
+            if (paymentPluginManager.plugins.size === 0) {
+                await paymentPluginManager.initialize();
+            }
+
+            // Process callback through plugin manager
+            const result = await paymentPluginManager.handleCallback({
+                ...callbackData,
+                plugin: plugin
+            });
+
+            if (result.success) {
+                // Update payment record in database
+                if (result.reference) {
+                    await db.update('payments',
+                        {
+                            status: result.status.toLowerCase() === 'success' ? 'paid' : 'failed',
+                            updated_at: new Date(),
+                            notes: `Webhook processed: ${JSON.stringify(result.metadata || {})}`
+                        },
+                        { transaction_id: result.reference }
+                    );
+                }
+
+                // Send WhatsApp notification if payment is successful
+                if (result.status === 'SUCCESS') {
+                    try {
+                        // Get payment details to find customer
+                        const paymentRecord = await db.getOne('payments', {
+                            transaction_id: result.reference
+                        });
+
+                        if (paymentRecord && paymentRecord.customer_id) {
+                            const customer = await db.getOne('customers', {
+                                id: paymentRecord.customer_id
+                            });
+
+                            if (customer && customer.nomor_hp) {
+                                await sendPaymentNotification(customer, {
+                                    ...paymentRecord,
+                                    transaction_id: result.reference,
+                                    amount: paymentRecord.amount,
+                                    method: paymentRecord.method
+                                }, 'confirmation');
+                            }
+                        }
+                    } catch (whatsappError) {
+                        fastify.log.error('WhatsApp notification failed in webhook:', whatsappError);
+                        // Don't fail the webhook processing if WhatsApp fails
+                    }
+                }
+
+                return reply.code(200).send({ success: true, message: 'Webhook processed successfully' });
+            } else {
+                return reply.code(400).send({ success: false, message: 'Webhook processing failed' });
+            }
+
+        } catch (error) {
+            fastify.log.error('Error processing webhook:', error);
+            return reply.code(500).send({ success: false, message: 'Webhook processing error' });
         }
     });
 

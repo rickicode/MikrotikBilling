@@ -1,0 +1,152 @@
+{
+  "name": "task-quality-validator",
+  "version": "0.24.0",
+  "role": "quality_intelligence",
+  "specialization": "billing-system-quality",
+  "createdAt": "2025-10-19T10:00:00.000Z",
+  "capabilities": [
+    "continuous_quality_verification",
+    "completion_validation",
+    "real_time_quality_loops",
+    "technical_debt_prevention",
+    "mikrotik_system_validation",
+    "payment_system_compliance",
+    "security_audit_automation"
+  ],
+  "integration": {
+    "claudeAgents": [
+      "@code-reviewer",
+      "@quality-system-engineer",
+      "@software-engineering-expert",
+      "@security-specialist",
+      "@test-automation-expert"
+    ],
+    "qualityGates": "comprehensive"
+  },
+  "validation": {
+    "realTimeChecks": true,
+    "qualityThreshold": 0.95,
+    "preventTechnicalDebt": true,
+    "automatedRemediation": true
+  },
+  "quality_criteria": {
+    "code_quality": {
+      "metrics": ["complexity", "maintainability", "readability", "documentation"],
+      "tools": ["eslint", "sonarjs", "complexity_analysis"],
+      "thresholds": {
+        "complexity_score": 10,
+        "maintainability_index": 70,
+        "documentation_coverage": 80
+      }
+    },
+    "testing_quality": {
+      "metrics": ["coverage", "test_effectiveness", "assertion_quality"],
+      "tools": ["jest", "playwright", "coverage_reports"],
+      "thresholds": {
+        "unit_test_coverage": 85,
+        "integration_test_coverage": 75,
+        "e2e_test_coverage": 60,
+        "critical_path_coverage": 100
+      }
+    },
+    "security_quality": {
+      "metrics": ["vulnerability_scan", "dependency_check", "authentication_test"],
+      "tools": ["security_audit", "dependency_check", "penetration_testing"],
+      "thresholds": {
+        "critical_vulnerabilities": 0,
+        "high_vulnerabilities": 0,
+        "dependency_vulnerabilities": 0
+      }
+    },
+    "performance_quality": {
+      "metrics": ["response_time", "throughput", "resource_usage"],
+      "tools": ["performance_monitoring", "load_testing", "profiling"],
+      "thresholds": {
+        "api_response_time": 200,
+        "database_query_time": 100,
+        "memory_usage": 512,
+        "cpu_usage": 70
+      }
+    },
+    "mikrotik_integration_quality": {
+      "metrics": ["api_connectivity", "error_handling", "data_consistency"],
+      "tools": ["connection_tests", "data_validation", "sync_verification"],
+      "thresholds": {
+        "connection_success_rate": 99.9,
+        "data_sync_accuracy": 100,
+        "error_recovery_time": 30
+      }
+    },
+    "payment_system_quality": {
+      "metrics": ["transaction_accuracy", "plugin_compliance", "security_compliance"],
+      "tools": ["payment_tests", "compliance_checks", "security_scans"],
+      "thresholds": {
+        "transaction_success_rate": 99.9,
+        "plugin_interface_compliance": 100,
+        "pci_compliance": 100
+      }
+    },
+    "whatsapp_integration_quality": {
+      "metrics": ["message_delivery", "session_health", "template_accuracy"],
+      "tools": ["message_tests", "session_monitoring", "template_validation"],
+      "thresholds": {
+        "message_delivery_rate": 95,
+        "session_uptime": 99,
+        "template_accuracy": 100
+      }
+    }
+  },
+  "validation_workflows": {
+    "pre_commit_validation": {
+      "enabled": true,
+      "checks": [
+        "code_style",
+        "unit_tests",
+        "security_scan",
+        "documentation_check"
+      ],
+      "failure_action": "block_commit"
+    },
+    "pre_deployment_validation": {
+      "enabled": true,
+      "checks": [
+        "full_test_suite",
+        "integration_tests",
+        "security_audit",
+        "performance_benchmark",
+        "mikrotik_connectivity",
+        "payment_gateway_tests"
+      ],
+      "failure_action": "block_deployment"
+    },
+    "continuous_monitoring": {
+      "enabled": true,
+      "checks": [
+        "performance_monitoring",
+        "error_tracking",
+        "security_monitoring",
+        "user_experience_monitoring"
+      ],
+      "alert_threshold": "warning"
+    }
+  },
+  "technical_debt_prevention": {
+    "automated_detection": true,
+    "debt_classification": ["code", "test", "documentation", "security", "performance"],
+    "remediation_prioritization": "risk_based",
+    "prevention_strategies": [
+      "code_review_enforcement",
+      "test_coverage_requirements",
+      "documentation_standards",
+      "security_guidelines",
+      "performance_standards"
+    ]
+  },
+  "reporting": {
+    "quality_dashboard": true,
+    "trend_analysis": true,
+    "debt_tracking": true,
+    "improvement_recommendations": true,
+    "stakeholder_reports": true
+  }
+}

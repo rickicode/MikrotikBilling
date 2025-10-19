@@ -1,0 +1,84 @@
+{
+  "name": "task-orchestrator-bridge",
+  "version": "0.24.0",
+  "role": "coordination_intelligence",
+  "specialization": "mikrotik-billing-orchestration",
+  "createdAt": "2025-10-19T10:00:00.000Z",
+  "capabilities": [
+    "multi_agent_coordination",
+    "parallel_execution_management",
+    "dependency_resolution",
+    "workflow_choreography",
+    "mikrotik_system_orchestration",
+    "payment_gateway_coordination",
+    "whatsapp_session_management"
+  ],
+  "integration": {
+    "claudeAgents": [
+      "@orchestrator",
+      "@parallel-coordinator",
+      "@exponential-planner",
+      "@session-manager"
+    ],
+    "taskMasterSubagents": [
+      "task-orchestrator",
+      "task-executor",
+      "task-checker"
+    ]
+  },
+  "coordination": {
+    "maxConcurrentTasks": 10,
+    "dependencyResolution": "automatic",
+    "errorHandling": "graceful_degradation",
+    "priorityQueue": true,
+    "loadBalancing": "intelligent"
+  },
+  "domainKnowledge": {
+    "mikrotik_billing": {
+      "workflow_patterns": [
+        "voucher-generation-workflow",
+        "pppoe-user-lifecycle",
+        "payment-processing-workflow",
+        "whatsapp-notification-workflow",
+        "backup-restore-workflow"
+      ],
+      "agent_specialization": {
+        "voucher_management": ["@nodejs-expert", "@api-architect"],
+        "payment_systems": ["@payment-systems-expert", "@plugin-developer"],
+        "mikrotik_integration": ["@network-engineer", "@api-architect"],
+        "whatsapp_integration": ["@messaging-specialist", "@network-engineer"],
+        "database_operations": ["@database-admin", "@performance-optimizer"],
+        "frontend_development": ["@frontend-optimization-expert", "@code-reviewer"],
+        "testing": ["@test-automation-expert", "@testing-coordinator"],
+        "deployment": ["@devops-engineer", "@deployment-specialist"],
+        "security": ["@security-specialist", "@code-reviewer"]
+      }
+    }
+  },
+  "intelligence": {
+    "context_awareness": {
+      "project_architecture": true,
+      "mikrotik_api_patterns": true,
+      "payment_plugin_architecture": true,
+      "whatsapp_multi_session": true
+    },
+    "decision_matrix": {
+      "task_complexity_threshold": 5,
+      "parallel_execution_limit": 8,
+      "specialist_required_threshold": 7,
+      "quality_gate_enforcement": true
+    }
+  },
+  "monitoring": {
+    "track_agent_performance": true,
+    "workflow_analytics": true,
+    "bottleneck_detection": true,
+    "success_rate_tracking": true
+  },
+  "communication": {
+    "protocol": "enhanced_bridge_protocol",
+    "message_format": "standardized_v2",
+    "correlation_tracking": true,
+    "timeout_handling": "adaptive"
+  }
+}

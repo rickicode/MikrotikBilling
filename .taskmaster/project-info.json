@@ -1,0 +1,168 @@
+{
+  "detectedAt": "2025-10-19T10:00:00.000Z",
+  "projectName": "HIJINETWORK Mikrotik Billing System",
+  "analysis": {
+    "primaryLanguage": "javascript",
+    "runtime": "nodejs",
+    "framework": "fastify",
+    "packageManager": "npm",
+    "techStack": [
+      "nodejs",
+      "fastify",
+      "postgresql",
+      "knex",
+      "bootstrap",
+      "htmx",
+      "ejs",
+      "mikro-routeros",
+      "whatsapp-web-js",
+      "jest",
+      "playwright"
+    ],
+    "databases": [
+      "postgresql"
+    ],
+    "orms": [
+      "knex"
+    ],
+    "testingFrameworks": [
+      "jest",
+      "playwright"
+    ],
+    "frontendLibraries": [
+      "bootstrap",
+      "htmx",
+      "ejs",
+      "chart.js",
+      "lucide-react"
+    ],
+    "backendLibraries": [
+      "fastify",
+      "jsonwebtoken",
+      "bcrypt",
+      "bull",
+      "ioredis",
+      "winston",
+      "node-cron",
+      "axios",
+      "uuid",
+      "moment"
+    ],
+    "specializedIntegrations": [
+      "mikro-routeros",
+      "@whiskeysockets/baileys",
+      "qrcode",
+      "jspdf",
+      "html2canvas"
+    ],
+    "projectType": "enterprise-billing-system",
+    "domain": "telecom-infrastructure",
+    "confidence": 0.95,
+    "complexityScore": 8
+  },
+  "architecture": {
+    "patterns": [
+      "plugin-architecture",
+      "service-oriented",
+      "event-driven",
+      "multi-session-management",
+      "backup-management"
+    ],
+    "keyComponents": [
+      "voucher-management",
+      "pppoe-user-management",
+      "customer-subscriptions",
+      "payment-gateway-plugins",
+      "whatsapp-notification-system",
+      "mikrotik-api-integration",
+      "multi-location-support",
+      "backup-restore-system",
+      "plugin-manager",
+      "monitoring-system"
+    ]
+  },
+  "businessDomain": {
+    "industry": "telecom",
+    "specialization": "wifi-hotspot-billing",
+    "targetMarket": "isp-wifi-providers",
+    "businessModel": "subscription-based",
+    "keyFeatures": [
+      "voucher-generation",
+      "user-management",
+      "payment-processing",
+      "automated-notifications",
+      "real-time-monitoring"
+    ]
+  },
+  "developmentEnvironment": {
+    "nodeVersion": ">=18.0.0",
+    "packageManager": "npm",
+    "testingSetup": {
+      "unit": "jest",
+      "integration": "jest",
+      "e2e": "playwright",
+      "coverage": true
+    },
+    "codeQuality": {
+      "linting": "eslint",
+      "formatting": "not-configured",
+      "preCommit": "not-configured"
+    }
+  },
+  "integrationPoints": {
+    "externalAPIs": [
+      "mikrotik-routeros",
+      "payment-gateways",
+      "whatsapp-web"
+    ],
+    "databases": [
+      "postgresql"
+    ],
+    "caching": [
+      "redis"
+    ],
+    "queues": [
+      "bull",
+      "bullmq"
+    ]
+  },
+  "securityFeatures": [
+    "jwt-authentication",
+    "bcrypt-password-hashing",
+    "csrf-protection",
+    "helmet-security-headers",
+    "rate-limiting",
+    "session-management"
+  ],
+  "monitoring": [
+    "winston-logging",
+    "prometheus-metrics",
+    "health-checks",
+    "performance-monitoring"
+  ],
+  "deployment": {
+    "platform": "node-server",
+    "processManager": "not-specified",
+    "reverseProxy": "not-specified",
+    "ssl": "not-configured"
+  },
+  "recommendations": {
+    "modelOptimization": "claude-3-5-sonnet-20241022",
+    "specializedAgents": [
+      "@nodejs-expert",
+      "@database-admin",
+      "@api-architect",
+      "@payment-systems-expert",
+      "@messaging-specialist",
+      "@network-engineer",
+      "@plugin-developer"
+    ],
+    "mcpServers": [
+      "github",
+      "context7",
+      "playwright",
+      "prisma",
+      "browser-tools"
+    ]
+  }
+}

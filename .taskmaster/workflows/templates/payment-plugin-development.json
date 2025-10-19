@@ -1,0 +1,294 @@
+{
+  "id": "payment-plugin-development-workflow",
+  "name": "Payment Gateway Plugin Development Workflow",
+  "version": "0.24.0",
+  "category": "plugin-development",
+  "complexity": 8,
+  "estimatedDuration": "6-8 hours",
+  "description": "Complete workflow for developing payment gateway plugins with sandbox architecture",
+  "createdFor": "HIJINETWORK Mikrotik Billing System",
+  "agents": [
+    "@payment-systems-expert",
+    "@plugin-developer",
+    "@security-specialist",
+    "@api-architect",
+    "@test-automation-expert",
+    "@code-reviewer"
+  ],
+  "prerequisites": [
+    "Payment gateway API documentation",
+    "Plugin interface understanding",
+    "Security requirements review",
+    "Testing environment setup"
+  ],
+  "steps": [
+    {
+      "id": 1,
+      "name": "Payment Gateway Analysis",
+      "description": "Analyze payment gateway API and requirements",
+      "agent": "@payment-systems-expert",
+      "estimatedTime": "60 minutes",
+      "deliverables": [
+        "API integration specifications",
+        "Security requirements document",
+        "Transaction flow diagrams",
+        "Error handling specifications"
+      ],
+      "validation": {
+        "api_documentation_complete": true,
+        "security_requirements_clear": true,
+        "transaction_flow_defined": true
+      }
+    },
+    {
+      "id": 2,
+      "name": "Plugin Interface Design",
+      "description": "Design plugin class implementing PaymentPlugin interface",
+      "agent": "@plugin-developer",
+      "estimatedTime": "45 minutes",
+      "deliverables": [
+        "Plugin class structure",
+        "Interface implementation plan",
+        "Configuration schema",
+        "Error handling strategy"
+      ],
+      "dependencies": [1],
+      "validation": {
+        "interface_compliant": true,
+        "configuration_complete": true,
+        "error_handling_planned": true
+      }
+    },
+    {
+      "id": 3,
+      "name": "Core Plugin Implementation",
+      "description": "Implement core payment plugin functionality",
+      "agent": "@plugin-developer",
+      "estimatedTime": "120 minutes",
+      "deliverables": [
+        "PaymentPlugin class implementation",
+        "API client integration",
+        "Transaction handling logic",
+        "Configuration management"
+      ],
+      "dependencies": [2],
+      "validation": {
+        "required_methods_implemented": true,
+        "api_integration_working": true,
+        "transaction_logic_correct": true
+      }
+    },
+    {
+      "id": 4,
+      "name": "Security Implementation",
+      "description": "Implement security measures and validation",
+      "agent": "@security-specialist",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "Input validation and sanitization",
+        "API signature verification",
+        "Data encryption implementation",
+        "Security audit checklist"
+      ],
+      "dependencies": [3],
+      "validation": {
+        "input_validation_complete": true,
+        "signature_verification_working": true,
+        "encryption_implemented": true,
+        "security_audit_passed": true
+      }
+    },
+    {
+      "id": 5,
+      "name": "Plugin Manager Integration",
+      "description": "Integrate plugin with WordPress-style plugin manager",
+      "agent": "@plugin-developer",
+      "estimatedTime": "60 minutes",
+      "deliverables": [
+        "Plugin metadata configuration",
+        "Manager integration code",
+        "Activation/deactivation logic",
+        "Error isolation implementation"
+      ],
+      "dependencies": [4],
+      "validation": {
+        "manager_integration_complete": true,
+        "activation_mechanism_works": true,
+        "isolation_functional": true
+      }
+    },
+    {
+      "id": 6,
+      "name": "Frontend Configuration Interface",
+      "description": "Create configuration interface for payment plugin",
+      "agent": "@frontend-optimization-expert",
+      "estimatedTime": "75 minutes",
+      "deliverables": [
+        "Plugin configuration forms",
+        "Settings validation interface",
+        "Status monitoring dashboard",
+        "Help documentation UI"
+      ],
+      "dependencies": [5],
+      "validation": {
+        "configuration_interface_usable": true,
+        "validation_feedback_clear": true,
+        "status_monitoring_working": true
+      }
+    },
+    {
+      "id": 7,
+      "name": "Comprehensive Testing Suite",
+      "description": "Implement testing for payment plugin",
+      "agent": "@test-automation-expert",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "Unit tests for plugin methods",
+        "Integration tests with payment gateway",
+        "Security testing scenarios",
+        "Mock payment gateway for testing"
+      ],
+      "dependencies": [6],
+      "validation": {
+        "test_coverage_above_85": true,
+        "security_tests_comprehensive": true,
+        "mock_gateway_functional": true
+      }
+    },
+    {
+      "id": 8,
+      "name": "Plugin Sandboxing Validation",
+      "description": "Test plugin isolation and crash recovery",
+      "agent": "@plugin-developer",
+      "estimatedTime": "45 minutes",
+      "deliverables": [
+        "Sandbox isolation tests",
+        "Crash recovery mechanisms",
+        "Error propagation tests",
+        "Performance impact analysis"
+      ],
+      "dependencies": [7],
+      "validation": {
+        "isolation_effective": true,
+        "crash_recovery_works": true,
+        "performance_impact_minimal": true
+      }
+    },
+    {
+      "id": 9,
+      "name": "Documentation and Deployment",
+      "description": "Create comprehensive documentation and deployment package",
+      "agent": "@documentation-specialist",
+      "estimatedTime": "60 minutes",
+      "deliverables": [
+        "Plugin installation guide",
+        "API integration documentation",
+        "Configuration instructions",
+        "Troubleshooting guide"
+      ],
+      "dependencies": [8],
+      "validation": {
+        "documentation_complete": true,
+        "installation_guide_clear": true,
+        "troubleshooting_comprehensive": true
+      }
+    }
+  ],
+  "qualityGates": {
+    "preDevelopment": [
+      "payment_gateway_docs_available",
+      "security_requirements_clear",
+      "plugin_interface_understood"
+    ],
+    "duringDevelopment": [
+      "interface_compliance_maintained",
+      "security_best_practices_followed",
+      "isolation_mechanisms_implemented"
+    ],
+    "preDeployment": [
+      "all_tests_passing",
+      "security_audit_clean",
+      "isolation_validation_passed",
+      "documentation_complete"
+    ]
+  },
+  "securityRequirements": [
+    "PCI DSS compliance",
+    "Data encryption in transit and at rest",
+    "API signature verification",
+    "Input validation and sanitization",
+    "Error message sanitization",
+    "Rate limiting implementation",
+    "Audit logging for transactions"
+  ],
+  "artifacts": {
+    "code": [
+      "src/plugins/payments/[payment-method].js",
+      "src/lib/PaymentPlugin.js (interface)",
+      "views/plugins/payment-[method].ejs",
+      "src/test/unit/payment-[method].test.js",
+      "src/test/integration/payment-[method].test.js",
+      "src/test/security/payment-[method]-security.test.js"
+    ],
+    "configuration": [
+      "config/payment-methods.json",
+      "database/migrations/add_payment_method.js"
+    ],
+    "documentation": [
+      "docs/plugins/payment-[method]-guide.md",
+      "docs/plugins/payment-[method]-api.md",
+      "docs/plugins/payment-[method]-security.md"
+    ]
+  },
+  "successCriteria": [
+    "Plugin implements PaymentPlugin interface completely",
+    "Payment transactions processed successfully",
+    "Security audit passes with no issues",
+    "Plugin isolation prevents system crashes",
+    "Configuration interface user-friendly",
+    "All tests passing with 85%+ coverage",
+    "Documentation comprehensive and clear"
+  ],
+  "testingRequirements": {
+    "unitTests": {
+      "coverage": "85%",
+      "focus": ["plugin_methods", "error_handling", "validation"]
+    },
+    "integrationTests": {
+      "coverage": "80%",
+      "focus": ["payment_gateway", "plugin_manager", "database"]
+    },
+    "securityTests": {
+      "coverage": "100%",
+      "focus": ["input_validation", "api_security", "data_protection"]
+    },
+    "performanceTests": {
+      "metrics": ["response_time", "throughput", "memory_usage"],
+      "thresholds": {"response_time": "200ms", "memory_increase": "50MB"}
+    }
+  },
+  "deploymentChecklist": [
+    "Plugin interface compliance verified",
+    "Security audit completed",
+    "All tests passing",
+    "Documentation reviewed",
+    "Performance benchmarks met",
+    "Error handling tested",
+    "Sandbox isolation validated",
+    "Configuration tested in multiple environments"
+  ],
+  "monitoring": {
+    "metrics": [
+      "transaction_success_rate",
+      "api_response_time",
+      "error_rate_by_type",
+      "plugin_performance_impact"
+    ],
+    "alerts": [
+      "high_failure_rate",
+      "security_vulnerability_detected",
+      "performance_degradation",
+      "plugin_crash_detected"
+    ]
+  }
+}

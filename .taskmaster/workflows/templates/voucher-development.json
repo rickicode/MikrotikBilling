@@ -1,0 +1,238 @@
+{
+  "id": "voucher-development-workflow",
+  "name": "Voucher System Development Workflow",
+  "version": "0.24.0",
+  "category": "feature-development",
+  "complexity": 7,
+  "estimatedDuration": "4-6 hours",
+  "description": "Complete workflow for developing voucher hotspot management features",
+  "createdFor": "HIJINETWORK Mikrotik Billing System",
+  "agents": [
+    "@nodejs-expert",
+    "@api-architect",
+    "@network-engineer",
+    "@database-admin",
+    "@test-automation-expert",
+    "@code-reviewer"
+  ],
+  "prerequisites": [
+    "PostgreSQL database connection",
+    "Mikrotik RouterOS access",
+    "Development environment setup",
+    "Git branch created"
+  ],
+  "steps": [
+    {
+      "id": 1,
+      "name": "Requirements Analysis",
+      "description": "Analyze voucher system requirements and specifications",
+      "agent": "@api-architect",
+      "estimatedTime": "30 minutes",
+      "deliverables": [
+        "Technical requirements document",
+        "API endpoint specifications",
+        "Database schema changes"
+      ],
+      "validation": {
+        "requirements_complete": true,
+        "api_spec_approved": true,
+        "db_changes_defined": true
+      }
+    },
+    {
+      "id": 2,
+      "name": "Database Schema Implementation",
+      "description": "Implement database changes for voucher system",
+      "agent": "@database-admin",
+      "estimatedTime": "45 minutes",
+      "deliverables": [
+        "Knex migration files",
+        "Seed data for testing",
+        "Schema validation scripts"
+      ],
+      "dependencies": [1],
+      "validation": {
+        "migration_executable": true,
+        "seed_data_valid": true,
+        "foreign_keys_correct": true
+      }
+    },
+    {
+      "id": 3,
+      "name": "Mikrotik API Integration",
+      "description": "Implement Mikrotik RouterOS API integration for voucher management",
+      "agent": "@network-engineer",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "Mikrotik client service",
+        "Voucher creation API calls",
+        "Error handling and retry logic",
+        "Connection pooling setup"
+      ],
+      "dependencies": [2],
+      "validation": {
+        "api_connection_successful": true,
+        "voucher_creation_works": true,
+        "error_handling_complete": true
+      }
+    },
+    {
+      "id": 4,
+      "name": "Backend API Development",
+      "description": "Develop Fastify routes and services for voucher management",
+      "agent": "@nodejs-expert",
+      "estimatedTime": "120 minutes",
+      "deliverables": [
+        "Fastify route handlers",
+        "Service layer implementation",
+        "Input validation schemas",
+        "Error handling middleware"
+      ],
+      "dependencies": [3],
+      "validation": {
+        "routes_respond_correctly": true,
+        "validation_schemas_complete": true,
+        "error_handling_implemented": true
+      }
+    },
+    {
+      "id": 5,
+      "name": "Frontend Interface Development",
+      "description": "Create Bootstrap/EJS frontend for voucher management",
+      "agent": "@frontend-optimization-expert",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "EJS templates for voucher pages",
+        "Bootstrap responsive design",
+        "HTMX interactive components",
+        "Form validation frontend"
+      ],
+      "dependencies": [4],
+      "validation": {
+        "ui_responsive": true,
+        "forms_validate_correctly": true,
+        "htmx_interactions_work": true
+      }
+    },
+    {
+      "id": 6,
+      "name": "Unit Testing Implementation",
+      "description": "Write comprehensive unit tests for voucher system",
+      "agent": "@test-automation-expert",
+      "estimatedTime": "60 minutes",
+      "deliverables": [
+        "Jest unit tests for services",
+        "Route handler tests",
+        "Database operation tests",
+        "Mock Mikrotik API tests"
+      ],
+      "dependencies": [5],
+      "validation": {
+        "test_coverage_above_80": true,
+        "all_tests_passing": true,
+        "mock_data_accurate": true
+      }
+    },
+    {
+      "id": 7,
+      "name": "Integration Testing",
+      "description": "Implement end-to-end integration tests",
+      "agent": "@test-automation-expert",
+      "estimatedTime": "45 minutes",
+      "deliverables": [
+        "Playwright E2E tests",
+        "API integration tests",
+        "Database integration tests",
+        "Mikrotik integration tests"
+      ],
+      "dependencies": [6],
+      "validation": {
+        "e2e_scenarios_covered": true,
+        "integration_tests_pass": true,
+        "critical_paths_tested": true
+      }
+    },
+    {
+      "id": 8,
+      "name": "Code Review and Quality Assurance",
+      "description": "Comprehensive code review and quality validation",
+      "agent": "@code-reviewer",
+      "estimatedTime": "30 minutes",
+      "deliverables": [
+        "Code review report",
+        "Security validation",
+        "Performance recommendations",
+        "Documentation review"
+      ],
+      "dependencies": [7],
+      "validation": {
+        "code_quality_approved": true,
+        "security_issues_resolved": true,
+        "performance_acceptable": true,
+        "documentation_complete": true
+      }
+    }
+  ],
+  "qualityGates": {
+    "preDevelopment": [
+      "requirements_clear",
+      "environment_ready",
+      "dependencies_available"
+    ],
+    "duringDevelopment": [
+      "code_follows_patterns",
+      "tests_written",
+      "security_considered"
+    ],
+    "preDeployment": [
+      "all_tests_pass",
+      "code_review_approved",
+      "security_scan_clean",
+      "performance_acceptable"
+    ]
+  },
+  "artifacts": {
+    "code": [
+      "src/routes/vouchers.js",
+      "src/services/VoucherService.js",
+      "src/services/MikrotikVoucherClient.js",
+      "views/vouchers/*.ejs",
+      "migrations/*_vouchers.js",
+      "src/test/unit/voucher*.test.js",
+      "src/test/integration/voucher*.test.js",
+      "tests/voucher*.spec.js"
+    ],
+    "documentation": [
+      "docs/voucher-api.md",
+      "docs/mikrotik-integration.md"
+    ]
+  },
+  "successCriteria": [
+    "Vouchers can be created via API",
+    "Mikrotik users created automatically",
+    "Frontend interface fully functional",
+    "All tests passing with 80%+ coverage",
+    "Code review approved",
+    "No security vulnerabilities",
+    "Performance meets requirements"
+  ],
+  "rollbackPlan": {
+    "database_rollback": "Migration rollback available",
+    "code_rollback": "Git branch management",
+    "configuration_rollback": "Config backup restore"
+  },
+  "monitoring": {
+    "metrics": [
+      "voucher_creation_rate",
+      "mikrotik_api_response_time",
+      "database_query_performance",
+      "error_rates"
+    ],
+    "alerts": [
+      "mikrotik_connection_failure",
+      "database_errors",
+      "high_error_rate",
+      "performance_degradation"
+    ]
+  }
+}

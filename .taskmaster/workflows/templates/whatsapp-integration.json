@@ -1,0 +1,318 @@
+{
+  "id": "whatsapp-integration-workflow",
+  "name": "WhatsApp Multi-Session Integration Workflow",
+  "version": "0.24.0",
+  "category": "messaging-integration",
+  "complexity": 8,
+  "estimatedDuration": "5-7 hours",
+  "description": "Complete workflow for implementing WhatsApp multi-session notification system with template management",
+  "createdFor": "HIJINETWORK Mikrotik Billing System",
+  "agents": [
+    "@messaging-specialist",
+    "@network-engineer",
+    "@frontend-optimization-expert",
+    "@database-admin",
+    "@test-automation-expert",
+    "@security-specialist"
+  ],
+  "prerequisites": [
+    "WhatsApp Web JS library understanding",
+    "Multi-session architecture requirements",
+    "Rate limiting specifications",
+    "Template system design"
+  ],
+  "steps": [
+    {
+      "id": 1,
+      "name": "WhatsApp Architecture Design",
+      "description": "Design multi-session WhatsApp integration architecture",
+      "agent": "@messaging-specialist",
+      "estimatedTime": "60 minutes",
+      "deliverables": [
+        "Multi-session architecture diagram",
+        "Session management strategy",
+        "Load balancing approach",
+        "Failover mechanisms design"
+      ],
+      "validation": {
+        "architecture_scalable": true,
+        "session_management_clear": true,
+        "failover_defined": true
+      }
+    },
+    {
+      "id": 2,
+      "name": "Session Management Implementation",
+      "description": "Implement WhatsApp multi-session management system",
+      "agent": "@network-engineer",
+      "estimatedTime": "120 minutes",
+      "deliverables": [
+        "WhatsApp session manager class",
+        "Session pool implementation",
+        "Health monitoring system",
+        "Auto-recovery mechanisms"
+      ],
+      "dependencies": [1],
+      "validation": {
+        "sessions_created_successfully": true,
+        "health_monitoring_working": true,
+        "auto_recovery_functional": true
+      }
+    },
+    {
+      "id": 3,
+      "name": "Rate Limiting and Queue System",
+      "description": "Implement rate limiting and message queue management",
+      "agent": "@messaging-specialist",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "Rate limiting implementation (1 msg/sec per session)",
+        "Message queue system with Bull/BullMQ",
+        "Priority queue management",
+        "Queue monitoring dashboard"
+      ],
+      "dependencies": [2],
+      "validation": {
+        "rate_limiting_enforced": true,
+        "queue_processing_correct": true,
+        "priority_handling_working": true
+      }
+    },
+    {
+      "id": 4,
+      "name": "Template System Development",
+      "description": "Create advanced WhatsApp template system with WYSIWYG editor",
+      "agent": "@frontend-optimization-expert",
+      "estimatedTime": "120 minutes",
+      "deliverables": [
+        "Template database schema",
+        "WYSIWYG template editor",
+        "Variable substitution engine",
+        "Template preview system"
+      ],
+      "dependencies": [3],
+      "validation": {
+        "template_editor_usable": true,
+        "variable_substitution_works": true,
+        "preview_accurate": true
+      }
+    },
+    {
+      "id": 5,
+      "name": "Message Service Implementation",
+      "description": "Implement core message sending and receiving services",
+      "agent": "@messaging-specialist",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "Message sending service",
+        "Message receiving handler",
+        "Media attachment support",
+        "Message status tracking"
+      ],
+      "dependencies": [4],
+      "validation": {
+        "message_sending_works": true,
+        "receiving_handler_functional": true,
+        "media_attachments_supported": true
+      }
+    },
+    {
+      "id": 6,
+      "name": "Load Balancing and Failover",
+      "description": "Implement intelligent load balancing and failover system",
+      "agent": "@network-engineer",
+      "estimatedTime": "75 minutes",
+      "deliverables": [
+        "Session load balancer",
+        "Failover detection system",
+        "Automatic session switching",
+        "Performance monitoring"
+      ],
+      "dependencies": [5],
+      "validation": {
+        "load_balancing_effective": true,
+        "failover_detection_working": true,
+        "automatic_switching_functional": true
+      }
+    },
+    {
+      "id": 7,
+      "name": "Database Integration",
+      "description": "Implement database integration for WhatsApp system",
+      "agent": "@database-admin",
+      "estimatedTime": "60 minutes",
+      "deliverables": [
+        "WhatsApp tables schema",
+        "Session storage implementation",
+        "Message logging system",
+        "Template storage system"
+      ],
+      "dependencies": [6],
+      "validation": {
+        "database_schema_optimal": true,
+        "session_storage_reliable": true,
+        "message_logging_complete": true
+      }
+    },
+    {
+      "id": 8,
+      "name": "Frontend Management Interface",
+      "description": "Create WhatsApp management interface for administrators",
+      "agent": "@frontend-optimization-expert",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "Session management dashboard",
+        "QR code scanner for session login",
+        "Template management interface",
+        "Message monitoring dashboard"
+      ],
+      "dependencies": [7],
+      "validation": {
+        "dashboard_user_friendly": true,
+        "qr_scanner_working": true,
+        "template_management_complete": true
+      }
+    },
+    {
+      "id": 9,
+      "name": "Security and Privacy Implementation",
+      "description": "Implement security measures and privacy protections",
+      "agent": "@security-specialist",
+      "estimatedTime": "60 minutes",
+      "deliverables": [
+        "End-to-end encryption validation",
+        "Session security hardening",
+        "Data privacy measures",
+        "Access control implementation"
+      ],
+      "dependencies": [8],
+      "validation": {
+        "encryption_working": true,
+        "session_security_hardened": true,
+        "privacy_measures_implemented": true
+      }
+    },
+    {
+      "id": 10,
+      "name": "Comprehensive Testing Suite",
+      "description": "Implement testing for WhatsApp integration system",
+      "agent": "@test-automation-expert",
+      "estimatedTime": "90 minutes",
+      "deliverables": [
+        "Unit tests for WhatsApp services",
+        "Integration tests for session management",
+        "E2E tests for message flow",
+        "Load testing for high volume scenarios"
+      ],
+      "dependencies": [9],
+      "validation": {
+        "test_coverage_above_80": true,
+        "load_tests_passing": true,
+        "integration_scenarios_covered": true
+      }
+    }
+  ],
+  "qualityGates": {
+    "preDevelopment": [
+      "whatsapp_api_requirements_clear",
+      "multi_session_strategy_defined",
+      "rate_limiting_specifications_available"
+    ],
+    "duringDevelopment": [
+      "rate_limiting_implemented",
+      "session_isolation_maintained",
+      "security_best_practices_followed"
+    ],
+    "preDeployment": [
+      "all_sessions_stable",
+      "message_delivery_reliable",
+      "template_system_functional",
+      "security_audit_passed"
+    ]
+  },
+  "performanceRequirements": {
+    "messageThroughput": {
+      "per_session": "1 message/second",
+      "total_system": "10+ concurrent sessions"
+    },
+    "sessionManagement": {
+      "startup_time": "< 30 seconds",
+      "recovery_time": "< 60 seconds",
+      "health_check_interval": "30 seconds"
+    },
+    "templateProcessing": {
+      "rendering_time": "< 100ms",
+      "variable_substitution": "< 50ms"
+    }
+  },
+  "securityRequirements": [
+    "Session data encryption",
+    "Message content privacy",
+    "QR code security",
+    "Rate limiting enforcement",
+    "Access control for admin interfaces",
+    "Audit logging for all operations"
+  ],
+  "artifacts": {
+    "code": [
+      "src/services/WhatsAppService.js",
+      "src/services/WhatsAppSessionManager.js",
+      "src/services/WhatsAppTemplateService.js",
+      "src/services/MessageQueueService.js",
+      "src/routes/whatsapp.js",
+      "src/routes/whatsapp-templates.js",
+      "views/whatsapp/*.ejs",
+      "views/whatsapp-templates/*.ejs"
+    ],
+    "database": [
+      "migrations/*_whatsapp.js",
+      "models/whatsapp_sessions.js",
+      "models/whatsapp_templates.js",
+      "models/whatsapp_messages.js"
+    ],
+    "tests": [
+      "src/test/unit/whatsapp*.test.js",
+      "src/test/integration/whatsapp*.test.js",
+      "tests/whatsapp*.spec.js"
+    ]
+  },
+  "successCriteria": [
+    "Multiple WhatsApp sessions running simultaneously",
+    "Rate limiting enforced at 1 msg/sec per session",
+    "Template system with variable substitution working",
+    "QR code login functionality working",
+    "Message delivery reliability > 95%",
+    "Automatic failover between sessions",
+    "Security audit passed",
+    "Load testing successful"
+  ],
+  "monitoring": {
+    "metrics": [
+      "session_health_status",
+      "message_delivery_rate",
+      "queue_processing_time",
+      "template_usage_statistics",
+      "error_rates_by_session"
+    ],
+    "alerts": [
+      "session_disconnect_detected",
+      "message_failure_rate_high",
+      "queue_backup_detected",
+      "rate_limiting_violations"
+    ]
+  },
+  "troubleshootingGuide": {
+    "commonIssues": [
+      "Session connection failures",
+      "QR code generation issues",
+      "Message delivery failures",
+      "Template rendering errors"
+    ],
+    "diagnosticTools": [
+      "Session health checker",
+      "Message queue monitor",
+      "Template validator",
+      "Network connectivity tester"
+    ]
+  }
+}

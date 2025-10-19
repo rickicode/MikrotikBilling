@@ -1,20 +1,20 @@
 {
+  "version": "0.24.0",
+  "createdAt": "2025-10-19T10:00:00.000Z",
+  "updatedAt": "2025-10-19T10:00:00.000Z",
   "models": {
     "main": "claude-3-5-sonnet-20241022",
     "research": "perplexity-llama-3.1-sonar-large-128k-online",
     "fallback": "gpt-4o-mini"
   },
-  "rules": [
-    "cursor",
-    "claude"
-  ],
   "project": {
-    "name": "MikrotikBilling",
-    "type": "enterprise-billing-system",
+    "name": "HIJINETWORK Mikrotik Billing System",
+    "root": "/home/ricki/workspaces/MikrotikBilling",
+    "type": "claude-007-enhanced",
     "complexity": 8,
-    "domain": "telecom-infrastructure",
+    "domain": "telecom-billing",
     "initialized": "2025-10-18T07:25:32.048Z",
-    "last_updated": "2025-10-18T14:30:00.000Z",
+    "last_updated": "2025-10-19T10:00:00.000Z",
     "features": [
       "voucher-management",
       "pppoe-user-management",
@@ -23,8 +23,22 @@
       "mikrotik-api-integration",
       "multi-location-support",
       "backup-management",
-      "plugin-ecosystem"
+      "plugin-ecosystem",
+      "codebase-aware-intelligence",
+      "hybrid-agent-architecture",
+      "exponential-parallel-execution",
+      "continuous-quality-revolution"
     ]
+  },
+  "features": {
+    "codebaseAware": true,
+    "bridgeAgents": true,
+    "parallelExecution": true,
+    "autonomousDevelopment": true,
+    "qualityValidation": true,
+    "enterpriseMode": true,
+    "mcpIntegration": true,
+    "gitWorkflow": true
   },
   "agent_system": {
     "total_agents": 19,
@@ -72,6 +86,95 @@
       "browser-tools",
       "web-search-prime"
     ]
+  },
+  "bridgeAgents": {
+    "taskOrchestrator": {
+      "enabled": true,
+      "config": "./bridge-agents/orchestrator/config.json",
+      "specialization": "mikrotik-billing-orchestration"
+    },
+    "taskExecutor": {
+      "enabled": true,
+      "config": "./bridge-agents/executor/config.json",
+      "specialization": "telecom-system-execution"
+    },
+    "taskChecker": {
+      "enabled": true,
+      "config": "./bridge-agents/checker/config.json",
+      "specialization": "billing-system-quality"
+    }
+  },
+  "integration": {
+    "claudeCode": {
+      "agentSystem": "claude-007",
+      "version": "2.0",
+      "agentCount": 19
+    },
+    "mcp": {
+      "servers": [
+        "task-master-ai",
+        "github",
+        "context7",
+        "basic-memory",
+        "sequential-thinking",
+        "zen",
+        "playwright",
+        "prisma",
+        "filesystem",
+        "browser-tools",
+        "web-search-prime"
+      ],
+      "enabled": true,
+      "validationRequired": true
+    }
+  },
+  "workflow": {
+    "defaultComplexity": 8,
+    "autoAgentAssignment": true,
+    "parallelExecution": true,
+    "maxConcurrentTasks": 10,
+    "qualityGates": {
+      "codeReview": true,
+      "testing": true,
+      "security": true,
+      "performance": true
+    }
+  },
+  "git": {
+    "enforceCommitFormat": true,
+    "commitFormat": "type(scope): description - @agent1 @agent2",
+    "autoTagAgents": true,
+    "branchProtection": true,
+    "prRequired": true
+  },
+  "testing": {
+    "frameworks": ["jest", "playwright"],
+    "coverage": {
+      "threshold": 80,
+      "enforced": true
+    },
+    "e2e": {
+      "enabled": true,
+      "headless": true,
+      "parallel": true
+    }
+  },
+  "monitoring": {
+    "enabled": true,
+    "metrics": ["task_completion", "agent_performance", "quality_scores"],
+    "alerts": {
+      "failure_rate": 0.1,
+      "performance_degradation": 0.2
+    }
+  },
+  "logging": {
+    "level": "info",
+    "file": "./logs/taskmaster.log",
+    "rotation": {
+      "enabled": true,
+      "maxSizeMB": 100,
+      "maxFiles": 10
+    }
   },
   "quality_standards": {
     "commit_format": "type(scope): description - @agent1 @agent2",
