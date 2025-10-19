@@ -145,8 +145,8 @@ const paymentRoutes = (fastify, options, done) => {
                         END), 0) as monthly_revenue
                     FROM payments
                 `);
-                if (statsResult && statsResult.length > 0) {
-                    Object.assign(stats, statsResult[0]);
+                if (statsResult && statsResult.rows && statsResult.rows.length > 0) {
+                    Object.assign(stats, statsResult.rows[0]);
                 }
             } catch (error) {
                 fastify.log.error('Error getting payment stats:', error);
@@ -166,8 +166,8 @@ const paymentRoutes = (fastify, options, done) => {
                     FROM payments
                     WHERE DATE(created_at) = CURRENT_DATE
                 `);
-                if (todayResult && todayResult.length > 0) {
-                    Object.assign(todaySummary, todayResult[0]);
+                if (todayResult && todayResult.rows && todayResult.rows.length > 0) {
+                    Object.assign(todaySummary, todayResult.rows[0]);
                 }
             } catch (error) {
                 fastify.log.error('Error getting today summary:', error);
@@ -222,7 +222,7 @@ const paymentRoutes = (fastify, options, done) => {
 
             // Get active subscriptions
             const subscriptions = await db.query(`
-                SELECT s.*, c.nama as customer_name, p.name as profile_name
+                SELECT s.*, c.name as customer_name, p.name as profile_name
                 FROM subscriptions s
                 JOIN customers c ON s.customer_id = c.id
                 JOIN profiles p ON s.profile_id = p.id
@@ -534,8 +534,8 @@ const paymentRoutes = (fastify, options, done) => {
             if (search) {
                 whereConditions.push(`
                     (p.id ILIKE $${paramIndex} OR
-                     c.nama ILIKE $${paramIndex + 1} OR
-                     c.nomor_hp ILIKE $${paramIndex + 2} OR
+                     c.name ILIKE $${paramIndex + 1} OR
+                     c.phone ILIKE $${paramIndex + 2} OR
                      pr.name ILIKE $${paramIndex + 3} OR
                      p.notes ILIKE $${paramIndex + 4})
                 `);
@@ -580,14 +580,14 @@ const paymentRoutes = (fastify, options, done) => {
                 ${whereClause}
             `;
             const countResult = await db.query(countQuery, queryParams);
-            const total = countResult[0]?.total || 0;
+            const total = countResult.rows?.[0]?.total || 0;
 
             // Get payments
             const paymentsQuery = `
                 SELECT
                     p.*,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone,
+                    c.name as customer_name,
+                    c.phone as customer_phone,
                     s.profile_id,
                     pr.name as subscription_name,
                     CASE
@@ -616,7 +616,7 @@ const paymentRoutes = (fastify, options, done) => {
             return reply.send({
                 success: true,
                 data: {
-                    payments: paymentsResult,
+                    payments: paymentsResult.rows || [],
                     pagination
                 }
             });
@@ -641,7 +641,7 @@ const paymentRoutes = (fastify, options, done) => {
                 FROM payments
             `;
             const result = await db.query(statsQuery);
-            const stats = result[0] || {};
+            const stats = result.rows?.[0] || {};
 
             return reply.send({
                 success: true,
@@ -661,7 +661,7 @@ const paymentRoutes = (fastify, options, done) => {
                 WHERE DATE(created_at) = CURRENT_DATE
             `;
             const result = await db.query(query);
-            const summary = result[0] || {};
+            const summary = result.rows?.[0] || {};
 
             return reply.send({
                 success: true,
@@ -905,8 +905,8 @@ const paymentRoutes = (fastify, options, done) => {
                         const query = `
                 SELECT
                     p.*,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone
+                    c.name as customer_name,
+                    c.phone as customer_phone
                 FROM payments p
                 LEFT JOIN customers c ON p.customer_id = c.id
                 WHERE p.method = 'duitku'
@@ -1122,8 +1122,8 @@ const paymentRoutes = (fastify, options, done) => {
             if (search) {
                 whereConditions.push(`
                     (p.id ILIKE $${paramIndex} OR
-                     c.nama ILIKE $${paramIndex + 1} OR
-                     c.nomor_hp ILIKE $${paramIndex + 2} OR
+                     c.name ILIKE $${paramIndex + 1} OR
+                     c.phone ILIKE $${paramIndex + 2} OR
                      pr.name ILIKE $${paramIndex + 3} OR
                      p.notes ILIKE $${paramIndex + 4})
                 `);
@@ -1168,8 +1168,8 @@ const paymentRoutes = (fastify, options, done) => {
                     p.transaction_id as duitku_reference,
                     p.notes as description,
                     p.created_at,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone,
+                    c.name as customer_name,
+                    c.phone as customer_phone,
                     pr.name as subscription_name
                 FROM payments p
                 LEFT JOIN customers c ON p.customer_id = c.id
@@ -1304,8 +1304,8 @@ const paymentRoutes = (fastify, options, done) => {
             const query = `
                 SELECT
                     s.*,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone,
+                    c.name as customer_name,
+                    c.phone as customer_phone,
                     pr.name as profile_name,
                     p.created_at as last_payment_date
                 FROM subscriptions s
@@ -1351,7 +1351,7 @@ const paymentRoutes = (fastify, options, done) => {
                 WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
             `;
             const result = await db.query(reconcileQuery);
-            const stats = result[0] || {};
+            const stats = result.rows?.[0] || {};
 
             const status = stats.pending > 0 ? 'Action Required' : 'Up to date';
             const message = stats.pending > 0
