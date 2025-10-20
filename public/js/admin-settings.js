@@ -564,19 +564,7 @@
                 console.warn('⚠️ Header status element (mikrotikStatus) not found');
             }
 
-            // Update juga class-based indicator (backup untuk settings page)
-            const classStatus = document.querySelector('.mikrotik-status-indicator');
-            if (classStatus) {
-                console.log('✅ Found class-based status indicator:', classStatus);
-                if (details.connected) {
-                    classStatus.className = 'mikrotik-status-indicator status-connected';
-                    classStatus.textContent = 'Connected';
-                } else {
-                    classStatus.className = 'mikrotik-status-indicator status-disconnected';
-                    classStatus.textContent = 'Disconnected';
-                }
-            }
-
+  
             // Update global Mikrotik status in header (fallback selector)
             const globalStatus = document.querySelector('[data-mikrotik-status]');
             if (globalStatus) {
@@ -642,48 +630,7 @@
                 }
             }
 
-            // Update juga class-based indicator (backup untuk settings page)
-            const statusIndicator = document.querySelector('.mikrotik-status-indicator');
-            if (statusIndicator) {
-                if (details.connected) {
-                    statusIndicator.className = 'mikrotik-status-indicator status-connected';
-                    statusIndicator.textContent = 'Connected';
-                } else {
-                    statusIndicator.className = 'mikrotik-status-indicator status-disconnected';
-                    statusIndicator.textContent = 'Disconnected';
-                }
-            }
-
-            // Update connection details in Mikrotik tab
-            const connectionInfo = document.getElementById('connectionInfo');
-            if (connectionInfo) {
-                connectionInfo.innerHTML = `
-                    <div class="alert ${details.connected ? 'alert-success' : 'alert-danger'}" role="alert">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Status:</strong> 
-                                <span class="badge ${details.connected ? 'bg-success' : 'bg-danger'}">
-                                    ${details.connected ? 'Connected' : 'Disconnected'}
-                                </span>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="small">
-                            <strong>Host:</strong> ${details.host}<br>
-                            <strong>Port:</strong> ${details.port}<br>
-                            <strong>Username:</strong> ${details.username}
-                            ${details.routeros ? `<br><strong>RouterOS:</strong> ${details.routeros.name}` : ''}
-                            ${details.note ? `<br><em>${details.note}</em>` : ''}
-                        </div>
-                    </div>
-                `;
-
-                // Auto-hide after 5 seconds
-                setTimeout(() => {
-                    connectionInfo.style.opacity = '0.7';
-                }, 5000);
-            }
-
+    
             // Update global Mikrotik status in header (if exists)
             const globalStatus = document.querySelector('[data-mikrotik-status]');
             if (globalStatus) {

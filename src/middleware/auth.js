@@ -319,7 +319,7 @@ class AuthMiddleware {
       try {
         // Use parameterized query to prevent SQL injection
         const adminResult = await this.fastify.db.query(
-          'SELECT * FROM admin_users WHERE username = $1 AND active = true',
+          'SELECT * FROM admin_users WHERE username = $1 AND is_active = true',
           [sanitizedUsername]
         );
         admin = adminResult.rows && adminResult.rows.length > 0 ? adminResult.rows[0] : null;

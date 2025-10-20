@@ -22,28 +22,28 @@ class BankTransferPlugin extends PaymentPlugin {
         code: 'bca',
         name: 'BCA (Bank Central Asia)',
         va_prefix: '88088',
-        account_number: config.accounts?.bca || '',
+        account_number: config.accounts?.bca || '1234567890',
         account_name: config.account_names?.bca || 'PT. HIJINETWORK'
       },
       {
         code: 'bni',
         name: 'BNI (Bank Negara Indonesia)',
         va_prefix: '88089',
-        account_number: config.accounts?.bni || '',
+        account_number: config.accounts?.bni || '0987654321',
         account_name: config.account_names?.bni || 'PT. HIJINETWORK'
       },
       {
         code: 'bri',
         name: 'BRI (Bank Rakyat Indonesia)',
         va_prefix: '88090',
-        account_number: config.accounts?.bri || '',
+        account_number: config.accounts?.bri || '5555666677',
         account_name: config.account_names?.bri || 'PT. HIJINETWORK'
       },
       {
         code: 'mandiri',
         name: 'Bank Mandiri',
         va_prefix: '88091',
-        account_number: config.accounts?.mandiri || '',
+        account_number: config.accounts?.mandiri || '9999888877',
         account_name: config.account_names?.mandiri || 'PT. HIJINETWORK'
       }
     ];

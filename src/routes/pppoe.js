@@ -583,6 +583,66 @@ async function pppoeRoutes(fastify, options) {
     }
   });
 
+  // Create PPPoE user (alternative route)
+  fastify.post('/create', {
+    preHandler: [auth.requireRole(['admin'])]
+  }, async (request, reply) => {
+    const { customer_id, profile_id, username, password, start_date, duration_days, custom_price_sell, custom_price_cost } = request.body;
+
+    try {
+      const profile = await db.query('SELECT * FROM pppoe_profiles WHERE id = $1', [profile_id]);
+      if (!profile.rows || profile.rows.length === 0) {
+        return reply.code(404).send('PPPoE profile not found');
+      }
+
+      const customer = await db.query('SELECT * FROM customers WHERE id = $1', [customer_id]);
+      if (!customer.rows || customer.rows.length === 0) {
+        return reply.code(404).send('Customer not found');
+      }
+
+      const profileData = profile.rows[0];
+      const customerData = customer.rows[0];
+      const now = new Date();
+      const start = start_date ? new Date(start_date) : now;
+      const end = new Date(start);
+      end.setDate(end.getDate() + (duration_days || profileData.duration_days || 30));
+
+      const result = await db.query(`
+        INSERT INTO pppoe_users (
+          customer_id, profile_id, username, password, start_date, end_date,
+          price_sell, price_cost, status, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', NOW())
+        RETURNING *
+      `, [
+        customer_id, profile_id, username, password, start, end,
+        custom_price_sell || profileData.price_sell, custom_price_cost || profileData.price_cost
+      ]);
+
+      const pppoeUser = result.rows[0];
+
+      if (mikrotikService.isConnected()) {
+        try {
+          await mikrotikService.addPPPUser(username, password, profileData.name, {
+            comment: `PPPOE_SYSTEM|${pppoeUser.id}|${customerData.name}|${pppoeUser.start_date.toISOString().split('T')[0]}`
+          });
+        } catch (mikrotikError) {
+          console.error('Failed to create PPPoE user in Mikrotik:', mikrotikError);
+        }
+      }
+
+      return reply.redirect('/pppoe');
+
+    } catch (error) {
+      logDetailedError(fastify, error, request, {
+        operation: 'Create PPPoE User',
+        username,
+        customer_id,
+        profile_id
+      });
+      return sendDetailedError(reply, error, request, { errorTitle: 'Failed to create PPPoE user' });
+    }
+  });
+
   // Update PPPoE user
   fastify.post('/:id', {
     preHandler: [auth.requireRole(['admin'])]

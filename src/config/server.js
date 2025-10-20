@@ -19,7 +19,6 @@ class ServerConfig {
     const instance = fastify({
       logger: {
         level: process.env.LOG_LEVEL || 'info',
-        prettyPrint: process.env.NODE_ENV !== 'production',
         serializers: {
           req(request) {
             return {

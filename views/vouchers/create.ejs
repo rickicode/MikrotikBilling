@@ -633,9 +633,20 @@ function updateDurationDisplay() {
 // Update profile information
 function updateProfileInfo() {
     const profileSelect = document.getElementById('profile_id');
+
+    if (!profileSelect || !profileSelect.options || profileSelect.selectedIndex < 0) {
+        document.getElementById('profileInfo').innerHTML = `
+            <div class="text-center text-slate-400 py-8">
+                <i class="bi bi-info-circle text-4xl mb-3"></i>
+                <p>Pilih profile untuk melihat informasi</p>
+            </div>
+        `;
+        return;
+    }
+
     const selectedOption = profileSelect.options[profileSelect.selectedIndex];
 
-    if (!selectedOption.value) {
+    if (!selectedOption || !selectedOption.value) {
         document.getElementById('profileInfo').innerHTML = `
             <div class="text-center text-slate-400 py-8">
                 <i class="bi bi-info-circle text-4xl mb-3"></i>

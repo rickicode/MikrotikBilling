@@ -109,18 +109,17 @@ class WhatsAppSessionManager {
             // Save to database
             await this.query.insert(`
                 INSERT INTO whatsapp_sessions (
-                    session_id, session_name, status, priority, is_active,
-                    is_default, created_at, updated_at
+                    session_id, session_name, status, priority,
+                    created_at, updated_at
                 ) VALUES (
-                    $1, $2, 'disconnected', $3, true,
-                    $4, NOW(), NOW()
+                    $1, $2, 'disconnected', $3,
+                    NOW(), NOW()
                 )
                 RETURNING *
             `, [
                 sessionId,
                 sessionName,
-                options.priority || 0,
-                options.isDefault || false
+                options.priority || 0
             ]);
 
             // Create session instance
@@ -289,7 +288,7 @@ class WhatsAppSessionManager {
                         // Update database
                         await this.query.query(`
                             UPDATE whatsapp_sessions
-                            SET status = 'logged_out', is_active = false,
+                            SET status = 'logged_out',
                                 updated_at = NOW()
                             WHERE session_id = $1
                         `, [sessionId]);

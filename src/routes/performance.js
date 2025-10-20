@@ -118,6 +118,95 @@ const performanceRoutes = async (fastify, options) => {
     }
   });
 
+  // Refresh Mikrotik status endpoint
+  fastify.post('/refresh-mikrotik-status', {
+    schema: {
+      tags: ['Performance'],
+      description: 'Refresh Mikrotik connection status',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            details: {
+              type: 'object',
+              properties: {
+                connected: { type: 'boolean' },
+                status: { type: 'string' },
+                responseTime: { type: 'string' },
+                identity: { type: 'string' },
+                error: { type: 'string' }
+              }
+            }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const startTime = Date.now();
+      let mikrotikStatus = 'disconnected';
+      let mikrotikDetails = {
+        connected: false,
+        status: 'disconnected',
+        responseTime: '0ms',
+        identity: '',
+        error: null
+      };
+
+      try {
+        // Test Mikrotik connection
+        const mikrotikStart = Date.now();
+        const result = await fastify.mikrotik.execute('/system/identity/print');
+        const responseTime = Date.now() - mikrotikStart;
+
+        if (result && result.length > 0) {
+          mikrotikStatus = 'connected';
+          mikrotikDetails = {
+            connected: true,
+            status: 'connected',
+            responseTime: `${responseTime}ms`,
+            identity: result[0]?.name || 'Unknown',
+            error: null
+          };
+        }
+
+        fastify.log.info('Mikrotik status refreshed successfully');
+      } catch (error) {
+        mikrotikStatus = 'error';
+        mikrotikDetails = {
+          connected: false,
+          status: 'error',
+          responseTime: '0ms',
+          identity: '',
+          error: error.message
+        };
+        fastify.log.error('Mikrotik status refresh failed:', error);
+      }
+
+      const totalTime = Date.now() - startTime;
+
+      return reply.send({
+        success: mikrotikStatus !== 'error',
+        details: mikrotikDetails,
+        timestamp: new Date().toISOString(),
+        processingTime: `${totalTime}ms`
+      });
+    } catch (error) {
+      fastify.log.error('Error in Mikrotik status refresh:', error);
+      return reply.status(500).send({
+        success: false,
+        details: {
+          connected: false,
+          status: 'error',
+          responseTime: '0ms',
+          identity: '',
+          error: 'Status refresh failed'
+        }
+      });
+    }
+  });
+
   // System health check
   fastify.get('/api/performance/health', {
     schema: {

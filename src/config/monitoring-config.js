@@ -143,10 +143,10 @@ const config = {
       },
       {
         name: 'High Memory Usage',
-        condition: 'memory_usage > 90',
-        severity: 'critical',
-        duration: 60000, // 1 minute
-        channels: ['email', 'slack', 'sms']
+        condition: 'memory_usage > 95',
+        severity: 'warning',
+        duration: 300000, // 5 minutes
+        channels: ['email']
       },
       {
         name: 'Database Connection Failed',

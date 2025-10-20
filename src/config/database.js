@@ -9,13 +9,38 @@ class DatabaseConfig {
   }
 
   setupPools() {
+    // Use Supabase DATABASE_URL if available, otherwise fallback to local config
+    const databaseUrl = process.env.DATABASE_URL;
+
+    let poolConfig;
+    if (databaseUrl) {
+      // Parse DATABASE_URL for Supabase connection
+      const url = new URL(databaseUrl);
+      poolConfig = {
+        host: url.hostname,
+        port: url.port || 5432,
+        database: url.pathname.substring(1),
+        user: url.username,
+        password: url.password,
+        ssl: {
+          rejectUnauthorized: false
+        }
+      };
+    } else {
+      // Fallback to local database config
+      poolConfig = {
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 5432,
+        database: process.env.DB_NAME || 'mikrotik_billing',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD,
+        ssl: false
+      };
+    }
+
     // Primary database pool
     this.createPool('primary', {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'mikrotik_billing',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD,
+      ...poolConfig,
       max: process.env.DB_POOL_MAX || 50, // Increased from 20
       min: process.env.DB_POOL_MIN || 5,
       idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT || 30000,
@@ -96,13 +121,17 @@ class DatabaseConfig {
 
     // Add connection monitoring
     pool.on('acquire', (client) => {
-      client.lastAcquired = Date.now();
+      if (client) {
+        client.lastAcquired = Date.now();
+      }
     });
 
     pool.on('release', (client) => {
-      const duration = Date.now() - client.lastAcquired;
-      if (duration > 5000) { // Log slow queries
-        console.warn(`Slow database connection detected in pool ${name}: ${duration}ms`);
+      if (client && client.lastAcquired) {
+        const duration = Date.now() - client.lastAcquired;
+        if (duration > 5000) { // Log slow queries
+          console.warn(`Slow database connection detected in pool ${name}: ${duration}ms`);
+        }
       }
     });
 

@@ -1,24 +1,32 @@
 <%- include('partials/header') %>
 
-    <!-- Flash Messages -->
+    <!-- Flash Messages with Global Toast Helper -->
     <% if (typeof success !== 'undefined' && success) { %>
-        <div class="fixed top-20 right-4 z-50 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3" role="alert">
-            <i class="fas fa-check-circle"></i>
-            <span><%= success %></span>
-            <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(() => {
+                    if (window.showToast) {
+                        window.showToast('<%= success %>', 'success');
+                    } else {
+                        console.log('Flash Success:', '<%= success %>');
+                    }
+                }, 100);
+            });
+        </script>
     <% } %>
 
     <% if (typeof error !== 'undefined' && error) { %>
-        <div class="fixed top-20 right-4 z-50 bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3" role="alert">
-            <i class="fas fa-exclamation-circle"></i>
-            <span><%= error %></span>
-            <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(() => {
+                    if (window.showToast) {
+                        window.showToast('<%= error %>', 'error');
+                    } else {
+                        console.log('Flash Error:', '<%= error %>');
+                    }
+                }, 100);
+            });
+        </script>
     <% } %>
 
     <!-- Main Content -->

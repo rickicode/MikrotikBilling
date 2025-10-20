@@ -178,7 +178,45 @@ Sistem manajemen voucher hotspot dan user PPPoE mikrotik lengkap menggunakan pen
 - Subscription: Complete metadata dengan customer assignment
 - Consistent pattern across all user types
 
-### 8. User Interface Structure
+### 8. Profile Management System
+
+**Web-Only Profile Management**
+
+- File: `src/routes/profiles.js`, `views/profiles/`
+- **Hanya profil yang dibuat melalui web interface** yang ditampilkan
+- Profil manual yang dibuat langsung di RouterOS tidak di-list di web
+- Sistem sinkronisasi untuk memverifikasi keberadaan profil di Mikrotik
+
+**Profile Creation Logic**
+
+- Semua profil dibuat melalui web otomatis dianggap "web-managed"
+- Tidak ada konsep "Managed By Manual" karena semua profil di web adalah sistem-managed
+- Status sync menunjukkan apakah profil sudah ada di Mikrotik (Tersinkron/Belum Sync)
+- Query filter hanya menampilkan profil yang ada di database lokal
+
+**Sync Status System**
+
+- **Tersinkron**: Profil sudah dibuat di Mikrotik RouterOS
+- **Belum Sync**: Profil ada di database web tapi belum di RouterOS
+- Automatic sync saat pembuatan profil baru
+- Manual sync button untuk sinkronisasi ulang
+- Real-time sync monitoring di statistics dashboard
+
+**Mikrotik Integration Pattern**
+
+- Comment pattern: `VOUCHER_SYSTEM` untuk hotspot profiles
+- Comment pattern: `PPPOE_SYSTEM` untuk PPPoE profiles
+- Script injection otomatis untuk profile lifecycle management
+- Profile validation sebelum pembuatan user voucher/PPPoE
+
+**CRUD Operations**
+
+- Create: Web interface → Database → RouterOS (sync)
+- Read: Hanya profil dari database web yang ditampilkan
+- Update: Web interface → Database → RouterOS (resync)
+- Delete: Web interface → Database → RouterOS (remove)
+
+### 9. User Interface Structure
 
 **Navigation System**
 
@@ -465,6 +503,8 @@ Sistem manajemen voucher hotspot dan user PPPoE mikrotik lengkap menggunakan pen
 13. **Backup Flexibility**: Customizable retention dengan SFTP cloud storage support
 14. **Template System**: Advanced WhatsApp templates dengan WYSIWYG editor
 15. **Plugin Ecosystem**: WordPress-style plugin management dengan developer tools
+16. **Web-Only Profiles**: Hanya profil yang dibuat melalui web yang ditampilkan, manual Mikrotik profiles diabaikan
+17. **Profile Sync System**: Status sync menunjukkan keberadaan profil di RouterOS, bukan management type
 
 
 ---

@@ -135,10 +135,17 @@ class PaymentPluginManager {
       const manifestPath = path.join(pluginDir, 'manifest.json');
       let manifest;
       try {
+        this.logger.info(`Loading plugin from directory: ${pluginDir}`);
+        this.logger.info(`Reading manifest from: ${manifestPath}`);
         const manifestContent = await fs.readFile(manifestPath, 'utf8');
         manifest = JSON.parse(manifestContent);
+        this.logger.info(`Successfully loaded manifest for plugin ${pluginName}: v${manifest.version}`);
       } catch (error) {
-        this.logger.error(`Missing or invalid manifest.json for plugin ${pluginName}`);
+        this.logger.error(`Missing or invalid manifest.json for plugin ${pluginName}:`, {
+          error: error.message,
+          manifestPath: manifestPath,
+          pluginDir: pluginDir
+        });
         return;
       }
 

@@ -807,6 +807,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return new bootstrap.Popover(popoverTriggerEl);
     });
 
+    // Initialize counter animations
+    initializeCounters();
+
     // Setup auto-refresh for real-time data
     setupAutoRefresh();
 
@@ -878,10 +881,8 @@ class MikrotikStatusMonitor {
     }
 
     init() {
-        // Start monitoring if we're on settings page
-        if (document.getElementById('mikrotik-tab')) {
-            this.startMonitoring();
-        }
+        // Always start monitoring for header status updates
+        this.startMonitoring();
     }
 
     startMonitoring() {
@@ -893,10 +894,10 @@ class MikrotikStatusMonitor {
         // Check status immediately
         this.checkStatus();
         
-        // Then check every 30 seconds
+        // Then check every 10 seconds for more responsive updates
         this.statusCheckInterval = setInterval(() => {
             this.checkStatus();
-        }, 30000);
+        }, 10000);
     }
 
     stopMonitoring() {
@@ -910,8 +911,8 @@ class MikrotikStatusMonitor {
 
     async checkStatus() {
         try {
-            const response = await fetch('/refresh-mikrotik-status', {
-                method: 'POST',
+            const response = await fetch('/api/public/system/connection', {
+                method: 'GET',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'
                 }
@@ -919,7 +920,7 @@ class MikrotikStatusMonitor {
 
             if (response.ok) {
                 const result = await response.json();
-                this.updateStatusUI(result.details || { connected: false });
+                this.updateStatusUI(result || { connected: false });
             } else {
                 this.updateStatusUI({ connected: false, error: 'Request failed' });
             }
@@ -930,18 +931,15 @@ class MikrotikStatusMonitor {
     }
 
     updateStatusUI(details) {
-        // Update header status indicator
-        const statusIndicator = document.querySelector('.mikrotik-status-indicator');
-        if (statusIndicator) {
-            // Remove all status classes
-            statusIndicator.classList.remove('status-connected', 'status-disconnected', 'status-checking');
-            
+        // Update header status indicator using the correct element ID
+        const statusElement = document.getElementById('mikrotikStatus');
+        if (statusElement) {
             if (details.connected) {
-                statusIndicator.classList.add('status-connected');
-                statusIndicator.textContent = 'Connected';
+                statusElement.textContent = 'Connected';
+                statusElement.className = 'text-green-400';
             } else {
-                statusIndicator.classList.add('status-disconnected');
-                statusIndicator.textContent = 'Disconnected';
+                statusElement.textContent = 'Disconnected';
+                statusElement.className = 'text-red-400';
             }
         }
 
@@ -957,6 +955,31 @@ class MikrotikStatusMonitor {
     async refreshStatus() {
         await this.checkStatus();
     }
+}
+
+// Counter animation function
+function initializeCounters() {
+    const counters = document.querySelectorAll('.counter');
+
+    counters.forEach(counter => {
+        const target = parseInt(counter.dataset.target) || 0;
+        if (target > 0) {
+            animateCounter(counter, target);
+        }
+    });
+}
+
+function animateCounter(element, target) {
+    let current = 0;
+    const increment = target / 50; // Animate over 50 steps
+    const timer = setInterval(() => {
+        current += increment;
+        if (current >= target) {
+            current = target;
+            clearInterval(timer);
+        }
+        element.textContent = Math.floor(current);
+    }, 20);
 }
 
 // Initialize Mikrotik status monitor

@@ -92,8 +92,8 @@ test.describe('PostgreSQL Database Integration', () => {
       const data = await response.json();
       expect(data.customers).toContainEqual(
         expect.objectContaining({
-          nama: testCustomer.nama,
-          nomor_hp: testCustomer.nomor_hp,
+          name: testCustomer.nama,
+          phone: testCustomer.nomor_hp,
           email: testCustomer.email
         })
       );
@@ -353,7 +353,7 @@ test.describe('PostgreSQL Database Integration', () => {
       // Verify customer exists
       const response = await page.request.get(`${BASE_URL}/api/customers?search=${customerData.nama}`);
       const data = await response.json();
-      const customer = data.customers.find(c => c.nomor_hp === customerData.nomor_hp);
+      const customer = data.customers.find(c => c.phone === customerData.nomor_hp);
       expect(customer).toBeTruthy();
 
       // Update customer

@@ -50,6 +50,34 @@ async function apiRoutes(fastify, options) {
       LIMIT ${limitParam} OFFSET ${offsetParam}
     `, [...params, limit, offset]);
 
+    // Check sync status with Mikrotik for each profile
+    const connectionInfo = fastify.mikrotik.getConnectionInfo();
+    let mikrotikProfiles = [];
+
+    if (connectionInfo.connected) {
+      try {
+        if (type === 'hotspot' || !type) {
+          const hotspotProfiles = await fastify.mikrotik.getHotspotProfiles();
+          mikrotikProfiles = mikrotikProfiles.concat(hotspotProfiles);
+        }
+        if (type === 'pppoe' || !type) {
+          const pppoeProfiles = await fastify.mikrotik.getPPPoEProfiles();
+          mikrotikProfiles = mikrotikProfiles.concat(pppoeProfiles);
+        }
+      } catch (error) {
+        console.error('Error checking Mikrotik profiles:', error);
+      }
+    }
+
+    // Add sync status to each profile
+    const profilesWithSync = profilesResult.rows.map(profile => {
+      const existsInMikrotik = mikrotikProfiles.some(mp => mp.name === profile.name);
+      return {
+        ...profile,
+        is_synced: existsInMikrotik
+      };
+    });
+
     // Get total count
     const countResult = await db.query(`
       SELECT COUNT(*) as total
@@ -62,7 +90,7 @@ async function apiRoutes(fastify, options) {
 
     return reply.send({
       success: true,
-      data: profilesResult.rows,
+      data: profilesWithSync,
       pagination: {
         current: page,
         total: totalPages,
@@ -83,7 +111,27 @@ async function apiRoutes(fastify, options) {
       return ApiErrorHandler.notFoundError(reply, 'Profile not found');
     }
 
-    return reply.send({ success: true, data: profileResult.rows[0] });
+    const profile = profileResult.rows[0];
+
+    // Check sync status with Mikrotik
+    const connectionInfo = fastify.mikrotik.getConnectionInfo();
+    let is_synced = false;
+
+    if (connectionInfo.connected) {
+      try {
+        let mikrotikProfiles = [];
+        if (profile.profile_type === 'hotspot') {
+          mikrotikProfiles = await fastify.mikrotik.getHotspotProfiles();
+        } else if (profile.profile_type === 'pppoe') {
+          mikrotikProfiles = await fastify.mikrotik.getPPPoEProfiles();
+        }
+        is_synced = mikrotikProfiles.some(mp => mp.name === profile.name);
+      } catch (error) {
+        console.error('Error checking Mikrotik profile:', error);
+      }
+    }
+
+    return reply.send({ success: true, data: { ...profile, is_synced } });
   }));
 
   // Create profile
@@ -169,6 +217,88 @@ async function apiRoutes(fastify, options) {
     return reply.send({ success: true, message: 'Profile updated successfully' });
   }));
 
+  // Sync profile to Mikrotik
+  fastify.post('/profiles/:id/sync', {
+    preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const profileId = request.params.id;
+
+    // Get profile from database
+    const profileResult = await db.query('SELECT * FROM profiles WHERE id = $1', [profileId]);
+    if (!profileResult.rows || profileResult.rows.length === 0) {
+      return ApiErrorHandler.notFoundError(reply, 'Profile not found');
+    }
+
+    const profile = profileResult.rows[0];
+
+    // Check Mikrotik connection
+    const connectionInfo = fastify.mikrotik.getConnectionInfo();
+    if (!connectionInfo.connected) {
+      return ApiErrorHandler.serverError(reply, 'Tidak terhubung ke Mikrotik');
+    }
+
+    try {
+      // Check if profile already exists in Mikrotik
+      let mikrotikProfiles = [];
+      if (profile.profile_type === 'hotspot') {
+        mikrotikProfiles = await fastify.mikrotik.getHotspotProfiles();
+      } else if (profile.profile_type === 'pppoe') {
+        mikrotikProfiles = await fastify.mikrotik.getPPPoEProfiles();
+      }
+
+      const existsInMikrotik = mikrotikProfiles.some(mp => mp.name === profile.name);
+
+      if (!existsInMikrotik) {
+        // Create profile in Mikrotik
+        if (profile.profile_type === 'hotspot') {
+          await fastify.mikrotik.createHotspotProfile(
+            profile.name,
+            profile.selling_price,
+            profile.cost_price
+          );
+
+          // Inject scripts
+          try {
+            await fastify.mikrotik.injectHotspotProfileScripts(profile.name);
+            console.log(`HIJINETWORK: Scripts injected into hotspot profile: ${profile.name}`);
+          } catch (scriptError) {
+            console.error('Error injecting scripts:', scriptError);
+          }
+        } else if (profile.profile_type === 'pppoe') {
+          await fastify.mikrotik.createPPPoEProfile(
+            profile.name,
+            profile.selling_price,
+            profile.cost_price
+          );
+
+          // Inject scripts
+          try {
+            await fastify.mikrotik.injectPPPoEProfileScripts(profile.name);
+            console.log(`HIJINETWORK: Scripts injected into PPPoE profile: ${profile.name}`);
+          } catch (scriptError) {
+            console.error('Error injecting scripts:', scriptError);
+          }
+        }
+
+        console.log(`HIJINETWORK: Profile ${profile.name} synced to Mikrotik successfully`);
+      } else {
+        console.log(`HIJINETWORK: Profile ${profile.name} already exists in Mikrotik`);
+      }
+
+      return reply.send({
+        success: true,
+        message: 'Profile berhasil disinkronkan ke Mikrotik'
+      });
+
+    } catch (mikrotikError) {
+      console.error('Error syncing profile to Mikrotik:', mikrotikError);
+      return ApiErrorHandler.serverError(
+        reply,
+        'Gagal sinkronkan profil ke Mikrotik: ' + mikrotikError.message
+      );
+    }
+  }));
+
   // Delete profile
   fastify.delete('/profiles/:id', {
     preHandler: [auth.verifyTokenAPI.bind(auth), auth.requireRole('admin')]
@@ -216,7 +346,8 @@ async function apiRoutes(fastify, options) {
       const stats = {
         total: 0,
         hotspot: 0,
-        pppoe: 0
+        pppoe: 0,
+        synced: 0
       };
 
       // Get total profiles
@@ -229,6 +360,31 @@ async function apiRoutes(fastify, options) {
 
       const pppoeResult = await db.query('SELECT COUNT(*) as count FROM profiles WHERE profile_type = \'pppoe\'');
       stats.pppoe = pppoeResult.rows[0]?.count || 0;
+
+      // Get synced profiles by checking actual Mikrotik presence
+      const connectionInfo = fastify.mikrotik.getConnectionInfo();
+      if (connectionInfo.connected) {
+        try {
+          const dbProfiles = await db.query('SELECT name, profile_type FROM profiles');
+          let mikrotikProfiles = [];
+
+          // Get all profiles from Mikrotik
+          const hotspotProfiles = await fastify.mikrotik.getHotspotProfiles();
+          mikrotikProfiles = mikrotikProfiles.concat(hotspotProfiles);
+          const pppoeProfiles = await fastify.mikrotik.getPPPoEProfiles();
+          mikrotikProfiles = mikrotikProfiles.concat(pppoeProfiles);
+
+          // Count synced profiles
+          stats.synced = dbProfiles.rows.filter(profile =>
+            mikrotikProfiles.some(mp => mp.name === profile.name)
+          ).length;
+        } catch (error) {
+          console.error('Error checking synced profiles:', error);
+          stats.synced = 0;
+        }
+      } else {
+        stats.synced = 0;
+      }
 
       return reply.send({ success: true, data: stats });
   }));
@@ -621,10 +777,12 @@ async function apiRoutes(fastify, options) {
             updated++;
           } else {
             // Create new profile
+            // Set default duration based on profile type (24 hours for hotspot, 168 hours for PPPoE weekly)
+            const defaultDuration = type === 'hotspot' ? 24 : (type === 'pppoe' ? 168 : 1);
             await db.query(`
-              INSERT INTO profiles (name, profile_type, mikrotik_name, selling_price, cost_price, is_active)
-              VALUES ($1, $2, $3, 0, 0, true)
-            `, [profile.name, type, profile.name]);
+              INSERT INTO profiles (name, profile_type, mikrotik_name, selling_price, cost_price, duration_hours, is_active)
+              VALUES ($1, $2, $3, 0, 0, $4, true)
+            `, [profile.name, type, profile.name, defaultDuration]);
             synced++;
           }
         } catch (error) {

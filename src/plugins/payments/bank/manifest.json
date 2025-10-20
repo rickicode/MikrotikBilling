@@ -1,0 +1,51 @@
+{
+  "name": "bank",
+  "version": "1.0.0",
+  "displayName": "Bank Transfer Payment",
+  "description": "Manual bank transfer payment processing with confirmation",
+  "author": "HIJINETWORK",
+  "website": "",
+  "main": "index.js",
+  "category": "bank",
+  "currencies": ["IDR"],
+  "fees": {
+    "type": "fixed",
+    "value": 0,
+    "min": 0,
+    "max": 0
+  },
+  "config": {
+    "bank_name": {
+      "type": "text",
+      "label": "Bank Name",
+      "required": true
+    },
+    "account_name": {
+      "type": "text",
+      "label": "Account Name",
+      "required": true
+    },
+    "account_number": {
+      "type": "text",
+      "label": "Account Number",
+      "required": true
+    },
+    "auto_approve": {
+      "type": "checkbox",
+      "label": "Auto Approve",
+      "default": false,
+      "required": false
+    }
+  },
+  "webhooks": {
+    "payment": "/api/payments/webhook/bank",
+    "status": "/api/payments/status/bank"
+  },
+  "permissions": [
+    "payment.create",
+    "payment.check",
+    "payment.approve"
+  ],
+  "dependencies": [],
+  "nodeVersion": ">=14.0.0"
+}

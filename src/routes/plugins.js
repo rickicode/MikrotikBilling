@@ -363,6 +363,7 @@ const pluginRoutes = (fastify, options, done) => {
             }
 
             return reply.view('plugins/settings', {
+                title: `${plugin.displayName || plugin.name} Settings`,
                 admin: request.admin,
                 plugin,
                 successMessage: request.query.success || null,

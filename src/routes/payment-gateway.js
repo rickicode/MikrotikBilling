@@ -166,7 +166,7 @@ const paymentGatewayRoutes = (fastify, options, done) => {
       } else {
         // Get all payment links with pagination
         paymentLinks = db.query(`
-          SELECT pl.*, c.nama as customer_name, c.nomor_hp as customer_phone
+          SELECT pl.*, c.name as customer_name, c.phone as customer_phone
           FROM payment_links pl
           LEFT JOIN customers c ON pl.customer_id = c.id
           ORDER BY pl.created_date DESC

@@ -1,102 +1,141 @@
 <%- include('../partials/header', { title: 'Manajemen Pembayaran', currentUrl: '/payments' }) %>
 
-<div class="mb-4 row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1 class="mb-0 h3">Manajemen Pembayaran</h1>
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Manajemen Pembayaran</h1>
+            <p class="text-slate-400">Kelola transaksi pembayaran dan monitoring pendapatan</p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex gap-3">
+            <button class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600" onclick="exportPayments()">
+                <i class="fas fa-download mr-2"></i>
+                Export
+            </button>
+            <button class="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600" onclick="reconcilePayments()">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Reconcile
+            </button>
+            <a href="/payments/create" class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                <i class="fas fa-plus mr-2"></i>
+                Tambah Pembayaran
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total Payments -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Total Pembayaran</p>
+                <p class="text-3xl font-bold text-white counter" data-target="0" id="totalPayments">0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                    <i class="fas fa-cash-register text-blue-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-green-400 flex items-center font-medium">
+                <i class="fas fa-arrow-up mr-1"></i>
+                <span id="paymentsGrowth">+15%</span>
+            </span>
+            <span class="text-slate-500 ml-2">dari bulan lalu</span>
+        </div>
+    </div>
+
+    <!-- Successful Payments -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Berhasil</p>
+                <p class="text-3xl font-bold text-white counter" data-target="0" id="successfulPayments">0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
+                    <i class="fas fa-check-circle text-green-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-green-400 flex items-center font-medium">
+                <i class="fas fa-arrow-up mr-1"></i>
+                <span id="successRate">98%</span>
+            </span>
+            <span class="text-slate-500 ml-2">success rate</span>
+        </div>
+    </div>
+
+    <!-- Pending Payments -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-yellow-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Pending</p>
+                <p class="text-3xl font-bold text-white counter" data-target="0" id="pendingPayments">0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
+                    <i class="fas fa-clock text-yellow-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-yellow-400 flex items-center font-medium">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                <span id="pendingRate">2%</span>
+            </span>
+            <span class="text-slate-500 ml-2">menunggu konfirmasi</span>
+        </div>
+    </div>
+
+    <!-- Monthly Revenue -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-slate-400 text-sm font-medium mb-1">Revenue Bulanan</p>
+                <p class="text-3xl font-bold text-white" id="monthlyRevenue">Rp 0</p>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="w-14 h-14 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20">
+                    <i class="fas fa-chart-line text-purple-400 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+            <span class="text-green-400 flex items-center font-medium">
+                <i class="fas fa-arrow-up mr-1"></i>
+                <span id="revenueGrowth">+23%</span>
+            </span>
+            <span class="text-slate-500 ml-2">dari bulan lalu</span>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter Section -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-8">
+    <form id="searchForm" class="space-y-4">
+        <!-- Search Bar -->
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-search text-slate-400"></i>
+            </div>
+            <input type="text"
+                   id="searchInput"
+                   class="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                   placeholder="Cari ID, Pelanggan, atau Deskripsi...">
+        </div>
+
+        <!-- Filters Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Status Filter -->
             <div>
-                <button class="btn btn-outline-primary btn-sm me-2" id="exportBtn">
-                    <i class="bi bi-download"></i> Export
-                </button>
-                <button class="btn btn-outline-success btn-sm me-2" id="reconcileBtn">
-                    <i class="bi bi-arrow-repeat"></i> Reconcile
-                </button>
-                <a href="/payments/create" class="btn btn-primary">
-                    <i class="bi bi-cash"></i> Tambah Pembayaran
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Statistics Overview -->
-<div class="mb-4 row">
-    <div class="col-md-3">
-        <div class="text-white card bg-primary">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Total Pembayaran</h6>
-                        <h3 class="mb-0" id="totalPayments">0</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-cash-stack fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="text-white card bg-success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Sukses</h6>
-                        <h3 class="mb-0" id="successfulPayments">0</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-check-circle fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="text-white card bg-warning">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Pending</h6>
-                        <h3 class="mb-0" id="pendingPayments">0</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-clock fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="text-white card bg-info">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Revenue Bulanan</h6>
-                        <h3 class="mb-0" id="monthlyRevenue">0</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-graph-up fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Search and Filter -->
-<div class="mb-4 card">
-    <div class="card-body">
-        <form id="searchForm" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Cari Pembayaran</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" id="searchInput" placeholder="ID, Pelanggan, atau Deskripsi...">
-                </div>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Status</label>
-                <select class="form-select" id="statusFilter">
+                <label class="block text-sm font-medium text-slate-400 mb-2">Status</label>
+                <select id="statusFilter"
+                        class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm">
                     <option value="">Semua Status</option>
                     <option value="pending">Pending</option>
                     <option value="paid">Lunas</option>
@@ -104,9 +143,12 @@
                     <option value="cancelled">Dibatalkan</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Metode</label>
-                <select class="form-select" id="methodFilter">
+
+            <!-- Method Filter -->
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">Metode</label>
+                <select id="methodFilter"
+                        class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm">
                     <option value="">Semua Metode</option>
                     <option value="cash">Cash</option>
                     <option value="transfer">Transfer</option>
@@ -114,155 +156,261 @@
                     <option value="credit">Saldo</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Tanggal</label>
-                <div class="input-group">
-                    <input type="date" class="form-control" id="startDate" name="startDate">
-                    <span class="input-group-text">s/d</span>
-                    <input type="date" class="form-control" id="endDate" name="endDate">
+
+            <!-- Date Range -->
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">Tanggal</label>
+                <div class="flex space-x-2">
+                    <input type="date"
+                           id="startDate"
+                           name="startDate"
+                           class="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm">
+                    <span class="flex items-center text-slate-400 px-2">s/d</span>
+                    <input type="date"
+                           id="endDate"
+                           name="endDate"
+                           class="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm">
                 </div>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">&nbsp;</label>
-                <div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-funnel"></i> Filter
-                    </button>
-                </div>
-            </div>
-        </form>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-between">
+            <button type="button" id="advancedFilterBtn"
+                    class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600 text-sm">
+                <i class="fas fa-sliders-h mr-2"></i>
+                Filter Lanjutan
+            </button>
+            <button type="submit"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm">
+                <i class="fas fa-search mr-2"></i>
+                Terapkan Filter
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Advanced Filters (Hidden by default) -->
+<div id="advancedFilters" class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-8 hidden">
+    <h6 class="text-lg font-semibold text-white mb-4">
+        <i class="fas fa-filter mr-2"></i>
+        Filter Lanjutan
+    </h6>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Additional filters can be added here -->
+        <div>
+            <label class="block text-sm font-medium text-slate-400 mb-2">Jumlah Minimum</label>
+            <input type="number"
+                   id="minAmount"
+                   class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                   placeholder="0">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-400 mb-2">Jumlah Maksimum</label>
+            <input type="number"
+                   id="maxAmount"
+                   class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                   placeholder="999999999">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-400 mb-2">Sort By</label>
+            <select id="sortBy"
+                    class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm">
+                <option value="created_at">Tanggal</option>
+                <option value="amount">Jumlah</option>
+                <option value="customer_name">Pelanggan</option>
+                <option value="method">Metode</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-400 mb-2">Order</label>
+            <select id="sortOrder"
+                    class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm">
+                <option value="desc">Terbaru</option>
+                <option value="asc">Terlama</option>
+            </select>
+        </div>
     </div>
 </div>
 
-<!-- Quick Actions -->
-<div class="mb-4 card">
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <div class="border rounded p-3">
-                    <h6 class="mb-3"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h6>
-                    <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-outline-success btn-sm" id="processDuitKuBtn">
-                            <i class="bi bi-credit-card me-2"></i>Proses DuitKu Pending
-                        </button>
-                        <button type="button" class="btn btn-outline-info btn-sm" id="generateReportsBtn">
-                            <i class="bi bi-file-earmark-text me-2"></i>Generate Laporan
-                        </button>
-                        <button type="button" class="btn btn-outline-warning btn-sm" id="checkOverdueBtn">
-                            <i class="bi bi-exclamation-triangle me-2"></i>Cek Pembayaran Terlambat
-                        </button>
-                    </div>
-                </div>
+<!-- Quick Actions & Info Cards -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Quick Actions Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+        <div class="flex items-center mb-4">
+            <div class="w-10 h-10 bg-yellow-500/10 rounded-lg flex items-center justify-center border border-yellow-500/20 mr-3">
+                <i class="fas fa-bolt text-yellow-400"></i>
             </div>
-            <div class="col-md-4">
-                <div class="border rounded p-3">
-                    <h6 class="mb-3"><i class="bi bi-bar-chart me-2"></i>Summary Hari Ini</h6>
-                    <div class="row text-center">
-                        <div class="col-6">
-                            <div class="text-success">
-                                <div class="fs-4 fw-bold" id="todayCount">0</div>
-                                <small>Transaksi</small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="text-primary">
-                                <div class="fs-4 fw-bold" id="todayAmount">0</div>
-                                <small>Nominal</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <h6 class="text-lg font-semibold text-white">Quick Actions</h6>
+        </div>
+        <div class="space-y-3">
+            <button type="button"
+                    id="processDuitKuBtn"
+                    class="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors duration-200 flex items-center justify-center border border-slate-600">
+                <i class="fas fa-credit-card mr-2"></i>
+                Proses DuitKu Pending
+            </button>
+            <button type="button"
+                    id="generateReportsBtn"
+                    class="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors duration-200 flex items-center justify-center border border-slate-600">
+                <i class="fas fa-file-alt mr-2"></i>
+                Generate Laporan
+            </button>
+            <button type="button"
+                    id="checkOverdueBtn"
+                    class="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors duration-200 flex items-center justify-center border border-slate-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Cek Pembayaran Terlambat
+            </button>
+        </div>
+    </div>
+
+    <!-- Today's Summary Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+        <div class="flex items-center mb-4">
+            <div class="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20 mr-3">
+                <i class="fas fa-chart-bar text-blue-400"></i>
             </div>
-            <div class="col-md-4">
-                <div class="border rounded p-3">
-                    <h6 class="mb-3"><i class="bi bi-calendar-check me-2"></i>Reconciliation Status</h6>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span id="reconciliationStatus">Up to date</span>
-                        <span class="badge bg-success" id="reconciliationBadge">OK</span>
-                    </div>
-                    <small class="text-muted">Last reconcile: <span id="lastReconcile">Never</span></small>
-                </div>
+            <h6 class="text-lg font-semibold text-white">Summary Hari Ini</h6>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="text-center">
+                <div class="text-3xl font-bold text-green-400 mb-1" id="todayCount">0</div>
+                <div class="text-sm text-slate-400">Transaksi</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-blue-400 mb-1" id="todayAmount">Rp 0</div>
+                <div class="text-sm text-slate-400">Nominal</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reconciliation Status Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+        <div class="flex items-center mb-4">
+            <div class="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center border border-green-500/20 mr-3">
+                <i class="fas fa-check-double text-green-400"></i>
+            </div>
+            <h6 class="text-lg font-semibold text-white">Reconciliation Status</h6>
+        </div>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between">
+                <span class="text-slate-300" id="reconciliationStatus">Up to date</span>
+                <span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30" id="reconciliationBadge">OK</span>
+            </div>
+            <div class="text-sm text-slate-400">
+                Last reconcile: <span id="lastReconcile" class="text-slate-300">Never</span>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Payments Table -->
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="mb-0">Daftar Pembayaran</h6>
-        <div class="d-flex align-items-center">
-            <span class="badge bg-primary me-2" id="resultCount">0 Hasil</span>
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn btn-outline-secondary" id="refreshBtn">
-                    <i class="bi bi-arrow-clockwise"></i>
+<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+    <!-- Table Header -->
+    <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+        <h6 class="text-lg font-semibold text-white">Daftar Pembayaran</h6>
+        <div class="flex items-center space-x-4">
+            <span class="px-3 py-1 bg-blue-500/20 text-blue-400 text-sm rounded-full border border-blue-500/30" id="resultCount">0 Hasil</span>
+            <div class="flex space-x-2">
+                <button type="button" id="refreshBtn"
+                        class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                    <i class="fas fa-sync-alt"></i>
                 </button>
-                <button type="button" class="btn btn-outline-info" id="autoReconcileBtn">
-                    <i class="bi bi-arrow-repeat"></i> Auto-Reconcile
+                <button type="button" id="autoReconcileBtn"
+                        class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Auto-Reconcile
                 </button>
             </div>
         </div>
     </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover" id="paymentsTable">
-                <thead>
-                    <tr>
-                        <th>
-                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
-                        </th>
-                        <th>ID</th>
-                        <th>Pelanggan</th>
-                        <th>Berlangganan</th>
-                        <th>Jumlah</th>
-                        <th>Metode</th>
-                        <th>Status</th>
-                        <th>Tanggal</th>
-                        <th>Deskripsi</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="paymentsTableBody">
-                    <tr>
-                        <td colspan="10" class="py-4 text-center">
-                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-                            Memuat data...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
 
-        <!-- Enhanced Pagination -->
-        <%- include('../partials/pagination') %>
+    <!-- Table Content -->
+    <div class="overflow-x-auto">
+        <table class="w-full" id="paymentsTable">
+            <thead class="bg-slate-900/50 border-b border-slate-700">
+                <tr>
+                    <th class="px-6 py-4 text-left">
+                        <input type="checkbox" id="selectAllCheckbox" class="rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-2">
+                    </th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Pelanggan</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Berlangganan</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Jumlah</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Metode</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Tanggal</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Deskripsi</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="paymentsTableBody" class="bg-slate-800/50 divide-y divide-slate-700">
+                <tr>
+                    <td colspan="10" class="px-6 py-12 text-center">
+                        <div class="flex flex-col items-center justify-center">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-4"></div>
+                            <span class="text-slate-400">Memuat data...</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-slate-400">
+                Menampilkan <span id="paginationStart">0</span> hingga <span id="paginationEnd">0</span> dari <span id="paginationTotal">0</span> hasil
+            </div>
+            <div class="flex space-x-2">
+                <button type="button" id="prevPageBtn" disabled
+                        class="px-3 py-2 bg-slate-700 text-slate-400 rounded-lg transition-colors duration-200 border border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-left mr-1"></i>
+                    Sebelumnya
+                </button>
+                <button type="button" id="nextPageBtn" disabled
+                        class="px-3 py-2 bg-slate-700 text-slate-400 rounded-lg transition-colors duration-200 border border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Berikutnya
+                    <i class="fas fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- Bulk Actions Bar -->
-<div class="card mt-3" id="bulkActionsBar" style="display: none;">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <span class="me-3">
-                    <i class="bi bi-check-square me-1"></i>
-                    <span id="selectedCount">0</span> dipilih
-                </span>
-                <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-success" id="bulkApproveSelected">
-                        <i class="bi bi-check-circle"></i> Approve
-                    </button>
-                    <button type="button" class="btn btn-outline-warning" id="bulkRejectSelected">
-                        <i class="bi bi-x-circle"></i> Reject
-                    </button>
-                    <button type="button" class="btn btn-outline-info" id="bulkExportSelected">
-                        <i class="bi bi-download"></i> Export
-                    </button>
-                </div>
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-8 hidden" id="bulkActionsBar">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center text-slate-300">
+                <i class="fas fa-check-square mr-2 text-blue-400"></i>
+                <span id="selectedCount">0</span> dipilih
             </div>
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="clearSelectionBtn">
-                <i class="bi bi-x-circle"></i> Batal Pilih
-            </button>
+            <div class="flex space-x-2">
+                <button type="button" id="bulkApproveSelected"
+                        class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 flex items-center">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    Approve
+                </button>
+                <button type="button" id="bulkRejectSelected"
+                        class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200 flex items-center">
+                    <i class="fas fa-times-circle mr-2"></i>
+                    Reject
+                </button>
+                <button type="button" id="bulkExportSelected"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center">
+                    <i class="fas fa-download mr-2"></i>
+                    Export
+                </button>
+            </div>
         </div>
+        <button type="button" id="clearSelectionBtn"
+                class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors duration-200 border border-slate-600">
+            <i class="fas fa-times mr-2"></i>
+            Batal Pilih
+        </button>
     </div>
 </div>
 
@@ -369,29 +517,73 @@
 </div>
 
 <style>
+/* Modern Dark Theme Styles */
 .payment-row {
     transition: all 0.2s ease;
 }
 .payment-row:hover {
-    background-color: #f8f9fa;
+    background-color: rgba(51, 65, 85, 0.5);
 }
 .payment-row.selected {
-    background-color: #e7f3ff;
+    background-color: rgba(59, 130, 246, 0.2);
+    border-left: 3px solid #3b82f6;
 }
+
+/* Status Badge Styles */
 .status-badge {
-    font-size: 0.8em;
+    font-size: 0.75em;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
 }
+
+/* Payment Amount Styles */
 .payment-amount {
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 0.875rem;
 }
 .payment-amount.success {
-    color: #28a745;
+    color: #10b981;
 }
 .payment-amount.warning {
-    color: #ffc107;
+    color: #f59e0b;
 }
 .payment-amount.danger {
-    color: #dc3545;
+    color: #ef4444;
+}
+
+/* Table Row Hover Effects */
+#paymentsTable tbody tr {
+    transition: all 0.2s ease;
+}
+#paymentsTable tbody tr:hover {
+    background-color: rgba(51, 65, 85, 0.3);
+}
+
+/* Custom Checkbox Styles */
+input[type="checkbox"]:checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+/* Loading Spinner */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Fade in Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
 }
 </style>
 

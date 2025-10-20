@@ -101,7 +101,7 @@ module.exports = async function(fastify, opts) {
 
             // Get subscription details
             const subscription = await db.getOne(`
-                SELECT s.*, c.nama as customer_name, p.name as profile_name
+                SELECT s.*, c.name as customer_name, p.name as profile_name
                 FROM subscriptions s
                 JOIN customers c ON s.customer_id = c.id
                 LEFT JOIN profiles p ON s.profile_id = p.id
@@ -213,7 +213,7 @@ module.exports = async function(fastify, opts) {
         const { id } = request.params;
 
         const subscription = await db.getOne(`
-            SELECT s.*, c.nama as customer_name, c.nomor_hp as customer_phone,
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone,
                    c.email as customer_email, p.name as profile_name
             FROM subscriptions s
             JOIN customers c ON s.customer_id = c.id
@@ -337,7 +337,7 @@ module.exports = async function(fastify, opts) {
 
         // Build WHERE clause
         if (search) {
-            whereClause += ` AND (c.nama LIKE $1 OR s.username LIKE $2 OR s.id = $3)`;
+            whereClause += ` AND (c.name LIKE $1 OR s.username LIKE $2 OR s.id = $3)`;
             const searchPattern = `%${search}%`;
             params.push(searchPattern, searchPattern, search);
         }
@@ -371,7 +371,7 @@ module.exports = async function(fastify, opts) {
 
         // Get subscriptions
         const subscriptions = await db.query(`
-            SELECT s.*, c.nama as customer_name, c.nomor_hp as customer_phone,
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone,
                    p.name as profile_name
             FROM subscriptions s
             JOIN customers c ON s.customer_id = c.id
@@ -438,7 +438,7 @@ module.exports = async function(fastify, opts) {
 
         // Build WHERE clause
         if (search) {
-            whereClause += ` AND (c.nama LIKE $1 OR s.username LIKE $2)`;
+            whereClause += ` AND (c.name LIKE $1 OR s.username LIKE $2)`;
             params.push(`%${search}%`, `%${search}%`);
         }
 
@@ -462,7 +462,7 @@ module.exports = async function(fastify, opts) {
         }
 
         const subscriptions = await db.query(`
-            SELECT s.id, c.nama as customer_name, c.nomor_hp as customer_phone,
+            SELECT s.id, c.name as customer_name, c.phone as customer_phone,
                    s.type, s.username, p.name as profile_name, s.status,
                    s.billing_cycle, s.price_sell, s.start_date, s.expiry_date,
                    s.auto_renew, s.created_at
@@ -682,7 +682,7 @@ module.exports = async function(fastify, opts) {
         // Get subscriptions with customer info
         const placeholders = subscription_ids.map((_, i) => `$${i + 1}`).join(',');
         const subscriptions = await db.query(`
-            SELECT s.*, c.nama, c.nomor_hp
+            SELECT s.*, c.name, c.phone
             FROM subscriptions s
             JOIN customers c ON s.customer_id = c.id
             WHERE s.id IN (${placeholders})

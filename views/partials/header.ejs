@@ -60,6 +60,9 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- Toast Helper - Global untuk semua halaman -->
+    <script src="/public/js/toast-helper.js"></script>
+
     <!-- Critical CSS (inline for performance) -->
     <style>
         /* Critical above-the-fold styles */
@@ -490,6 +493,27 @@
                 <span class="text-xs">Pengaturan</span>
             </a>
         </nav>
+
+        <!-- Toast Initialization Script -->
+        <script>
+            // Initialize Toast Helper ketika DOM siap
+            document.addEventListener('DOMContentLoaded', function() {
+                // Pastikan ToastHelper tersedia
+                if (typeof window.ToastHelper !== 'undefined') {
+                    console.log('✅ Toast Helper initialized successfully');
+                } else {
+                    console.warn('⚠️ Toast Helper not loaded');
+                }
+            });
+
+            // Override console methods untuk debugging (opsional)
+            if (typeof window.console !== 'undefined' && window.location.hostname === 'localhost') {
+                const originalLog = console.log;
+                console.log = function(...args) {
+                    originalLog.apply(console, args);
+                };
+            }
+        </script>
 
         <!-- Main Content -->
         <main id="main-content" class="flex-1 mobile-safe-area-top mobile-safe-area-bottom pb-20 md:pb-6" role="main" aria-label="Main content">

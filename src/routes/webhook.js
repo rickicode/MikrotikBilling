@@ -176,7 +176,7 @@ const webhookRoutes = (fastify, options, done) => {
 
       // Get webhook logs
       const logs = db.query(`
-        SELECT pt.*, pl.invoice_number, c.nama as customer_name
+        SELECT pt.*, pl.invoice_number, c.name as customer_name
         FROM payment_transactions pt
         LEFT JOIN payment_links pl ON pt.payment_link_id = pl.id
         LEFT JOIN customers c ON pl.customer_id = c.id

@@ -219,8 +219,8 @@ class WhatsAppService extends EventEmitter {
     async getSessions() {
         try {
             const sessions = await this.query.getMany(`
-                SELECT session_id, session_name, status, priority, is_active,
-                       is_default, phone_number, last_activity, created_at
+                SELECT session_id, session_name, status, priority,
+                       phone_number, last_activity, created_at
                 FROM whatsapp_sessions
                 ORDER BY priority DESC, session_name
             `);
@@ -546,24 +546,23 @@ class WhatsAppService extends EventEmitter {
             // If no sessionId provided, try to get or create a default session
             if (!sessionId) {
                 const sessions = await this.getSessions();
-                let defaultSession = sessions.find(s => s.is_default);
+                // Since is_default column doesn't exist, use the first session or highest priority
+                let defaultSession = sessions.length > 0 ? sessions[0] : null;
 
                 if (!defaultSession) {
-                    if (sessions.length === 0) {
-                        // Create a new session if none exist
-                        const result = await this.createSession('Default Session', {
-                            isDefault: true,
-                            priority: 100
-                        });
-                        sessionId = result.sessionId;
-                    } else {
-                        // Use the first session as default
-                        defaultSession = sessions[0];
-                        sessionId = defaultSession.session_id;
-                    }
+                    // Create a new session if none exist
+                    const result = await this.createSession('Default Session', {
+                        isDefault: true,
+                        priority: 100
+                    });
+                    sessionId = result.sessionId;
                 } else {
+                    // Use the first session as default
+                    defaultSession = sessions[0];
                     sessionId = defaultSession.session_id;
                 }
+            } else {
+                sessionId = defaultSession.session_id;
             }
 
             // Connect the session to generate QR code
@@ -642,20 +641,19 @@ class WhatsAppService extends EventEmitter {
     async getDefaultSession() {
         try {
             const sessions = await this.getSessions();
-            let defaultSession = sessions.find(s => s.is_default);
+            // Since is_default column doesn't exist, use the first session or highest priority
+            let defaultSession = sessions.length > 0 ? sessions[0] : null;
 
             if (!defaultSession) {
-                if (sessions.length === 0) {
-                    // Create default session
-                    const result = await this.createSession('Default Session', {
-                        isDefault: true,
-                        priority: 100
-                    });
-                    return result.sessionId;
-                } else {
-                    // Use first session as default
-                    return sessions[0].session_id;
-                }
+                // Create default session
+                const result = await this.createSession('Default Session', {
+                    isDefault: true,
+                    priority: 100
+                });
+                return result.sessionId;
+            } else {
+                // Use first session as default
+                return sessions[0].session_id;
             }
 
             return defaultSession.session_id;

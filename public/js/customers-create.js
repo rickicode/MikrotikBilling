@@ -398,15 +398,27 @@ function hideLoading() {
 }
 
 function showSuccess(message) {
-    ToastSystem.success(message);
+    if (window.toastSystem) {
+        window.toastSystem.success(message);
+    } else {
+        alert(message);
+    }
 }
 
 function showWarning(message) {
-    ToastSystem.warning(message);
+    if (window.toastSystem) {
+        window.toastSystem.warning(message);
+    } else {
+        alert(message);
+    }
 }
 
 function showError(message) {
-    ToastSystem.error(message);
+    if (window.toastSystem) {
+        window.toastSystem.error(message);
+    } else {
+        alert(message);
+    }
 }
 
 // Add event delegation for inline onclick handlers
