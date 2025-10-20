@@ -617,14 +617,21 @@ const start = async () => {
       return payload;
     });
 
+    // Connect to Mikrotik first before starting any dependent services
+    console.log('🔌 Establishing Mikrotik connection...');
+    const mikrotikConnected = await mikrotik.connect();
+
+    if (!mikrotikConnected) {
+      console.warn('⚠️ Mikrotik connection failed during startup - services will run in offline mode');
+    } else {
+      console.log('✅ Mikrotik connection established');
+    }
+
     await fastify.listen({ port: process.env.PORT || 3006, host: 'localhost' });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);
 
-    // Start background tasks
+    // Start background tasks only after Mikrotik connection is attempted
     require('./src/services/Scheduler')(fastify);
-
-    // Connect to Mikrotik
-    await mikrotik.connect();
 
   } catch (err) {
     fastify.log.error(err);

@@ -125,18 +125,29 @@ class UserMonitorService extends EventEmitter {
     }
 
     /**
-     * Main polling function with offline handling
+     * Main polling function with enhanced offline handling and exponential backoff
      */
     async pollUsers() {
         try {
             const startTime = Date.now();
             this.lastPollTime = new Date();
 
-            // Check if Mikrotik is offline
-            const connectionInfo = this.mikrotik?.getConnectionInfo() || {};
-            if (connectionInfo.isOffline) {
-                console.log('⚠️ Mikrotik is offline, skipping user poll');
-                return;
+            // Enhanced connection check with health verification
+            if (!this.mikrotik || !this.mikrotik.isConnected()) {
+                console.log('⚠️ Mikrotik is not connected, attempting health check...');
+
+                // Try to recover connection
+                const healthResult = await this.mikrotik.healthCheck();
+                if (!healthResult.healthy) {
+                    console.log(`⚠️ Mikrotik is offline, skipping user poll: ${healthResult.message}`);
+
+                    // Implement exponential backoff for failed connections
+                    this.handleConnectionFailure();
+                    return;
+                } else {
+                    console.log('✅ Mikrotik connection recovered via health check');
+                    this.connectionFailureCount = 0; // Reset failure counter
+                }
             }
 
             // Poll hotspot users
@@ -151,16 +162,78 @@ class UserMonitorService extends EventEmitter {
             const duration = Date.now() - startTime;
             console.log(`🔍 User poll completed in ${duration}ms`);
 
+            // Reset connection failure count on successful poll
+            this.connectionFailureCount = 0;
+
         } catch (error) {
             console.error('Error in pollUsers:', error);
 
-            // Don't emit error for connection issues
-            if (!error.message.includes('timeout') &&
-                !error.message.includes('connection') &&
-                !error.message.includes('ECONNREFUSED')) {
-                this.emit('error', error);
+            // Handle connection errors with exponential backoff
+            if (this.isConnectionError(error)) {
+                this.handleConnectionFailure();
+                return;
             }
+
+            // Only emit non-connection errors
+            this.emit('error', error);
         }
+    }
+
+    /**
+     * Handle connection failures with exponential backoff
+     */
+    handleConnectionFailure() {
+        this.connectionFailureCount = (this.connectionFailureCount || 0) + 1;
+
+        // Calculate backoff delay: 30s, 60s, 120s, 240s, max 300s (5 minutes)
+        const backoffDelay = Math.min(
+            this.pollInterval * Math.pow(2, this.connectionFailureCount - 1),
+            300000 // 5 minutes maximum
+        );
+
+        console.log(`🔄 Connection failure #${this.connectionFailureCount}, next poll in ${backoffDelay/1000}s`);
+
+        // Clear existing interval and set new one with backoff
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+        }
+
+        // Schedule next poll with backoff delay
+        setTimeout(() => {
+            if (this.isRunning) {
+                this.intervalId = setInterval(() => {
+                    this.pollUsers().catch(error => {
+                        console.error('Error in user polling:', error);
+                    });
+                }, this.pollInterval);
+
+                // Run immediate poll after backoff
+                this.pollUsers().catch(error => {
+                    console.error('Error in backoff poll:', error);
+                });
+            }
+        }, backoffDelay);
+    }
+
+    /**
+     * Check if error is a connection-related error
+     */
+    isConnectionError(error) {
+        const connectionErrors = [
+            'timeout',
+            'connection',
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            'EHOSTUNREACH',
+            'socket hang up',
+            'read ECONNRESET',
+            'write ECONNRESET'
+        ];
+
+        return connectionErrors.some(err =>
+            error.message.toLowerCase().includes(err.toLowerCase())
+        );
     }
 
     /**

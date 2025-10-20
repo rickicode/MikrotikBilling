@@ -60,8 +60,18 @@ class MikrotikSyncService extends EventEmitter {
         try {
             console.log('🔄 Starting Mikrotik Sync Service...');
 
-            // Initial sync
-            await this.performFullSync();
+            // Verify Mikrotik connection is available before starting
+            if (!this.mikrotik || !this.mikrotik.isConnected()) {
+                console.log('⚠️ Mikrotik not connected, starting sync service in offline mode');
+                // Service will run but sync operations will be skipped
+            }
+
+            // Initial sync only if connected
+            if (this.mikrotik && this.mikrotik.isConnected()) {
+                await this.performFullSync();
+            } else {
+                console.log('⚠️ Skipping initial sync - Mikrotik not connected');
+            }
 
             // Start continuous sync
             this.isRunning = true;

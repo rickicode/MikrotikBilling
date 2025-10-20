@@ -220,7 +220,24 @@ class MikrotikClient {
 
   async connect() {
     try {
+      // Ensure configuration is loaded before attempting connection
+      if (!this.config.host || !this.config.port) {
+        console.log('📋 Loading Mikrotik configuration before connection...');
+        await this.loadConfig();
+      }
+
       console.log(`🔌 Attempting to connect to Mikrotik: ${this.config.host}:${this.config.port}`);
+
+      // Validate configuration before connection
+      if (!this.config.host) {
+        throw new Error('Mikrotik host is not configured');
+      }
+      if (!this.config.username) {
+        throw new Error('Mikrotik username is not configured');
+      }
+      if (!this.config.port) {
+        throw new Error('Mikrotik port is not configured');
+      }
 
       // Create connection timeout promise
       const connectionTimeout = new Promise((_, reject) => {
@@ -248,7 +265,7 @@ class MikrotikClient {
         this.isOffline = true;
         this.lastError = error.message;
 
-        // Don't reconnect for timeout/connection errors
+        // Don't reconnect for timeout/connection errors during startup
         return false;
       }
 
