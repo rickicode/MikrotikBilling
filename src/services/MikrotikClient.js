@@ -696,6 +696,22 @@ class MikrotikClient {
     }
   }
 
+  // Get PPPoE profiles
+  async getPPPoEProfiles() {
+    try {
+      const profiles = await this.executeCommand('/ppp/profile/print');
+      return profiles || [];
+    } catch (error) {
+      console.error('Error getting PPPoE profiles:', error);
+      return [];
+    }
+  }
+
+  // Get PPP profiles (alias for getPPPoEProfiles for backward compatibility)
+  async getPPPProfiles() {
+    return this.getPPPoEProfiles();
+  }
+
   // Create hotspot user with proper RouterOS integration
   async createHotspotUser(userData) {
     try {
@@ -911,7 +927,7 @@ class MikrotikClient {
   }
 
   // Get PPP profiles
-  async getPPPProfiles() {
+  async getPPPoEProfiles() {
     try {
       const profiles = await this.executeCommand('/ppp/profile/print');
       return profiles || [];
@@ -1542,7 +1558,7 @@ class MikrotikClient {
       }
 
       // Get current profile
-      const profiles = await this.getPPPProfiles();
+      const profiles = await this.getPPPoEProfiles();
       const profile = profiles.find(p => p.name === profileName);
 
       if (!profile) {
@@ -1682,7 +1698,7 @@ class MikrotikClient {
         console.log(`HIJINETWORK: Hotspot profile overridden: ${profileName}`);
         this.logProfileSync(profileName, 'hotspot', 'override', true);
       } else if (profileType === 'pppoe') {
-        const profiles = await this.getPPPProfiles();
+        const profiles = await this.getPPPoEProfiles();
         const profile = profiles.find(p => p.name === profileName);
 
         if (!profile) {
@@ -2021,6 +2037,73 @@ class MikrotikClient {
     }
   }
 
+  // Update hotspot profile in RouterOS
+  async updateHotspotProfile(profileName, priceSell = 0, priceCost = 0) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Updating hotspot profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getHotspotProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`Hotspot profile ${profileName} not found`);
+      }
+
+      // Update the profile using RouterOS set command
+      await this.client.runQuery('/ip/hotspot/user/profile/set', {
+        '.id': profile['.id'],
+        'rate-limit': '1M/2M' // Keep existing rate limit, can be enhanced later
+      });
+
+      console.log(`HIJINETWORK: Hotspot profile updated successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'hotspot', 'update', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error updating hotspot profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'hotspot', 'update', false, error);
+      return false;
+    }
+  }
+
+  // Delete hotspot profile in RouterOS
+  async deleteHotspotProfile(profileName) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Deleting hotspot profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getHotspotProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`Hotspot profile ${profileName} not found`);
+      }
+
+      // Delete the profile using RouterOS remove command
+      await this.client.runQuery('/ip/hotspot/user/profile/remove', {
+        '.id': profile['.id']
+      });
+
+      console.log(`HIJINETWORK: Hotspot profile deleted successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'hotspot', 'delete', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error deleting hotspot profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'hotspot', 'delete', false, error);
+      return false;
+    }
+  }
+
   // Create PPPoE profile in RouterOS with unique name-based identification
   async createPPPoEProfile(profileName, priceSell = 0, priceCost = 0) {
     try {
@@ -2052,6 +2135,73 @@ class MikrotikClient {
     }
   }
 
+  // Update PPPoE profile in RouterOS
+  async updatePPPoEProfile(profileName, priceSell = 0, priceCost = 0) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Updating PPPoE profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getPPPoEProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`PPPoE profile ${profileName} not found`);
+      }
+
+      // Update the profile using RouterOS set command
+      await this.client.runQuery('/ppp/profile/set', {
+        '.id': profile['.id'],
+        'rate-limit': '1M/2M' // Keep existing rate limit, can be enhanced later
+      });
+
+      console.log(`HIJINETWORK: PPPoE profile updated successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'pppoe', 'update', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error updating PPPoE profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'pppoe', 'update', false, error);
+      return false;
+    }
+  }
+
+  // Delete PPPoE profile in RouterOS
+  async deletePPPoEProfile(profileName) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Deleting PPPoE profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getPPPoEProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`PPPoE profile ${profileName} not found`);
+      }
+
+      // Delete the profile using RouterOS remove command
+      await this.client.runQuery('/ppp/profile/remove', {
+        '.id': profile['.id']
+      });
+
+      console.log(`HIJINETWORK: PPPoE profile deleted successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'pppoe', 'delete', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error deleting PPPoE profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'pppoe', 'delete', false, error);
+      return false;
+    }
+  }
+
   // Check if profile exists in RouterOS by name (no comment dependency)
   async checkProfileExists(profileName, profileType) {
     try {
@@ -2066,7 +2216,7 @@ class MikrotikClient {
         const profile = profiles.find(p => p.name === profileName);
         return !!profile;
       } else if (profileType === 'pppoe') {
-        const profiles = await this.getPPPProfiles();
+        const profiles = await this.getPPPoEProfiles();
         const profile = profiles.find(p => p.name === profileName);
         return !!profile;
       }
