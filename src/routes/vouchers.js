@@ -745,7 +745,7 @@ async function voucherRoutes(fastify, options) {
     const statsResult = await db.query(`
       SELECT
         COUNT(*) as total,
-        SUM(CASE WHEN v.status = 'available' THEN 1 ELSE 0 END) as available,
+        SUM(CASE WHEN v.status = 'unused' THEN 1 ELSE 0 END) as available,
         SUM(CASE WHEN v.status = 'used' THEN 1 ELSE 0 END) as used,
         SUM(CASE WHEN v.status = 'expired' THEN 1 ELSE 0 END) as expired,
         SUM(CASE WHEN v.status = 'used' THEN v.price_sell ELSE 0 END) as revenue
@@ -758,20 +758,24 @@ async function voucherRoutes(fastify, options) {
       vouchers: vouchers.map(v => ({
         id: v.id,
         code: v.code,
-        profileName: v.profileName,
-        vendorName: v.vendorName,
+        profileName: v.profile_name,
+        vendorName: v.vendor_name,
         priceSell: v.price_sell,
         priceCost: v.price_cost,
         expiredDays: v.duration_hours ? Math.ceil(v.duration_hours / 24) : 0,
         expiredHours: v.expired_hours || 0,
         expiredMinutes: v.expired_minutes || 0,
         status: v.status,
+        mikrotikSynced: v.mikrotik_synced,
         createdAt: v.created_at,
         usedAt: v.used_at,
         expiresAt: v.expires_at,
         batchId: v.batch_id
       })),
       pagination: {
+        current_page: page,
+        total_pages: Math.ceil(total / pageSize),
+        total_items: total,
         page,
         pageSize,
         total,
@@ -1296,10 +1300,17 @@ async function voucherRoutes(fastify, options) {
 
     for (let i = 0; i < quantity; i++) {
       const voucherCode = generateVoucherCode(prefix, i + 1, code_length, request.body.case_format);
+      // Voucher hotspot uses same code for username and password
 
-      // Calculate expires_at based on duration hours
+      // Calculate expires_at based on expired_hours (if provided) or duration_hours
       let expiresAt = null;
-      if (finalDurationHours && finalDurationHours > 0) {
+      const expiryHoursFromRequest = expired_hours || 0;
+
+      if (expiryHoursFromRequest > 0) {
+        const expiryDate = new Date(createdDate);
+        expiryDate.setHours(expiryDate.getHours() + parseInt(expiryHoursFromRequest));
+        expiresAt = expiryDate.toISOString();
+      } else if (finalDurationHours && finalDurationHours > 0) {
         const expiryDate = new Date(createdDate);
         expiryDate.setHours(expiryDate.getHours() + parseInt(finalDurationHours));
         expiresAt = expiryDate.toISOString();
@@ -1308,11 +1319,11 @@ async function voucherRoutes(fastify, options) {
       vouchers.push([
         batchId,
         voucherCode,
+        voucherCode, // Use same code as password for hotspot vouchers
         profile_id,
         finalPriceSell,
         finalPriceCost,
         finalDurationHours,
-        expired_hours || 0,
         expiresAt,
         vendor_id || 1
       ]);
@@ -1321,14 +1332,14 @@ async function voucherRoutes(fastify, options) {
     // Insert vouchers
     for (const voucher of vouchers) {
       await db.query(`
-        INSERT INTO vouchers (batch_id, code, profile_id, price_sell, price_cost, duration_hours, expired_hours, expires_at, vendor_id, mikrotik_synced)
+        INSERT INTO vouchers (batch_id, code, password, profile_id, price_sell, price_cost, duration_hours, expires_at, vendor_id, mikrotik_synced)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
       `, voucher);
     }
 
     // Get created vouchers for response
     const createdVouchersResult = await db.query(`
-      SELECT id, code, profile_id, price_sell, price_cost, expired_hours, created_at
+      SELECT id, code, password, profile_id, price_sell, price_cost, created_at
       FROM vouchers
       WHERE batch_id = $1
       ORDER BY created_at
@@ -1669,7 +1680,7 @@ async function voucherRoutes(fastify, options) {
   fastify.get('/api/vouchers/statistics', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
     // Get basic statistics
     const totalResult = await db.query('SELECT COUNT(*) as count FROM vouchers');
-    const availableResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['available']);
+    const availableResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['unused']);
     const usedResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['used']);
     const expiredResult = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE status = $1', ['expired']);
     const generatedTodayResult = await db.query(`

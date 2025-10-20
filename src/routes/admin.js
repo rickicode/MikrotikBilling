@@ -176,9 +176,25 @@ async function adminRoutes(fastify, options) {
       settingsMap[setting.key] = setting.value;
     });
 
+    // Load current template content from data/print folder
+    const fs = require('fs');
+    const path = require('path');
+    const currentTemplateType = settingsMap.template_type || 'a4';
+    const templatePath = path.join(__dirname, '../../data/print', `template_${currentTemplateType}.html`);
+
+    let currentTemplateContent = '';
+    try {
+      if (fs.existsSync(templatePath)) {
+        currentTemplateContent = fs.readFileSync(templatePath, 'utf8');
+      }
+    } catch (error) {
+      console.warn('Error loading template:', error.message);
+    }
+
     return reply.view('admin/templates', {
       admin: request.admin,
       settings: settingsMap,
+      currentTemplate: currentTemplateContent,
       success: request.query.success,
       error: request.query.error
     });
@@ -188,32 +204,28 @@ async function adminRoutes(fastify, options) {
   fastify.post('/templates', {
     preHandler: [auth.requireRole('admin')]
   }, async (request, reply) => {
-    const { template_type, template_content, template_name, print_template_type } = request.body;
+    const { template_type, template_content, print_template_type } = request.body;
 
     try {
       const fs = require('fs');
       const path = require('path');
 
-      // Create data directory if it doesn't exist
-      const dataDir = path.join(__dirname, '../../data');
+      // Create data/print directory if it doesn't exist
+      const dataDir = path.join(__dirname, '../../data/print');
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
       }
 
-      // Save template as HTML file in data folder
+      // Save template as HTML file in data/print folder
       const templateFileName = `template_${template_type}.html`;
       const templateFilePath = path.join(dataDir, templateFileName);
 
       fs.writeFileSync(templateFilePath, template_content, 'utf8');
 
-      // Also save template name and print template type in settings for reference
-      await db.query(`
-        INSERT INTO settings (key, value, description, updated_at)
-        VALUES ('template_name', $1, 'Template display name', CURRENT_TIMESTAMP)
-        ON CONFLICT (key) DO UPDATE SET
-          value = EXCLUDED.value,
-          updated_at = CURRENT_TIMESTAMP
-      `, [template_name]);
+      // Also save to main data folder for backward compatibility
+      const mainDataDir = path.join(__dirname, '../../data');
+      const mainTemplatePath = path.join(mainDataDir, templateFileName);
+      fs.writeFileSync(mainTemplatePath, template_content, 'utf8');
 
       // Save print template type setting
       if (print_template_type) {
@@ -238,6 +250,53 @@ async function adminRoutes(fastify, options) {
       reply.status(500).send({
         success: false,
         message: 'Gagal menyimpan template ke file: ' + error.message
+      });
+    }
+  });
+
+  // API untuk mendapatkan template default
+  fastify.get('/api/templates/default/:type', {
+    preHandler: [auth.requireRole('admin')]
+  }, async (request, reply) => {
+    const { type } = request.params;
+    const fs = require('fs');
+    const path = require('path');
+
+    try {
+      // Validasi template type
+      if (!['a4', 'thermal'].includes(type)) {
+        return reply.code(400).send({
+          success: false,
+          message: 'Template type tidak valid. Gunakan a4 atau thermal'
+        });
+      }
+
+      // Path ke template default
+      const templatePath = path.join(__dirname, '../../data/print/default', `template_${type}.html`);
+
+      // Cek apakah file template ada
+      if (!fs.existsSync(templatePath)) {
+        return reply.code(404).send({
+          success: false,
+          message: `File template ${type} tidak ditemukan`
+        });
+      }
+
+      // Baca template file
+      const templateContent = fs.readFileSync(templatePath, 'utf8');
+
+      return reply.send({
+        success: true,
+        template: templateContent,
+        type: type,
+        message: `Template default ${type} berhasil dimuat`
+      });
+
+    } catch (error) {
+      fastify.log.error('Error loading default template:', error);
+      return reply.code(500).send({
+        success: false,
+        message: 'Gagal memuat template: ' + error.message
       });
     }
   });

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WiFi Voucher - Thermal</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            font-size: 12px;
+        }
+        .voucher-container {
+            display: block;
+            max-width: 80mm;
+            margin: 0 auto;
+        }
+        .voucher {
+            width: 100%;
+            border: 1px solid #000;
+            page-break-inside: avoid;
+            background: #ffffff;
+            padding: 5px;
+        }
+        .header {
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            background: #FBA1B7;
+            color: white;
+            padding: 5px;
+            margin-bottom: 5px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .code {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            padding: 8px;
+            background: #f0f0f0;
+            margin: 5px 0;
+            letter-spacing: 2px;
+        }
+        .info {
+            font-size: 11px;
+            padding: 3px 0;
+            border-bottom: 1px dashed #ccc;
+        }
+        .price {
+            font-size: 13px;
+            font-weight: bold;
+            text-align: right;
+            color: #333;
+            margin-top: 5px;
+        }
+        .vendor {
+            font-size: 10px;
+            padding: 3px 0;
+            background: #E8F5E9;
+            border-radius: 3px;
+            text-align: center;
+            margin-bottom: 3px;
+        }
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .voucher-container {
+                max-width: 80mm;
+            }
+            .header {
+                background: #FBA1B7 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .code {
+                background: #f0f0f0 !important;
+            }
+            .vendor {
+                background: #E8F5E9 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="voucher-container">
+        <div class="voucher">
+            <div class="header">{NamaPerusahaan}</div>
+            <div class="vendor">Vendor: {NamaVendor}</div>
+            <div class="code">{KodeVoucher}</div>
+            <div class="info">Durasi: {DurasiHari}</div>
+            <div class="info">Valid: {TanggalExpired}</div>
+            <div class="price">Rp {HargaJual}</div>
+        </div>
+    </div>
+</body>
+</html>

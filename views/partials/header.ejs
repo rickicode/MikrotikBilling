@@ -163,6 +163,13 @@
                                         </div>
                                     </a>
                                     <hr class="border-dark-700 my-2">
+                                    <a href="/templates" class="<%= currentUrl === '/templates' ? 'bg-dark-700 text-blue-400' : 'text-dark-300 hover:bg-dark-700 hover:text-white' %> flex items-center px-3 py-2 text-sm rounded-md transition-colors">
+                                        <i class="fas fa-print mr-3 w-4"></i>
+                                        <div>
+                                            <div class="font-medium">Template</div>
+                                            <div class="text-xs text-dark-500">Pengaturan template print</div>
+                                        </div>
+                                    </a>
                                     <a href="/vendors" class="text-dark-300 hover:bg-dark-700 hover:text-white flex items-center px-3 py-2 text-sm rounded-md transition-colors">
                                         <i class="fas fa-store mr-3 w-4"></i>
                                         <div>
@@ -332,6 +339,13 @@
                             <div>
                                 <div class="font-medium">Buat Voucher</div>
                                 <div class="text-xs text-dark-500">Generate voucher baru</div>
+                            </div>
+                        </a>
+                        <a href="/templates" class="<%= currentUrl === '/templates' ? 'bg-dark-700 text-blue-400' : 'text-dark-300 hover:bg-dark-700 hover:text-white' %> flex items-center px-6 py-3 rounded-md text-base transition-colors">
+                            <i class="fas fa-print mr-3 w-5"></i>
+                            <div>
+                                <div class="font-medium">Template</div>
+                                <div class="text-xs text-dark-500">Pengaturan template print</div>
                             </div>
                         </a>
                         <a href="/vendors" class="text-dark-300 hover:bg-dark-700 hover:text-white flex items-center px-6 py-3 rounded-md text-base transition-colors">

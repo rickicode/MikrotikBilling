@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const printBtn = document.querySelector('[onclick="showPrintPreview()"]');
             if (printBtn) {
                 printBtn.removeAttribute('onclick');
-                printBtn.addEventListener('click', () => this.showPrintPreview());
+                printBtn.addEventListener('click', () => this.showPrintOptions());
             }
 
             // Search functionality
@@ -535,18 +535,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex flex-col space-y-1">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                this.getStatusClass(voucher.status, voucher.mikrotik_synced)
+                                this.getStatusClass(voucher.status, voucher.mikrotikSynced)
                             }">
                                 <span class="w-2 h-2 mr-1.5 rounded-full ${
-                                    this.getStatusColor(voucher.status, voucher.mikrotik_synced)
-                                } ${voucher.status === 'available' && voucher.mikrotik_synced ? 'animate-pulse' : ''}"></span>
-                                ${this.getStatusText(voucher.status, voucher.mikrotik_synced)}
+                                    this.getStatusColor(voucher.status, voucher.mikrotikSynced)
+                                } ${voucher.status === 'available' && voucher.mikrotikSynced ? 'animate-pulse' : ''}"></span>
+                                ${this.getStatusText(voucher.status, voucher.mikrotikSynced)}
                             </span>
                             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                voucher.mikrotik_synced ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                voucher.mikrotikSynced ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                             }">
-                                <i class="fas fa-${voucher.mikrotik_synced ? 'check' : 'clock'} mr-1 text-xs"></i>
-                                ${voucher.mikrotik_synced ? 'Synced' : 'Pending'}
+                                <i class="fas fa-${voucher.mikrotikSynced ? 'check' : 'clock'} mr-1 text-xs"></i>
+                                ${voucher.mikrotikSynced ? 'Synced' : 'Pending'}
                             </span>
                         </div>
                     </td>
@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
 
         getStatusText(status, mikrotikSynced) {
-            if (status === 'available') {
+            if (status === 'unused') {
                 return mikrotikSynced ? 'Tersedia' : 'Tersedia (Pending)';
             } else if (status === 'used') {
                 return 'Terpakai';
@@ -635,25 +635,56 @@ document.addEventListener('DOMContentLoaded', function() {
             const { current_page, total_pages } = pagination;
             let pageNumbersHTML = '';
 
-            // Calculate page range
-            const startPage = Math.max(1, current_page - 2);
-            const endPage = Math.min(total_pages, current_page + 2);
-
-            // Always show first page if not in range
-            if (startPage > 1) {
-                pageNumbersHTML += `
-                    <button onclick="VoucherManager.goToPage(1)" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition-colors duration-200">
-                        1
-                    </button>
-                `;
-                if (startPage > 2) {
-                    pageNumbersHTML += `<span class="px-2 text-sm text-slate-500">...</span>`;
-                }
+            // If only 1 page, show nothing
+            if (total_pages <= 1) {
+                container.innerHTML = '';
+                this.updatePaginationControls(pagination);
+                return;
             }
 
-            // Page numbers
-            for (let i = startPage; i <= endPage; i++) {
-                if (i > 0 && i <= total_pages) {
+            // Show prev button if not on first page
+            if (current_page > 1) {
+                pageNumbersHTML += `
+                    <button id="prevPage" onclick="VoucherManager.goToPage(${current_page - 1})" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition-colors duration-200">
+                        <i class="fas fa-chevron-left mr-1"></i>
+                        Prev
+                    </button>
+                `;
+            }
+
+            // Show page numbers (max 3)
+            if (total_pages <= 3) {
+                // Show all pages if 3 or fewer
+                for (let i = 1; i <= total_pages; i++) {
+                    pageNumbersHTML += `
+                        <button onclick="VoucherManager.goToPage(${i})"
+                                class="px-3 py-2 text-sm font-medium rounded-md ${
+                                    i === current_page
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
+                                } transition-colors duration-200 page-number"
+                                data-page="${i}">
+                            ${i}
+                        </button>
+                    `;
+                }
+            } else {
+                // Show max 3 pages with current page in middle when possible
+                let startPage = 1;
+                let endPage = 3;
+
+                if (current_page > 2) {
+                    startPage = current_page - 1;
+                    endPage = current_page + 1;
+                }
+
+                // Adjust if we're near the end
+                if (endPage > total_pages) {
+                    endPage = total_pages;
+                    startPage = total_pages - 2;
+                }
+
+                for (let i = startPage; i <= endPage; i++) {
                     pageNumbersHTML += `
                         <button onclick="VoucherManager.goToPage(${i})"
                                 class="px-3 py-2 text-sm font-medium rounded-md ${
@@ -668,14 +699,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Always show last page if not in range
-            if (endPage < total_pages) {
-                if (endPage < total_pages - 1) {
-                    pageNumbersHTML += `<span class="px-2 text-sm text-slate-500">...</span>`;
-                }
+            // Show next button if not on last page
+            if (current_page < total_pages) {
                 pageNumbersHTML += `
-                    <button onclick="VoucherManager.goToPage(${total_pages})" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition-colors duration-200">
-                        ${total_pages}
+                    <button id="nextPage" onclick="VoucherManager.goToPage(${current_page + 1})" class="px-3 py-2 text-sm font-medium rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition-colors duration-200">
+                        Next
+                        <i class="fas fa-chevron-right ml-1"></i>
                     </button>
                 `;
             }
@@ -820,6 +849,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 this.selectedVouchers.delete(voucherId);
             }
+            console.log('Selected voucher IDs:', Array.from(this.selectedVouchers));
             this.updateSelectAllState();
         },
 
@@ -951,17 +981,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div>
                                     <p class="text-sm text-slate-400">Status</p>
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                        this.getStatusClass(voucher.status, voucher.mikrotik_synced)
+                                        this.getStatusClass(voucher.status, voucher.mikrotikSynced)
                                     }">
-                                        ${this.getStatusText(voucher.status, voucher.mikrotik_synced)}
+                                        ${this.getStatusText(voucher.status, voucher.mikrotikSynced)}
                                     </span>
                                 </div>
                                 <div>
                                     <p class="text-sm text-slate-400">Mikrotik Sync</p>
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                        voucher.mikrotik_synced ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                        voucher.mikrotikSynced ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                                     }">
-                                        ${voucher.mikrotik_synced ? 'Tersinkronisasi' : 'Pending'}
+                                        ${voucher.mikrotikSynced ? 'Tersinkronisasi' : 'Pending'}
                                     </span>
                                 </div>
                             </div>
@@ -1203,29 +1233,25 @@ document.addEventListener('DOMContentLoaded', function() {
             ToastManager.show('Mengunduh data voucher...', 'info');
         },
 
-        showPrintPreview() {
+        showPrintOptions() {
             if (this.selectedVouchers.size === 0) {
                 ToastManager.show('Pilih voucher terlebih dahulu', 'warning');
                 return;
             }
 
-            // Generate print preview content
-            const printFormat = document.getElementById('printFormat');
-            const printContent = document.getElementById('printPreviewContent');
+            // Show print options modal
+            document.getElementById('printOptionsModal').classList.remove('hidden');
+        },
 
-            if (printFormat && printContent) {
-                const format = printFormat.value;
-                // Here you would typically fetch the selected vouchers and render them
-                printContent.innerHTML = `
-                    <div class="text-center text-slate-500">
-                        <i class="fas fa-file-invoice text-6xl mb-4"></i>
-                        <p>Preview untuk ${this.selectedVouchers.size} voucher</p>
-                        <p class="text-sm">Format: ${format === 'a4' ? 'A4 (120 per halaman)' : 'Thermal (1 per halaman)'}</p>
-                    </div>
-                `;
+        printVouchersWithFormat(format) {
+            try {
+                const voucherIds = Array.from(this.selectedVouchers).join(',');
+                window.open(`/print/vouchers/${voucherIds}?format=${format}`, '_blank');
+                ToastManager.show(`Voucher siap dicetak dengan format ${format === 'a4' ? 'A4' : 'Thermal'}`, 'success');
+            } catch (error) {
+                console.error('Print error:', error);
+                ToastManager.show('Gagal mencetak voucher', 'error');
             }
-
-            this.showModal('printPreviewModal');
         },
 
         printVouchers() {
@@ -1275,12 +1301,23 @@ document.addEventListener('DOMContentLoaded', function() {
     window.VoucherManager = VoucherManager;
     window.syncVouchers = () => VoucherManager.syncVouchers();
     window.exportVouchers = () => VoucherManager.exportVouchers();
-    window.showPrintPreview = () => VoucherManager.showPrintPreview();
+    window.showPrintOptions = () => VoucherManager.showPrintOptions();
     window.printVouchers = () => VoucherManager.printVouchers();
     window.downloadPDF = () => VoucherManager.downloadPDF();
     window.confirmDelete = () => VoucherManager.confirmDelete();
     window.refreshVouchers = () => VoucherManager.refreshVouchers();
     window.closeVoucherModal = () => VoucherManager.closeModal('voucherDetailModal');
+
+    // Print Options Modal Functions
+    window.closePrintOptionsModal = () => {
+        document.getElementById('printOptionsModal').classList.add('hidden');
+    };
+
+    window.confirmPrintFormat = () => {
+        const selectedFormat = document.querySelector('input[name="printFormat"]:checked').value;
+        document.getElementById('printOptionsModal').classList.add('hidden');
+        VoucherManager.printVouchersWithFormat(selectedFormat);
+    };
     window.closePrintModal = () => VoucherManager.closeModal('printPreviewModal');
     window.closeDeleteModal = () => VoucherManager.closeModal('deleteConfirmModal');
     window.toggleAdvancedFilters = () => {

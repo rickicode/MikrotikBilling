@@ -18,69 +18,7 @@
         </div>
     </div>
 
-    <!-- Statistics Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <!-- Total Vouchers -->
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
-            <div class="flex items-center justify-between">
-                <div class="flex-1">
-                    <p class="text-slate-400 text-sm font-medium mb-1">Total Voucher</p>
-                    <p class="text-3xl font-bold text-white" id="totalVouchersStat">-</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <div class="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
-                        <i class="bi bi-ticket-perforated-fill text-blue-400 text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Available Vouchers -->
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
-            <div class="flex items-center justify-between">
-                <div class="flex-1">
-                    <p class="text-slate-400 text-sm font-medium mb-1">Tersedia</p>
-                    <p class="text-3xl font-bold text-white" id="availableVouchersStat">-</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
-                        <i class="bi bi-check-circle-fill text-green-400 text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Generated Today -->
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-yellow-500/10 transition-all duration-300 transform hover:-translate-y-1">
-            <div class="flex items-center justify-between">
-                <div class="flex-1">
-                    <p class="text-slate-400 text-sm font-medium mb-1">Generated Hari Ini</p>
-                    <p class="text-3xl font-bold text-white" id="todayGeneratedStat">-</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <div class="w-14 h-14 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
-                        <i class="bi bi-calendar-plus-fill text-yellow-400 text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Total Revenue -->
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 transform hover:-translate-y-1">
-            <div class="flex items-center justify-between">
-                <div class="flex-1">
-                    <p class="text-slate-400 text-sm font-medium mb-1">Total Revenue</p>
-                    <p class="text-3xl font-bold text-white" id="revenueStat">-</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <div class="w-14 h-14 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20">
-                        <i class="bi bi-cash-fill text-purple-400 text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
+  
     <!-- Quick Templates -->
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-8">
         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -486,7 +424,6 @@ let generatedVoucherData = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeForm();
-    loadStatistics();
     loadRecentActivity();
 });
 
@@ -912,7 +849,6 @@ async function generateVouchers() {
         if (result.success) {
             generatedVoucherData = result.data;
             showSuccessModal(result.message, result.data);
-            loadStatistics(); // Refresh statistics
             loadRecentActivity(); // Refresh recent activity
         } else {
             alert('Error: ' + result.message);
@@ -974,25 +910,6 @@ function resetForm() {
     document.getElementById('previewCard').style.display = 'none';
 }
 
-// Load statistics
-async function loadStatistics() {
-    try {
-        const response = await fetch('/vouchers/api/vouchers/statistics');
-        const stats = await response.json();
-
-        document.getElementById('totalVouchersStat').textContent = stats.total || 0;
-        document.getElementById('availableVouchersStat').textContent = stats.available || 0;
-        document.getElementById('todayGeneratedStat').textContent = stats.generated_today || 0;
-        document.getElementById('revenueStat').textContent = formatCurrency(stats.revenue || 0);
-    } catch (error) {
-        console.error('Error loading statistics:', error);
-        // Set default values on error
-        document.getElementById('totalVouchersStat').textContent = '0';
-        document.getElementById('availableVouchersStat').textContent = '0';
-        document.getElementById('todayGeneratedStat').textContent = '0';
-        document.getElementById('revenueStat').textContent = 'Rp 0';
-    }
-}
 
 // Load recent activity
 async function loadRecentActivity() {

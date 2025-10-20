@@ -16,7 +16,7 @@ class UserMonitorService extends EventEmitter {
             this.query = new Query(dbPool);
         }
         this.isRunning = false;
-        this.pollInterval = 30000; // 30 seconds
+        this.pollInterval = 60000; // Increased to 60 seconds to reduce connection frequency
         this.intervalId = null;
         this.lastPollTime = null;
         this.knownUsers = new Map(); // Cache of known users
@@ -33,7 +33,7 @@ class UserMonitorService extends EventEmitter {
         }
 
         try {
-            console.log('🔍 Starting User Monitor Service (30-second polling)...');
+            console.log('🔍 Starting User Monitor Service (60-second polling)...');
 
             // Initialize known users cache
             await this.initializeKnownUsers();

@@ -335,8 +335,8 @@ async function customerRoutes(fastify, options) {
       return reply.view('customers/service-create', {
         admin: request.admin,
         customer,
-        profiles: profiles || [],
-        pppProfiles: pppProfiles || []
+        profiles: profiles.rows || [],
+        pppProfiles: pppProfiles.rows || []
       });
     } catch (error) {
             fastify.log.error('Internal Server Error:', error);

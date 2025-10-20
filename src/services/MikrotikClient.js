@@ -9,7 +9,7 @@ class MikrotikClient {
       port: 8728,
       username: 'admin',
       password: '',
-      timeout: 30000, // Default 30 seconds
+      timeout: 60000, // Increased to 60 seconds to reduce timeouts
       tls: false
     };
     this.client = null;
@@ -21,11 +21,11 @@ class MikrotikClient {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 5000;
 
-    // Performance optimizations
+    // Performance optimizations - SINGLE CONNECTION MODE
     this.cache = new Map();
     this.cacheTimeout = 30000; // 30 seconds for Mikrotik data
     this.connectionPool = [];
-    this.maxPoolSize = 3;
+    this.maxPoolSize = 1; // Reduced to 1 connection to prevent connection competition
     this.requestQueue = [];
     this.processingRequest = false;
 
@@ -52,7 +52,7 @@ class MikrotikClient {
           port: parseInt(settings.port) || 8728,
           username: settings.username || 'admin',
           password: settings.password || '',
-          timeout: parseInt(settings.timeout) || 30000, // Default 30 seconds
+          timeout: parseInt(settings.timeout) || 60000, // Increased to 60 seconds
           tls: false // Explicitly disable TLS/SSL
         };
 
@@ -70,7 +70,7 @@ class MikrotikClient {
           port: parseInt(process.env.MIKROTIK_PORT) || 8728,
           username: process.env.MIKROTIK_USERNAME || 'admin',
           password: process.env.MIKROTIK_PASSWORD || '',
-          timeout: parseInt(process.env.MIKROTIK_TIMEOUT) || 30000, // Default 30 seconds
+          timeout: parseInt(process.env.MIKROTIK_TIMEOUT) || 60000, // Increased to 60 seconds
           tls: false // Explicitly disable TLS/SSL
         };
       }
@@ -81,7 +81,7 @@ class MikrotikClient {
         port: parseInt(process.env.MIKROTIK_PORT) || 8728,
         username: process.env.MIKROTIK_USERNAME || 'admin',
         password: process.env.MIKROTIK_PASSWORD || '',
-        timeout: parseInt(process.env.MIKROTIK_TIMEOUT) || 30000, // Default 30 seconds
+        timeout: parseInt(process.env.MIKROTIK_TIMEOUT) || 60000, // Increased to 60 seconds
         tls: false // Explicitly disable TLS/SSL
       };
     }
