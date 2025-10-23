@@ -1,6 +1,5 @@
 const EventEmitter = require('events');
-const Query = require('../lib/query');
-// Database pool will be passed as parameter
+const QueryHelper = require('../lib/QueryHelper');
 
 /**
  * User Monitor Service - Replaces profile scripts with 30-second polling
@@ -11,10 +10,8 @@ class UserMonitorService extends EventEmitter {
         super();
         this.mikrotik = mikrotikClient;
         this.whatsapp = whatsappService;
-        if (dbPool) {
-            // PostgreSQL pool
-            this.query = new Query(dbPool);
-        }
+        // Use QueryHelper for all database operations
+        this.query = QueryHelper;
         this.isRunning = false;
         this.pollInterval = 60000; // Increased to 60 seconds to reduce connection frequency
         this.intervalId = null;
@@ -86,14 +83,16 @@ class UserMonitorService extends EventEmitter {
     async initializeKnownUsers() {
         try {
             // Get all voucher users from database
-            const vouchers = await this.query.getMany(`
-                SELECT code, status, used_at, expires_at
-                FROM vouchers
-                WHERE status IN ('unused', 'used', 'expired')
-            `);
+            const vouchersResult = await QueryHelper.getMany(
+                'SELECT * FROM vouchers WHERE status IN (?, ?, ?)',
+                ['unused', 'used', 'expired']
+            );
 
+            const vouchers = vouchersResult.rows || vouchersResult || [];
             vouchers.forEach(voucher => {
-                this.knownUsers.set(voucher.code, {
+                // Use username field instead of code
+                const username = voucher.username || voucher.code;
+                this.knownUsers.set(username, {
                     type: 'voucher',
                     status: voucher.status,
                     firstLogin: voucher.used_at,
@@ -102,12 +101,12 @@ class UserMonitorService extends EventEmitter {
             });
 
             // Get all PPPoE users from database
-            const pppoeUsers = await this.query.getMany(`
-                SELECT username, status, expires_at
-                FROM pppoe_users
-                WHERE status IN ('active', 'expired')
-            `);
+            const pppoeResult = await QueryHelper.getMany(
+                'SELECT * FROM pppoe_users WHERE status IN (?, ?)',
+                ['active', 'expired']
+            );
 
+            const pppoeUsers = pppoeResult.rows || pppoeResult || [];
             pppoeUsers.forEach(user => {
                 this.knownUsers.set(user.username, {
                     type: 'pppoe',
@@ -340,11 +339,11 @@ class UserMonitorService extends EventEmitter {
 
             if (userType === 'hotspot') {
                 // Update voucher first login
-                await this.query.query(`
+                await QueryHelper.execute(`
                     UPDATE vouchers
-                    SET used_at = $1, status = 'used'
-                    WHERE code = $2
-                `, [now.toISOString(), user.name]);
+                    SET used_at = NOW(), status = 'used'
+                    WHERE username = ?
+                `, [user.name]);
 
                 // Update Mikrotik user comment
                 const commentData = this.mikrotik.parseComment(user.comment) || {};
@@ -355,13 +354,14 @@ class UserMonitorService extends EventEmitter {
                 );
 
                 // Get customer info for notification
-                const voucher = await this.query.getOne(`
-                    SELECT v.*, c.id as customer_id, c.name, c.phone
-                    FROM vouchers v
-                    LEFT JOIN pppoe_users p ON v.code = p.username
-                    LEFT JOIN customers c ON p.customer_id = c.id
-                    WHERE v.code = $1
-                `, [user.name]);
+                const voucher = await QueryHelper.getOne(
+                    `SELECT v.*, c.id as customer_id, c.name, c.phone
+                     FROM vouchers v
+                     LEFT JOIN pppoe_users p ON v.username = p.username
+                     LEFT JOIN customers c ON p.customer_id = c.id
+                     WHERE v.username = ?`,
+                    [user.name]
+                );
 
                 // Send WhatsApp notification
                 if (voucher && voucher.customer_id && voucher.phone && this.whatsapp) {
@@ -404,9 +404,9 @@ class UserMonitorService extends EventEmitter {
     async handleLogout(username, session) {
         try {
             // Log session data
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO activity_logs (username, session_type, login_time, logout_time, ip_address, duration)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                VALUES (?, ?, ?, ?, ?, ?)
             `, [
                 username,
                 session.type,
@@ -434,9 +434,9 @@ class UserMonitorService extends EventEmitter {
     async handlePPPoEDisconnect(username, session) {
         try {
             // Log PPPoE session
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO activity_logs (username, session_type, connect_time, disconnect_time, caller_id, uptime)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                VALUES (?, ?, ?, ?, ?, ?)
             `, [
                 username,
                 'pppoe',
@@ -464,54 +464,52 @@ class UserMonitorService extends EventEmitter {
     async cleanupExpiredUsers() {
         try {
             // Clean up expired vouchers
-            const expiredVouchers = await this.query.getMany(`
-                SELECT code, expires_at
-                FROM vouchers
-                WHERE status = 'used' AND expires_at < NOW()
-            `);
+            const expiredVouchers = await QueryHelper.getMany(
+                'SELECT username, expires_at FROM vouchers WHERE status = ? AND expires_at < datetime("now")',
+                ['used']
+            );
 
             for (const voucher of expiredVouchers) {
                 try {
                     // Delete from Mikrotik
-                    await this.mikrotik.deleteHotspotUser(voucher.code);
+                    await this.mikrotik.deleteHotspotUser(voucher.username);
 
                     // Update database
-                    await this.query.query(`
-                        UPDATE vouchers
-                        SET status = 'expired'
-                        WHERE code = $1
-                    `, [voucher.code]);
+                    await QueryHelper.raw(
+                        'UPDATE vouchers SET status = ? WHERE username = ?',
+                        ['expired', voucher.username]
+                    );
 
                     // Log cleanup
-                    await this.query.insert(`
-                        INSERT INTO activity_logs (action, user_type, username, details, created_at)
-                        VALUES ($1, $2, $3, $4, NOW())
-                    `, [
-                        'delete_expired',
-                        'voucher',
-                        voucher.code,
-                        JSON.stringify({
-                            reason: 'expired',
-                            expires_at: voucher.expires_at
-                        })
-                    ]);
+                    await QueryHelper.raw(
+                        'INSERT INTO activity_logs (action, user_type, username, details, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+                        [
+                            'delete_expired',
+                            'voucher',
+                            voucher.username,
+                            JSON.stringify({
+                                reason: 'expired',
+                                expires_at: voucher.expires_at
+                            })
+                        ]
+                    );
 
                     // Remove from cache
-                    this.knownUsers.delete(voucher.code);
+                    this.knownUsers.delete(voucher.username);
 
-                    console.log(`🗑️ Cleaned up expired voucher: ${voucher.code}`);
+                    console.log(`🗑️ Cleaned up expired voucher: ${voucher.username}`);
 
                 } catch (error) {
-                    console.error(`Error cleaning up voucher ${voucher.code}:`, error);
+                    console.error(`Error cleaning up voucher ${voucher.username}:`, error);
                 }
             }
 
             // Clean up expired PPPoE users
-            const expiredPPPoE = await this.query.getMany(`
-                SELECT username, expires_at
-                FROM pppoe_users
-                WHERE status = 'active' AND expires_at < NOW()
-            `);
+            const expiredPPPoE = await QueryHelper.findMany(
+                `SELECT username, expires_at
+                 FROM pppoe_users
+                 WHERE status = 'active' AND expires_at < NOW()`
+            );
 
             for (const user of expiredPPPoE) {
                 try {
@@ -521,25 +519,27 @@ class UserMonitorService extends EventEmitter {
                     });
 
                     // Update database
-                    await this.query.query(`
-                        UPDATE pppoe_users
-                        SET status = 'disabled', updated_at = NOW()
-                        WHERE username = $1
-                    `, [user.username]);
+                    await QueryHelper.execute(
+                        `UPDATE pppoe_users
+                         SET status = 'disabled', updated_at = NOW()
+                         WHERE username = ?`,
+                        [user.username]
+                    );
 
                     // Log cleanup
-                    await this.query.insert(`
-                        INSERT INTO activity_logs (action, user_type, username, details, created_at)
-                        VALUES ($1, $2, $3, $4, NOW())
-                    `, [
-                        'disable_expired',
-                        'pppoe',
-                        user.username,
-                        JSON.stringify({
-                            reason: 'expired',
-                            expiry_date: user.expires_at
-                        })
-                    ]);
+                    await QueryHelper.insert(
+                        `INSERT INTO activity_logs (action, user_type, username, details, created_at)
+                         VALUES (?, ?, ?, ?, NOW())`,
+                        [
+                            'disable_expired',
+                            'pppoe',
+                            user.username,
+                            JSON.stringify({
+                                reason: 'expired',
+                                expiry_date: user.expires_at
+                            })
+                        ]
+                    );
 
                     // Update cache
                     const cachedUser = this.knownUsers.get(user.username);

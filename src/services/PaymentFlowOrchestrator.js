@@ -80,7 +80,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
                 await this.updateInvoiceStatus(invoice.id, invoiceStatus, carryOverResult, client);
 
                 // 6. Create payment record
-                const paymentId = await this.query.insertWithClient(`
+                const paymentId = await QueryHelper.insertWithClient(`
                     INSERT INTO payments
                     (customer_id, subscription_id, invoice_id, amount, method, status, reference, created_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
@@ -172,7 +172,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
             const { reference, status, amount, transactionId } = paymentInfo;
 
             // 3. Update payment record
-            const payment = await this.query.getOne(`
+            const payment = await QueryHelper.getOne(`
                 SELECT p.*, i.customer_id, i.subscription_id
                 FROM payments p
                 LEFT JOIN invoices i ON p.invoice_id = i.id
@@ -217,7 +217,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
             await client.query('BEGIN');
 
             // Update payment status
-            await this.query.queryWithClient(`
+            await QueryHelper.queryWithClient(`
                 UPDATE payments
                 SET status = 'paid',
                     transaction_id = $1,
@@ -276,7 +276,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
      * @param {Object} updateData - Update data
      */
     async processFailedPayment(payment, updateData) {
-        await this.query.query(`
+        await QueryHelper.query(`
             UPDATE payments
             SET status = 'failed',
                 failure_reason = $1,
@@ -305,7 +305,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
      * @returns {Object} Token data
      */
     async validatePaymentToken(token, client) {
-        const result = await this.query.getOneWithClient(`
+        const result = await QueryHelper.getOneWithClient(`
             SELECT pt.*, i.invoice_number, i.total_amount, i.customer_id, i.subscription_id
             FROM payment_tokens pt
             LEFT JOIN invoices i ON pt.invoice_id = i.id
@@ -316,7 +316,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
 
         if (result) {
             // Mark token as used
-            await this.query.queryWithClient(`
+            await QueryHelper.queryWithClient(`
                 UPDATE payment_tokens
                 SET is_used = true, used_at = NOW()
                 WHERE id = $1
@@ -335,14 +335,14 @@ class PaymentFlowOrchestrator extends EventEmitter {
      */
     async getOrCreateInvoice(invoiceId, tokenData, client) {
         if (invoiceId) {
-            return await this.query.getOneWithClient(`
+            return await QueryHelper.getOneWithClient(`
                 SELECT * FROM invoices WHERE id = $1
             `, client, [invoiceId]);
         }
 
         // Create new invoice
         const invoiceNumber = this.generateInvoiceNumber();
-        const newInvoice = await this.query.insertWithClient(`
+        const newInvoice = await QueryHelper.insertWithClient(`
             INSERT INTO invoices
             (invoice_number, customer_id, subscription_id, total_amount, status, due_date, created_at)
             VALUES ($1, $2, $3, $4, 'pending', NOW() + INTERVAL '7 days', NOW())
@@ -379,7 +379,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
 
             // Log carry over usage
             if (result.appliedAmount > 0) {
-                await this.query.insertWithClient(`
+                await QueryHelper.insertWithClient(`
                     INSERT INTO payment_logs
                     (payment_id, action, details, created_at)
                     VALUES ($1, $2, $3, NOW())
@@ -424,7 +424,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
         const payment = await plugin.createPayment(paymentData);
 
         // Store payment reference
-        await this.query.insertWithClient(`
+        await QueryHelper.insertWithClient(`
             INSERT INTO payment_references
             (payment_id, method, reference, payment_url, created_at)
             VALUES ($1, $2, $3, $4, NOW())
@@ -458,7 +458,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
      * @param {Object} client - Database client
      */
     async updateInvoiceStatus(invoiceId, status, carryOverResult, client) {
-        await this.query.queryWithClient(`
+        await QueryHelper.queryWithClient(`
             UPDATE invoices
             SET status = $1,
                 paid_amount = COALESCE(paid_amount, 0) + $2,
@@ -481,7 +481,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
      */
     async extendSubscription(subscriptionId, amount, client) {
         // Get subscription details
-        const subscription = await this.query.getOneWithClient(`
+        const subscription = await QueryHelper.getOneWithClient(`
             SELECT * FROM subscriptions WHERE id = $1
         `, client, [subscriptionId]);
 
@@ -491,7 +491,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
         const daysExtension = Math.floor((amount / subscription.price_sell) * 30);
 
         // Update subscription
-        await this.query.queryWithClient(`
+        await QueryHelper.queryWithClient(`
             UPDATE subscriptions
             SET expiry_date = CASE
                 WHEN expiry_date > NOW()
@@ -525,7 +525,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
         if (this.whatsappService) {
             try {
                 // Get customer phone number
-                const customer = await this.query.getOne(`
+                const customer = await QueryHelper.getOne(`
                     SELECT phone FROM customers WHERE id = $1
                 `, [customerId]);
 
@@ -552,7 +552,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
         setTimeout(async () => {
             try {
                 const plugin = await this.loadPaymentPlugin(method);
-                const payment = await this.query.getOne(`
+                const payment = await QueryHelper.getOne(`
                     SELECT * FROM payments WHERE id = $1 AND status = 'pending'
                 `, [paymentId]);
 
@@ -617,7 +617,7 @@ class PaymentFlowOrchestrator extends EventEmitter {
             params.push(status);
         }
 
-        const stats = await this.query.getOne(`
+        const stats = await QueryHelper.getOne(`
             SELECT
                 COUNT(*) as total_payments,
                 COUNT(CASE WHEN p.status = 'paid' THEN 1 END) as successful_payments,

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= error.status || 500 %> - <%= error.message || 'Error Server' %></title>
+    <title><%= locals.error?.status || 500 %> - <%= locals.error?.message || 'Error Server' %></title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -59,13 +59,13 @@
         <!-- Error Code -->
         <div class="text-center mb-6">
             <div class="text-8xl font-black bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent animate-pulse-slow">
-                <%= error.status || 500 %>
+                <%= locals.error.status || 500 %>
             </div>
         </div>
 
         <!-- Error Title -->
         <h1 class="text-4xl font-bold text-white text-center mb-4">
-            <%= error.message || 'Terjadi Kesalahan Server' %>
+            <%= locals.error.message || 'Terjadi Kesalahan Server' %>
         </h1>
 
         <!-- Error Description -->
@@ -74,11 +74,80 @@
             Tim kami sedang bekerja untuk memperbaikinya sesegera mungkin.
         </p>
 
-        <!-- Error Details (if in development) -->
-        <% if (process.env.NODE_ENV === 'development' && error.stack) { %>
+        <!-- Error Details (if in development or debug mode) -->
+        <% if ((process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') && (locals.error.stack || locals.error.debugInfo)) { %>
             <div class="bg-slate-900/50 border border-red-500/30 rounded-xl p-4 mb-8">
-                <p class="text-sm text-red-400 mb-2 font-mono">Error Details:</p>
-                <pre class="text-xs text-slate-400 font-mono overflow-x-auto whitespace-pre-wrap break-all"><%= error.stack %></pre>
+                <p class="text-sm text-red-400 mb-3 font-mono">🐛 DEBUG MODE - Error Details:</p>
+
+                <% if (locals.error.message) { %>
+                <div class="mb-3">
+                    <p class="text-sm text-yellow-400 mb-1 font-mono">Error Message:</p>
+                    <code class="text-xs text-slate-300 font-mono bg-slate-800/50 px-2 py-1 rounded block"><%= locals.error.message %></code>
+                </div>
+                <% } %>
+
+                <% if (locals.error.code) { %>
+                <div class="mb-3">
+                    <p class="text-sm text-blue-400 font-mono">Error Code: <code class="text-xs text-slate-300 bg-slate-800/50 px-2 py-1 rounded"><%= locals.error.code %></code></p>
+                </div>
+                <% } %>
+
+                <% if (locals.error.status) { %>
+                <div class="mb-3">
+                    <p class="text-sm text-orange-400 font-mono">HTTP Status: <code class="text-xs text-slate-300 bg-slate-800/50 px-2 py-1 rounded"><%= locals.error.status %></code></p>
+                </div>
+                <% } %>
+
+                <% if (locals.error.url) { %>
+                <div class="mb-3">
+                    <p class="text-sm text-purple-400 font-mono">URL: <code class="text-xs text-slate-300 bg-slate-800/50 px-2 py-1 rounded"><%= locals.error.method %> <%= locals.error.url %></code></p>
+                </div>
+                <% } %>
+
+                <% if (locals.error.requestId) { %>
+                <div class="mb-3">
+                    <p class="text-sm text-green-400 font-mono">Request ID: <code class="text-xs text-slate-300 bg-slate-800/50 px-2 py-1 rounded"><%= locals.error.requestId %></code></p>
+                </div>
+                <% } %>
+
+                <% if (locals.error.stack) { %>
+                <div class="mt-3 pt-3 border-t border-slate-700">
+                    <p class="text-sm text-red-400 mb-2 font-mono">Stack Trace:</p>
+                    <pre class="text-xs text-slate-400 font-mono overflow-x-auto whitespace-pre-wrap break-all bg-slate-800/30 p-2 rounded"><%= locals.error.stack %></pre>
+                </div>
+                <% } %>
+
+                <% if (locals.error.debugInfo && locals.error.debugInfo.originalError) { %>
+                <div class="mt-3 pt-3 border-t border-slate-700">
+                    <p class="text-sm text-cyan-400 mb-2 font-mono">Original Error Object:</p>
+                    <pre class="text-xs text-slate-400 font-mono overflow-x-auto whitespace-pre-wrap break-all bg-slate-800/30 p-2 rounded"><%= JSON.stringify(locals.error.debugInfo.originalError, null, 2) %></pre>
+                </div>
+                <% } %>
+
+                <% if (locals.error.debugInfo) { %>
+                <div class="mt-3 pt-3 border-t border-slate-700">
+                    <p class="text-sm text-indigo-400 mb-2 font-mono">Request Context:</p>
+                    <div class="text-xs text-slate-400 font-mono bg-slate-800/30 p-2 rounded overflow-x-auto">
+                        <div class="mb-2"><strong>Headers:</strong></div>
+                        <pre class="mb-3"><%= JSON.stringify(locals.error.debugInfo.headers, null, 2) %></pre>
+
+                        <% if (locals.error.debugInfo.body && Object.keys(locals.error.debugInfo.body).length > 0) { %>
+                        <div class="mb-2"><strong>Body:</strong></div>
+                        <pre class="mb-3"><%= JSON.stringify(locals.error.debugInfo.body, null, 2) %></pre>
+                        <% } %>
+
+                        <% if (locals.error.debugInfo.query && Object.keys(locals.error.debugInfo.query).length > 0) { %>
+                        <div class="mb-2"><strong>Query:</strong></div>
+                        <pre class="mb-3"><%= JSON.stringify(locals.error.debugInfo.query, null, 2) %></pre>
+                        <% } %>
+
+                        <% if (locals.error.debugInfo.params && Object.keys(locals.error.debugInfo.params).length > 0) { %>
+                        <div class="mb-2"><strong>Params:</strong></div>
+                        <pre><%= JSON.stringify(locals.error.debugInfo.params, null, 2) %></pre>
+                        <% } %>
+                    </div>
+                </div>
+                <% } %>
             </div>
         <% } %>
 
@@ -110,7 +179,7 @@
                     <i class="fas fa-copy text-2xl text-green-400 mb-2 group-hover:scale-110 transition-transform"></i>
                     <p class="text-sm text-slate-300">Salin Error</p>
                 </button>
-                <a href="mailto:admin@example.com?subject=Error Report&body=Error: <%= error.status || 500 %>" class="bg-slate-900/30 hover:bg-slate-900/50 rounded-xl p-4 transition-all duration-300 group">
+                <a href="mailto:admin@example.com?subject=Error Report&body=Error: <%= locals.error.status || 500 %>" class="bg-slate-900/30 hover:bg-slate-900/50 rounded-xl p-4 transition-all duration-300 group">
                     <i class="fas fa-envelope text-2xl text-purple-400 mb-2 group-hover:scale-110 transition-transform"></i>
                     <p class="text-sm text-slate-300">Laporkan</p>
                 </a>
@@ -125,13 +194,13 @@
         <div class="mt-8 text-center">
             <p class="text-xs text-slate-500">
                 Error ID: <code class="bg-slate-900/50 px-2 py-1 rounded"><%= Math.random().toString(36).substr(2, 9).toUpperCase() %></code> |
-                Waktu: <span id="errorTime"></span>
+                Waktu: <span id="locals.errorTime"></span>
             </p>
         </div>
     </div>
 
     <!-- Toast Notification -->
-    <div id="errorToast" class="hidden fixed top-4 right-4 z-50 bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-xl max-w-sm">
+    <div id="locals.errorToast" class="hidden fixed top-4 right-4 z-50 bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-xl max-w-sm">
         <div class="flex items-start">
             <i class="fas fa-info-circle text-blue-400 mt-0.5 mr-3"></i>
             <div class="flex-1">
@@ -146,7 +215,7 @@
 
     <script>
         // Set current time
-        document.getElementById('errorTime').textContent = new Date().toLocaleString('id-ID');
+        document.getElementById('locals.errorTime').textContent = new Date().toLocaleString('id-ID');
 
         // Clear cache and reload
         function clearCacheAndReload() {
@@ -162,23 +231,23 @@
             location.reload(true);
         }
 
-        // Copy error details
+        // Copy locals.error details
         function copyErrorDetails() {
-            const errorDetails = {
-                status: <%= error.status || 500 %>,
-                message: '<%= error.message || "Internal Server Error" %>',
+            const locals.errorDetails = {
+                status: <%= locals.error.status || 500 %>,
+                message: '<%= locals.error.message || "Internal Server Error" %>',
                 url: window.location.href,
                 userAgent: navigator.userAgent,
                 timestamp: new Date().toISOString(),
                 userId: '<%= (typeof admin !== "undefined" && admin?.id) ? admin.id : "anonymous" %>'
             };
 
-            navigator.clipboard.writeText(JSON.stringify(errorDetails, null, 2)).then(() => {
+            navigator.clipboard.writeText(JSON.stringify(locals.errorDetails, null, 2)).then(() => {
                 showToast();
             }).catch(() => {
                 // Fallback for older browsers
                 const textarea = document.createElement('textarea');
-                textarea.value = JSON.stringify(errorDetails, null, 2);
+                textarea.value = JSON.stringify(locals.errorDetails, null, 2);
                 document.body.appendChild(textarea);
                 textarea.select();
                 document.execCommand('copy');
@@ -189,7 +258,7 @@
 
         // Show toast notification
         function showToast() {
-            const toast = document.getElementById('errorToast');
+            const toast = document.getElementById('locals.errorToast');
             toast.classList.remove('hidden');
             toast.classList.add('animate-slide-up');
 
@@ -204,7 +273,7 @@
 
         // Hide toast
         function hideToast() {
-            const toast = document.getElementById('errorToast');
+            const toast = document.getElementById('locals.errorToast');
             toast.style.opacity = '0';
             setTimeout(() => {
                 toast.classList.add('hidden');

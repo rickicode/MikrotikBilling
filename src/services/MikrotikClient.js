@@ -35,15 +35,15 @@ class MikrotikClient {
   async loadConfig() {
     if (this.db) {
       try {
-        // PostgreSQL
-        const query = new Query(this.db.getPool());
+        // Use QueryHelper for database operations
+        const QueryHelper = require('../lib/QueryHelper');
 
         const settings = {
-          host: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_host']))?.value || process.env.MIKROTIK_HOST,
-          port: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_port']))?.value || process.env.MIKROTIK_PORT,
-          username: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_username']))?.value || process.env.MIKROTIK_USERNAME,
-          password: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_password']))?.value || process.env.MIKROTIK_PASSWORD,
-          timeout: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_timeout']))?.value || process.env.MIKROTIK_TIMEOUT,
+          host: (await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_host']))[0]?.value || process.env.MIKROTIK_HOST,
+          port: parseInt((await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_port']))[0]?.value || process.env.MIKROTIK_PORT) || 8728,
+          username: (await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_username']))[0]?.value || process.env.MIKROTIK_USERNAME,
+          password: (await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_password']))[0]?.value || process.env.MIKROTIK_PASSWORD,
+          timeout: parseInt((await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_timeout']))[0]?.value || process.env.MIKROTIK_TIMEOUT) || 60000,
           use_ssl: false // Force disable SSL
         };
 
@@ -151,14 +151,13 @@ class MikrotikClient {
       let dbUsers = [];
       try {
         const voucherResult = await this.db.query(
-          'SELECT id, code, profile_id, status, created_at FROM vouchers WHERE status = $1',
+          'SELECT id, username, profile_name, status, created_at FROM vouchers WHERE status = $1',
           ['active']
         ) || { rows: [] };
 
-        const pppoeResult = await this.db.query(
-          'SELECT id, username, password, profile_id, status, created_at FROM pppoe_users WHERE status = $1',
-          ['active']
-        ) || { rows: [] };
+        // PPPoE users are not stored in database for now
+        // They are created directly in RouterOS but tracked via subscriptions
+        const pppoeResult = { rows: [] };
 
         const vouchers = voucherResult.rows || [];
         const pppoeUsers = pppoeResult.rows || [];
@@ -1763,15 +1762,12 @@ class MikrotikClient {
         try {
           // Get active vouchers from database
           const dbVoucherResult = await this.db.query(
-            'SELECT code, password, profile_id FROM vouchers WHERE status = $1',
+            'SELECT username, password, profile_name FROM vouchers WHERE status = $1',
             ['active']
           ) || { rows: [] };
 
-          // Get active PPPoE users from database
-          const dbPPPoEResult = await this.db.query(
-            'SELECT username, password, profile_id FROM pppoe_users WHERE status = $1',
-            ['active']
-          ) || { rows: [] };
+          // Get active PPPoE users from database (stored in subscriptions)
+          const dbPPPoEResult = { rows: [] }; // No PPPoE users stored in DB for now
 
           const dbVouchers = dbVoucherResult.rows || [];
           const dbPPPoEUsers = dbPPPoEResult.rows || [];
@@ -1786,23 +1782,16 @@ class MikrotikClient {
 
           // Restore missing vouchers
           for (const voucher of dbVouchers) {
-            if (!mikrotikVoucherMap.has(voucher.code)) {
+            if (!mikrotikVoucherMap.has(voucher.username)) {
               try {
-                console.log(`Restoring voucher in Mikrotik: ${voucher.code}`);
+                console.log(`Restoring voucher in Mikrotik: ${voucher.username}`);
 
-                // Get profile name
-                let profileName = null;
-                if (voucher.profile_id) {
-                  const profileResult = await this.db.query(
-                    'SELECT name FROM profiles WHERE id = $1',
-                    [voucher.profile_id]
-                  );
-                  profileName = profileResult.rows[0]?.name;
-                }
+                // Get profile name (already stored as profile_name in vouchers)
+                const profileName = voucher.profile_name;
 
                 // Create voucher user in Mikrotik
                 await this.createVoucherUser({
-                  username: voucher.code,
+                  username: voucher.username,
                   password: voucher.password,
                   profile: profileName,
                   price_sell: 0, // Will be updated from actual voucher data
@@ -1812,7 +1801,7 @@ class MikrotikClient {
 
                 restoredVouchers++;
               } catch (error) {
-                console.error(`Error restoring voucher ${voucher.code}:`, error);
+                console.error(`Error restoring voucher ${voucher.username}:`, error);
               }
             }
           }
@@ -1823,15 +1812,8 @@ class MikrotikClient {
               try {
                 console.log(`Restoring PPPoE user in Mikrotik: ${pppoeUser.username}`);
 
-                // Get profile name
-                let profileName = null;
-                if (pppoeUser.profile_id) {
-                  const profileResult = await this.db.query(
-                    'SELECT name FROM profiles WHERE id = $1',
-                    [pppoeUser.profile_id]
-                  );
-                  profileName = profileResult.rows[0]?.name;
-                }
+                // Get profile name (already stored as profile_name in subscriptions)
+                const profileName = pppoeUser.profile_name;
 
                 // Create PPPoE user in Mikrotik
                 await this.createPPPoESecret({

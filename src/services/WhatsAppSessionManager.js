@@ -5,13 +5,12 @@ const fs = require('fs').promises;
 const path = require('path');
 const qrcode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
-// Database pool will be available globally when the app starts
-const Query = require('../../lib/query');
+const { db } = require('../database/DatabaseManager');
 
 class WhatsAppSessionManager {
     constructor() {
         this.sessions = new Map(); // session_id -> session_data
-        this.query = null; // Will be initialized when database is available
+        this.query = db; // Use the new database manager
         this.sessionsDir = path.join(__dirname, '../.whatsapp-sessions');
         this.isInitialized = false;
         this.messageQueue = [];
@@ -73,11 +72,11 @@ class WhatsAppSessionManager {
      */
     async loadActiveSessions() {
         try {
-            const sessions = await this.query.getMany(`
-                SELECT * FROM whatsapp_sessions
-                WHERE status IN ('connected', 'connecting', 'scanning')
-                ORDER BY priority DESC, session_name
-            `);
+            const sessions = await db.findMany('whatsapp_sessions', {
+                status: ['connected', 'connecting', 'scanning']
+            }, {
+                orderBy: [{ column: 'priority', direction: 'desc' }, { column: 'session_name', direction: 'asc' }]
+            });
 
             for (const session of sessions) {
                 this.sessions.set(session.session_id, {
@@ -107,7 +106,7 @@ class WhatsAppSessionManager {
             await fs.mkdir(sessionPath, { recursive: true });
 
             // Save to database
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO whatsapp_sessions (
                     session_id, session_name, status, priority,
                     created_at, updated_at
@@ -229,7 +228,7 @@ class WhatsAppSessionManager {
                 sessionData.status = 'qr';
 
                 // Save QR code to database
-                await this.query.query(`
+                await QueryHelper.query(`
                     UPDATE whatsapp_sessions
                     SET qr_code = $1, status = 'qr', updated_at = NOW()
                     WHERE session_id = $2
@@ -253,7 +252,7 @@ class WhatsAppSessionManager {
                     sessionData.phone_number = socket.user.id.split(':')[0];
 
                     // Update database
-                    await this.query.query(`
+                    await QueryHelper.query(`
                         UPDATE whatsapp_sessions
                         SET status = 'connected', phone_number = $1,
                             qr_code = NULL, last_activity = NOW(),
@@ -286,7 +285,7 @@ class WhatsAppSessionManager {
                         console.log(`Session ${sessionId} logged out`);
 
                         // Update database
-                        await this.query.query(`
+                        await QueryHelper.query(`
                             UPDATE whatsapp_sessions
                             SET status = 'logged_out',
                                 updated_at = NOW()
@@ -506,7 +505,7 @@ class WhatsAppSessionManager {
         try {
             const formatted = this.formatMessage(message);
 
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO whatsapp_messages (
                     session_id, message_id, from_number, to_number,
                     message_type, content, is_incoming, created_at
@@ -532,7 +531,7 @@ class WhatsAppSessionManager {
      */
     async logOutboundMessage(sessionId, phoneNumber, message) {
         try {
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO notification_queue (
                     session_id, phone_number, message_type, content,
                     status, sent_at, created_at
@@ -647,7 +646,7 @@ class WhatsAppSessionManager {
             await this.disconnectSession(sessionId);
 
             // Delete from database
-            await this.query.query('DELETE FROM whatsapp_sessions WHERE session_id = $1', [sessionId]);
+            await QueryHelper.query('DELETE FROM whatsapp_sessions WHERE session_id = $1', [sessionId]);
 
             // Remove from memory
             this.sessions.delete(sessionId);

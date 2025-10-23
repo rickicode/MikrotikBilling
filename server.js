@@ -236,6 +236,10 @@ fastify.addHook('preHandler', async (request, reply) => {
 console.log('🐘 Using PostgreSQL database with Knex.js');
 const { db } = require('./src/database/DatabaseManager');
 
+// Also expose the direct PostgreSQL pool for legacy compatibility
+const pgPool = require('./config/database');
+fastify.decorate('pgPool', pgPool);
+
 // Mikrotik client
 const MikrotikClient = require('./src/services/MikrotikClient');
 const mikrotik = new MikrotikClient(db);
@@ -606,6 +610,8 @@ fastify.setErrorHandler(async (error, request, reply) => {
     error: {
       message: error.message,
       stack: error.stack,
+        message: error.message,
+        code: error.code,
       code: error.code,
       statusCode: error.statusCode
     },
@@ -621,8 +627,56 @@ fastify.setErrorHandler(async (error, request, reply) => {
     timestamp: new Date().toISOString()
   });
 
-  // Use GlobalErrorHandler for consistent error formatting
-  return GlobalErrorHandler.errorHandler(error, request, reply);
+  // Check if it's an API route
+  const isApiRoute = request.url.startsWith('/api/') ||
+                    request.url.startsWith('/customers/api/') ||
+                    request.url.startsWith('/vouchers/api/') ||
+                    request.url.startsWith('/pppoe/api/') ||
+                    request.headers.accept === 'application/json' ||
+                    request.headers['content-type'] === 'application/json';
+
+  if (isApiRoute) {
+    // For API routes, return JSON error response
+    return GlobalErrorHandler.errorHandler(error, request, reply);
+  } else {
+    // For web routes, render the error page with full debug information
+    const statusCode = error.statusCode || error.status || 500;
+    reply.code(statusCode);
+
+    // Enhance error object with additional debug information for DEBUG mode
+    const enhancedError = {
+      ...error,
+      status: statusCode,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      debugMode: process.env.DEBUG === 'true',
+      timestamp: new Date().toISOString(),
+      requestId: request.id,
+      url: request.url,
+      method: request.method,
+      userAgent: request.headers['user-agent'],
+      admin: request.admin || null
+    };
+
+    // Add additional debug context in DEBUG mode
+    if (process.env.DEBUG === 'true') {
+      enhancedError.nodeEnv = process.env.NODE_ENV;
+      enhancedError.debugInfo = {
+        headers: request.headers,
+        body: request.body,
+        query: request.query,
+        params: request.params,
+        stack: error.stack,
+        message: error.message,
+        code: error.code,
+        originalError: error
+      };
+    }
+
+        // Pass error data as 'error' variable to match EJS template expectations
+    return reply.view('error', { error: enhancedError });
+  }
 });
 
 // 404 handler - Global detailed 404 response
@@ -685,9 +739,16 @@ const start = async () => {
 
     // Validate database connection first
     console.log('🔍 Validating database connection...');
-    await db.initialize();
-    await db.query('SELECT 1');
-    console.log('✅ Database connection validated');
+    try {
+      await db.initialize();
+      console.log('✅ Database connection validated');
+    } catch (dbError) {
+      console.error('❌ Database connection failed:', dbError.message);
+      if (process.env.DEBUG === 'true') {
+        console.error('Database error details:', dbError.stack);
+      }
+      console.log('🔄 Continuing with limited database functionality...');
+    }
 
     // Initialize services with error handling
     console.log('🔧 Initializing services...');

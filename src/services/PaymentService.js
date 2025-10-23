@@ -48,7 +48,7 @@ class PaymentService {
     }
 
     // Get customer information
-    const customer = await this.query.getOne('SELECT * FROM customers WHERE id = $1', [customerId]);
+    const customer = await QueryHelper.getOne('SELECT * FROM customers WHERE id = $1', [customerId]);
     if (!customer) {
       throw new Error('Customer not found');
     }
@@ -149,7 +149,7 @@ class PaymentService {
 
     try {
       // Get customer info
-      const customer = await this.query.getOne('SELECT * FROM customers WHERE id = $1', [paymentLink.customer_id]);
+      const customer = await QueryHelper.getOne('SELECT * FROM customers WHERE id = $1', [paymentLink.customer_id]);
       if (!customer) {
         throw new Error('Customer not found');
       }
@@ -364,7 +364,7 @@ class PaymentService {
    */
   async createPaymentRecord(paymentLink, validation) {
     // PostgreSQL
-    await this.query.query(`
+    await QueryHelper.query(`
         INSERT INTO payments (
           customer_id, amount, payment_method, payment_status,
           invoice_number, payment_link_id, duitku_invoice_number,

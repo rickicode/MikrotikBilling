@@ -1,6 +1,5 @@
-const Query = require('../../lib/query');
+const QueryHelper = require('../lib/QueryHelper');
 const MikrotikClient = require('./MikrotikClient');
-// Database pool will be passed as parameter
 const EventEmitter = require('events');
 const cron = require('node-cron');
 
@@ -12,10 +11,8 @@ class MikrotikSyncService extends EventEmitter {
     constructor(mikrotikClient, dbPool = null, options = {}) {
         super();
         this.mikrotik = mikrotikClient;
-        if (dbPool) {
-            // PostgreSQL pool
-            this.query = new Query(dbPool);
-        }
+        // Use global QueryHelper for database operations
+        this.query = QueryHelper;
         this.isRunning = false;
         this.syncInterval = options.syncInterval || 60000; // 1 minute
         this.batchSize = options.batchSize || 100;
@@ -33,11 +30,7 @@ class MikrotikSyncService extends EventEmitter {
      */
     async initialize(dbPool = null, config = {}) {
         try {
-            if (dbPool) {
-                // PostgreSQL pool
-                this.query = new Query(dbPool);
-            }
-
+            // QueryHelper already set in constructor, no need to override
             // Initialize Mikrotik client
             if (config) {
                 this.mikrotik = new MikrotikClient(config);
@@ -215,7 +208,7 @@ class MikrotikSyncService extends EventEmitter {
             // Check for recent changes in database
             let recentChanges = [];
             try {
-                recentChanges = await this.query.getMany(`
+                recentChanges = await QueryHelper.getMany(`
                     SELECT
                         'hotspot_user' as type,
                         v.code as name,
@@ -309,7 +302,7 @@ class MikrotikSyncService extends EventEmitter {
             );
 
             for (const profile of systemProfiles) {
-                const existing = await this.query.getOne(`
+                const existing = await QueryHelper.getOne(`
                     SELECT id FROM profiles
                     WHERE mikrotik_name = $1 AND type = 'hotspot'
                 `, [profile.name]);
@@ -318,7 +311,7 @@ class MikrotikSyncService extends EventEmitter {
                     // Parse pricing from comment
                     const commentData = this.mikrotik.parseComment(profile.comment) || {};
 
-                    await this.query.insert(`
+                    await QueryHelper.insert(`
                         INSERT INTO profiles
                         (name, type, mikrotik_name, price_sell, price_cost, mikrotik_synced, managed_by, created_at)
                         VALUES ($1, $2, $3, $4, $5, true, 'system', NOW())
@@ -333,7 +326,7 @@ class MikrotikSyncService extends EventEmitter {
                     console.log(`📥 Synced new hotspot profile: ${profile.name}`);
                 } else {
                     // Update existing profile
-                    await this.query.query(`
+                    await QueryHelper.query(`
                         UPDATE profiles
                         SET mikrotik_synced = true,
                             updated_at = NOW()
@@ -358,7 +351,7 @@ class MikrotikSyncService extends EventEmitter {
             );
 
             for (const profile of systemProfiles) {
-                const existing = await this.query.getOne(`
+                const existing = await QueryHelper.getOne(`
                     SELECT id FROM profiles
                     WHERE mikrotik_name = $1 AND type = 'pppoe'
                 `, [profile.name]);
@@ -367,7 +360,7 @@ class MikrotikSyncService extends EventEmitter {
                     // Parse pricing from comment
                     const commentData = this.mikrotik.parseComment(profile.comment) || {};
 
-                    await this.query.insert(`
+                    await QueryHelper.insert(`
                         INSERT INTO profiles
                         (name, type, mikrotik_name, price_sell, price_cost, mikrotik_synced, managed_by, created_at)
                         VALUES ($1, $2, $3, $4, $5, true, 'system', NOW())
@@ -382,7 +375,7 @@ class MikrotikSyncService extends EventEmitter {
                     console.log(`📥 Synced new PPPoE profile: ${profile.name}`);
                 } else {
                     // Update existing profile
-                    await this.query.query(`
+                    await QueryHelper.query(`
                         UPDATE profiles
                         SET mikrotik_synced = true,
                             updated_at = NOW()
@@ -411,14 +404,14 @@ class MikrotikSyncService extends EventEmitter {
                 const commentData = MikrotikClient.parseComment(user.comment) || {};
 
                 // Check if exists in database
-                const existing = await this.query.getOne(`
+                const existing = await QueryHelper.getOne(`
                     SELECT id, status FROM vouchers
                     WHERE code = $1
                 `, [user.name]);
 
                 if (!existing) {
                     // Create new voucher record
-                    await this.query.insert(`
+                    await QueryHelper.insert(`
                         INSERT INTO vouchers
                         (code, status, price_sell, profile_id, mikrotik_synced, created_at)
                         VALUES ($1, $2, $3, $4, true, NOW())
@@ -434,7 +427,7 @@ class MikrotikSyncService extends EventEmitter {
                     // Update status
                     const newStatus = user.disabled === 'true' ? 'disabled' : 'active';
                     if (existing.status !== newStatus) {
-                        await this.query.query(`
+                        await QueryHelper.query(`
                             UPDATE vouchers
                             SET status = $1, mikrotik_synced = true, updated_at = NOW()
                             WHERE id = $2
@@ -465,14 +458,14 @@ class MikrotikSyncService extends EventEmitter {
                 const commentData = this.mikrotik.parseComment(secret.comment) || {};
 
                 // Check if exists in database
-                const existing = await this.query.getOne(`
+                const existing = await QueryHelper.getOne(`
                     SELECT id, status FROM pppoe_users
                     WHERE username = $1
                 `, [secret.name]);
 
                 if (!existing) {
                     // Create new PPPoE user record
-                    await this.query.insert(`
+                    await QueryHelper.insert(`
                         INSERT INTO pppoe_users
                         (username, password, status, price_sell, profile_id, mikrotik_synced, created_at)
                         VALUES ($1, $2, $3, $4, $5, true, NOW())
@@ -489,7 +482,7 @@ class MikrotikSyncService extends EventEmitter {
                     // Update status
                     const newStatus = secret.disabled === 'true' ? 'disabled' : 'active';
                     if (existing.status !== newStatus) {
-                        await this.query.query(`
+                        await QueryHelper.query(`
                             UPDATE pppoe_users
                             SET status = $1, mikrotik_synced = true, updated_at = NOW()
                             WHERE id = $2
@@ -513,7 +506,7 @@ class MikrotikSyncService extends EventEmitter {
             // Sync active hotspot users
             const activeHotspot = await this.mikrotik.getActiveHotspotUsers();
             for (const session of activeHotspot) {
-                await this.query.query(`
+                await QueryHelper.query(`
                     INSERT INTO user_sessions
                     (username, session_type, ip_address, mac_address, uptime, start_time, last_seen)
                     VALUES ($1, 'hotspot', $2, $3, $4, NOW(), NOW())
@@ -528,7 +521,7 @@ class MikrotikSyncService extends EventEmitter {
             // Sync active PPPoE users
             const activePPPoE = await this.mikrotik.getActivePPPoEUsers();
             for (const session of activePPPoE) {
-                await this.query.query(`
+                await QueryHelper.query(`
                     INSERT INTO user_sessions
                     (username, session_type, caller_id, uptime, start_time, last_seen)
                     VALUES ($1, 'pppoe', $2, $3, NOW(), NOW())
@@ -568,7 +561,7 @@ class MikrotikSyncService extends EventEmitter {
         const mikrotikUsers = await this.mikrotik.getHotspotUsers();
         let localUsers = [];
         try {
-            localUsers = await this.query.getMany(`
+            localUsers = await QueryHelper.getMany(`
                 SELECT code FROM vouchers
             `);
         } catch (error) {
@@ -590,7 +583,7 @@ class MikrotikSyncService extends EventEmitter {
         for (const user of missingUsers) {
             const commentData = this.mikrotik.parseComment(user.comment) || {};
 
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO vouchers
                 (code, status, price_sell, profile_id, mikrotik_synced, created_at)
                 VALUES ($1, $2, $3, $4, true, NOW())
@@ -613,7 +606,7 @@ class MikrotikSyncService extends EventEmitter {
         const mikrotikSecrets = await this.mikrotik.getPPPoESecrets();
         let localUsers = [];
         try {
-            localUsers = await this.query.getMany(`
+            localUsers = await QueryHelper.getMany(`
                 SELECT username FROM pppoe_users
             `);
         } catch (error) {
@@ -635,7 +628,7 @@ class MikrotikSyncService extends EventEmitter {
         for (const secret of missingUsers) {
             const commentData = this.mikrotik.parseComment(secret.comment) || {};
 
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO pppoe_users
                 (username, password, status, price_sell, profile_id, mikrotik_synced, created_at)
                 VALUES ($1, $2, $3, $4, $5, true, NOW())
@@ -658,7 +651,7 @@ class MikrotikSyncService extends EventEmitter {
     async cleanupStaleSessions() {
         // Remove sessions not seen in last 10 minutes
         const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-        await this.query.query(`
+        await QueryHelper.query(`
             DELETE FROM user_sessions
             WHERE last_seen < $1
         `, [tenMinutesAgo]);
@@ -671,7 +664,7 @@ class MikrotikSyncService extends EventEmitter {
      * @returns {number|null} Profile ID
      */
     async getProfileIdByName(profileName, type) {
-        const profile = await this.query.getOne(`
+        const profile = await QueryHelper.getOne(`
             SELECT id FROM profiles
             WHERE mikrotik_name = $1 AND type = $2
         `, [profileName, type]);

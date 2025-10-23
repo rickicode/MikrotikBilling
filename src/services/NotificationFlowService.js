@@ -1,5 +1,4 @@
-const Query = require('../lib/query');
-// Database pool will be passed as parameter
+const QueryHelper = require('../lib/QueryHelper');
 const EventEmitter = require('events');
 const { v4: uuidv4 } = require('uuid');
 
@@ -10,12 +9,11 @@ const { v4: uuidv4 } = require('uuid');
 class NotificationFlowService extends EventEmitter {
     constructor(dbPool = null, options = {}) {
         super();
-        if (dbPool) {
-            // PostgreSQL pool
-            this.query = new Query(dbPool);
-        } else {
-            console.error('Invalid database instance passed to NotificationFlowService');
-            this.query = null;
+        // Use global QueryHelper for database operations
+        this.query = QueryHelper;
+
+        if (!this.query) {
+            console.error('Database query not available in NotificationFlowService');
         }
         this.whatsappService = options.whatsappService;
         this.emailService = options.emailService;
@@ -69,42 +67,40 @@ class NotificationFlowService extends EventEmitter {
                 }
 
                 // Get pending notifications
-                // First select, then update (PostgreSQL uses $1 style placeholders)
-                const selectedNotifications = await this.query.getMany(`
-                    SELECT id FROM notification_queue
-                    WHERE status = 'pending'
-                      AND send_after <= NOW()
-                    ORDER BY priority DESC, created_at ASC
-                    LIMIT $1
-                `, [this.batchSize]);
+                const selectedNotifications = await QueryHelper.getMany(
+                    'SELECT id FROM notification_queue WHERE status = ? AND send_after <= datetime("now") ORDER BY priority DESC, created_at ASC LIMIT ?',
+                    ['pending', this.batchSize]
+                );
 
                 if (selectedNotifications.length > 0) {
                     // Update selected notifications
                     const ids = selectedNotifications.map(n => n.id);
-                    const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
-                    await this.query.run(`
-                        UPDATE notification_queue
-                        SET status = 'processing',
-                            processed_at = NOW()
-                        WHERE id IN (${placeholders})
-                    `, ids);
+                    if (ids.length > 0) {
+                        const placeholders = ids.map(() => '?').join(', ');
 
-                    // Get the full notification details
-                    const notifications = await this.query.getMany(`
-                        SELECT * FROM notification_queue
-                        WHERE id IN (${placeholders})
-                    `, ids);
+                        // Update selected notifications
+                        await QueryHelper.execute(
+                            'UPDATE notification_queue SET status = ?, processed_at = datetime("now") WHERE id IN (' + placeholders + ')',
+                            ['processing', ...ids]
+                        );
 
-                    if (notifications.length > 0) {
+                        // Get the full notification details
+                        const notifications = await QueryHelper.getMany(
+                            'SELECT * FROM notification_queue WHERE id IN (' + placeholders + ')',
+                            ids
+                        );
+
+                        if (notifications.length > 0) {
                         console.log(`📮 Processing ${notifications.length} notifications...`);
 
-                    // Process notifications in parallel
-                    const promises = notifications.map(notification =>
-                        this.processNotification(notification)
-                    );
+                        // Process notifications in parallel
+                        const promises = notifications.map(notification =>
+                            this.processNotification(notification)
+                        );
 
                         await Promise.allSettled(promises);
                         console.log(`✅ Completed processing ${notifications.length} notifications`);
+                        }
                     }
                 } else {
                     // No notifications, wait before next check
@@ -146,7 +142,7 @@ class NotificationFlowService extends EventEmitter {
             }
 
             // Mark as sent
-            await this.query.query(`
+            await QueryHelper.query(`
                 UPDATE notification_queue
                 SET status = 'sent',
                     sent_at = NOW(),
@@ -174,7 +170,7 @@ class NotificationFlowService extends EventEmitter {
 
             if (newAttemptCount >= this.retryAttempts) {
                 // Mark as failed
-                await this.query.query(`
+                await QueryHelper.query(`
                     UPDATE notification_queue
                     SET status = 'failed',
                         attempt_count = $1,
@@ -192,7 +188,7 @@ class NotificationFlowService extends EventEmitter {
                 // Schedule retry
                 const retryAt = new Date(Date.now() + this.retryDelay * newAttemptCount);
 
-                await this.query.query(`
+                await QueryHelper.query(`
                     UPDATE notification_queue
                     SET status = 'pending',
                         attempt_count = $1,
@@ -306,7 +302,7 @@ class NotificationFlowService extends EventEmitter {
         };
 
         // Insert into queue
-        const notificationId = await this.query.insert(`
+        const notificationId = await QueryHelper.insert(`
             INSERT INTO notification_queue
             (channel, recipient, message_data, priority, status, send_after, customer_id, subscription_id, session_id, created_at)
             VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, NOW())
@@ -410,7 +406,7 @@ class NotificationFlowService extends EventEmitter {
      * @returns {boolean} Cancel result
      */
     async cancelNotification(notificationId) {
-        const result = await this.query.query(`
+        const result = await QueryHelper.query(`
             UPDATE notification_queue
             SET status = 'cancelled',
                 updated_at = NOW()
@@ -426,7 +422,7 @@ class NotificationFlowService extends EventEmitter {
      * @returns {Object} Notification status
      */
     async getNotificationStatus(notificationId) {
-        return await this.query.getOne(`
+        return await QueryHelper.getOne(`
             SELECT
                 id,
                 channel,
@@ -477,7 +473,7 @@ class NotificationFlowService extends EventEmitter {
             params.push(channel);
         }
 
-        const stats = await this.query.getOne(`
+        const stats = await QueryHelper.getOne(`
             SELECT
                 COUNT(*) as total_notifications,
                 COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent_notifications,
@@ -496,7 +492,7 @@ class NotificationFlowService extends EventEmitter {
         `, params);
 
         // Get pending count by priority
-        const pendingByPriority = await this.query.getMany(`
+        const pendingByPriority = await QueryHelper.getMany(`
             SELECT priority, COUNT(*) as count
             FROM notification_queue
             WHERE status = 'pending'
@@ -518,7 +514,7 @@ class NotificationFlowService extends EventEmitter {
      * @returns {number} Cleaned count
      */
     async cleanupOldNotifications(daysToKeep = 30) {
-        const result = await this.query.query(`
+        const result = await QueryHelper.query(`
             DELETE FROM notification_queue
             WHERE created_at < NOW() - INTERVAL $1 days
             RETURNING id
@@ -545,7 +541,7 @@ class NotificationFlowService extends EventEmitter {
             isActive = true
         } = templateData;
 
-        const templateId = await this.query.insert(`
+        const templateId = await QueryHelper.insert(`
             INSERT INTO notification_templates
             (name, channel, subject, content, variables, is_active, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
@@ -573,7 +569,7 @@ class NotificationFlowService extends EventEmitter {
      * @returns {Object} Template data
      */
     async getTemplate(name, channel) {
-        return await this.query.getOne(`
+        return await QueryHelper.getOne(`
             SELECT * FROM notification_templates
             WHERE name = $1 AND channel = $2 AND is_active = true
         `, [name, channel]);

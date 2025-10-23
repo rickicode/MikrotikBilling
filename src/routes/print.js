@@ -263,45 +263,61 @@ module.exports = async function(fastify, opts) {
     function generateVoucherHTML(voucher, index, template, settings = {}) {
         const companyName = (settings && settings.company_name) || 'WiFi Hotspot';
         const durationDays = Math.floor(voucher.duration_hours / 24);
-        const expiryDate = new Date(voucher.created_at).toLocaleDateString('id-ID');
         const formattedPrice = formatCurrency(voucher.price_sell).replace('Rp', '').trim();
 
+        // Hanya tampilkan expiry untuk voucher yang sudah digunakan
+        const isUsed = voucher.used_at !== null && voucher.used_at !== undefined;
+        const expiryDate = isUsed ? new Date(voucher.expires_at).toLocaleDateString('id-ID') : null;
+
+        // Sistem VALID: periode aktif setelah voucher digunakan (1 hari setelah first login)
+        const validPeriod = "Valid 1 Hari";
+
         if (template === 'a4') {
+            // Hitung durasi dalam jam (sesuai template)
+            const durationHours = voucher.duration_hours || 0;
+            const durationText = durationHours >= 24
+                ? `Durasi: ${Math.floor(durationHours / 24)} hari`
+                : `Durasi: ${durationHours} jam`;
+
             return `
                 <div class="voucher">
-                    <table>
-                        <tr>
-                            <td class="rotate" rowspan="4">
-                                <span>WiFi VOUCHER</span>
-                            </td>
-                            <td class="company-header" colspan="2">
-                                <div class="company-name">${companyName}</div>
-                                <div class="voucher-number">No. [${index}]</div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="voucher-code" colspan="2">${voucher.code}</td>
-                        </tr>
-                        <tr>
-                            <td class="duration">Durasi: ${durationDays} Hari</td>
-                            <td class="validity">Exp: ${expiryDate}</td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" style="text-align: center; font-size: 12px; font-weight: bold;">
-                                ${voucher.vendor_name}
-                            </td>
-                        </tr>
+                    <table class="voucher" style="width: 145;">
+                        <tbody>
+                            <tr>
+                                <td class="rotate" style="font-weight: bold; border-right: 1px solid black; background-color:#ffea8f; -webkit-print-color-adjust: exact;" rowspan="6">
+                                    <span style="padding-bottom: 5px; font-size: 18px; font-weight: bold;">Rp ${formattedPrice}</span>
+                                </td>
+                                <td style="font-weight: bold;font-size: 12px;padding-left: 5px;background: #FBA1B7;color: white;text-align: center;" colspan="2">
+                                    <span>${companyName}</span>
+                                    <span style="text-align: right;font-size: 9px;">[${index}]</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width: 100%; font-weight: 600; font-size: 18px; text-align: center;">${voucher.code}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-size: 11px;padding-right: 5px;text-align: end;background: #FFECAF;"> ${durationText}  </td>
+                            </tr>
+                            <tr>
+                                <td style="font-size: 11px;padding-right: 5px;text-align: end;background: #FFECAF;"> Valid: 1 hari  </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             `;
         } else if (template === 'thermal') {
+            // Untuk voucher thermal
+            const expiryInfo = isUsed
+                ? `<div class="info">Berlaku sampai: ${expiryDate}</div>`
+                : '';
+
             return `
                 <div class="voucher">
                     <div class="header">${companyName}</div>
                     <div class="code">${voucher.code}</div>
                     <div class="info">Durasi: ${durationDays} Hari</div>
-                    <div class="info">Berlaku sampai: ${expiryDate}</div>
-                    <div class="info">Vendor: ${voucher.vendor_name}</div>
+                    ${expiryInfo}
+                    <div class="info">${validPeriod}</div>
                     <div class="price">Rp ${formattedPrice}</div>
                 </div>
             `;
@@ -346,7 +362,7 @@ module.exports = async function(fastify, opts) {
                 background-color: #ffea8f !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
-                width: 20px;
+                width: 25px;
                 height: 80px;
             }
             .rotate span {
@@ -355,9 +371,10 @@ module.exports = async function(fastify, opts) {
                 transform: rotate(180deg);
                 display: block;
                 text-align: center;
-                font-size: 10px;
-                line-height: 1.2;
-                padding: 5px 2px;
+                font-size: 9px;
+                line-height: 1.1;
+                padding: 4px 2px;
+                font-weight: 600;
             }
             .company-header {
                 font-weight: bold;
