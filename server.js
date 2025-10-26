@@ -547,6 +547,9 @@ fastify.register(require('./src/routes/performance'), { prefix: '/performance' }
 // Register plugin management routes
 fastify.register(require('./src/routes/plugins'), { prefix: '/plugins' });
 
+// Register network monitoring routes
+fastify.register(require('./src/routes/network-monitor'), { prefix: '/network-monitor' });
+
 // Register additional new routes if they exist
 try {
   if (require.resolve('./src/routes/webhook')) {

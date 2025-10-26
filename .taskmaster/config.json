@@ -1,188 +1,107 @@
 {
-  "version": "0.24.0",
-  "createdAt": "2025-10-19T10:00:00.000Z",
-  "updatedAt": "2025-10-19T10:00:00.000Z",
-  "models": {
-    "main": "claude-3-5-sonnet-20241022",
-    "research": "perplexity-llama-3.1-sonar-large-128k-online",
-    "fallback": "gpt-4o-mini"
-  },
+  "version": "2.0.0",
   "project": {
-    "name": "HIJINETWORK Mikrotik Billing System",
-    "root": "/home/ricki/workspaces/MikrotikBilling",
-    "type": "claude-007-enhanced",
+    "name": "Mikrotik Billing System",
+    "type": "enterprise-mikrotik-billing",
     "complexity": 8,
-    "domain": "telecom-billing",
-    "initialized": "2025-10-18T07:25:32.048Z",
-    "last_updated": "2025-10-19T10:00:00.000Z",
-    "features": [
-      "voucher-management",
-      "pppoe-user-management",
-      "payment-gateway-plugins",
-      "whatsapp-integration",
-      "mikrotik-api-integration",
-      "multi-location-support",
-      "backup-management",
-      "plugin-ecosystem",
-      "codebase-aware-intelligence",
-      "hybrid-agent-architecture",
-      "exponential-parallel-execution",
-      "continuous-quality-revolution"
+    "description": "Enterprise-grade Mikrotik billing system with voucher management, PPPoE users, WhatsApp notifications, and payment gateway plugins"
+  },
+  "taskMaster": {
+    "enabled": true,
+    "level": "enterprise",
+    "autoCoordination": true,
+    "prioritySystem": "mikrotik-critical",
+    "workflowTemplates": [
+      "mikrotik-integration",
+      "payment-plugin-development",
+      "voucher-system-enhancement",
+      "whatsapp-notification-system",
+      "database-migration-optimization"
     ]
   },
-  "features": {
-    "codebaseAware": true,
-    "bridgeAgents": true,
-    "parallelExecution": true,
-    "autonomousDevelopment": true,
-    "qualityValidation": true,
-    "enterpriseMode": true,
-    "mcpIntegration": true,
-    "gitWorkflow": true
-  },
-  "agent_system": {
-    "total_agents": 19,
-    "core_agents": [
-      "@software-engineering-expert",
-      "@code-reviewer",
-      "@orchestrator",
-      "@vibe-coding-coordinator",
-      "@security-specialist",
-      "@documentation-specialist",
-      "@git-expert"
-    ],
-    "specialist_agents": [
+  "agents": {
+    "total": 108,
+    "specializedForMikrotik": 19,
+    "coreAgents": [
       "@nodejs-expert",
       "@database-admin",
       "@api-architect",
+      "@network-engineer",
       "@payment-systems-expert",
       "@messaging-specialist",
-      "@network-engineer",
       "@plugin-developer",
-      "@frontend-optimization-expert",
-      "@devops-engineer",
-      "@performance-optimizer",
-      "@test-automation-expert",
-      "@testing-coordinator",
-      "@deployment-specialist"
+      "@devops-engineer"
     ],
-    "workflow_agents": [
-      "@exponential-planner",
-      "@session-manager"
+    "domainExperts": [
+      "@mikrotik-specialist",
+      "@billing-systems-expert",
+      "@voucher-management-expert",
+      "@pppoe-user-specialist",
+      "@whatsapp-integration-expert"
+    ],
+    "bridgeAgents": [
+      "@task-executor",
+      "@task-checker",
+      "@task-orchestrator",
+      "@workflow-coordinator"
     ]
   },
-  "mcp_integration": {
-    "active_servers": 8,
+  "mcpServers": {
+    "active": 8,
     "servers": [
-      "task-master",
-      "basic-memory",
-      "context7",
-      "sequential-thinking",
-      "zen",
       "playwright",
       "github",
+      "context7",
       "prisma",
       "filesystem",
       "browser-tools",
-      "web-search-prime"
+      "web-search-prime",
+      "database-optimizer"
     ]
   },
-  "bridgeAgents": {
-    "taskOrchestrator": {
-      "enabled": true,
-      "config": "./bridge-agents/orchestrator/config.json",
-      "specialization": "mikrotik-billing-orchestration"
+  "workflows": {
+    "mikrotikIntegration": {
+      "priority": "critical",
+      "agents": ["@network-engineer", "@api-architect", "@nodejs-expert"],
+      "estimatedDuration": "2-4 hours",
+      "dependencies": ["database-connection", "mikrotik-credentials"]
     },
-    "taskExecutor": {
-      "enabled": true,
-      "config": "./bridge-agents/executor/config.json",
-      "specialization": "telecom-system-execution"
+    "paymentPluginDevelopment": {
+      "priority": "high",
+      "agents": ["@payment-systems-expert", "@plugin-developer", "@api-architect"],
+      "estimatedDuration": "4-6 hours",
+      "dependencies": ["payment-gateway-docs", "plugin-interface"]
     },
-    "taskChecker": {
-      "enabled": true,
-      "config": "./bridge-agents/checker/config.json",
-      "specialization": "billing-system-quality"
+    "voucherSystemEnhancement": {
+      "priority": "medium",
+      "agents": ["@nodejs-expert", "@database-admin", "@frontend-optimization-expert"],
+      "estimatedDuration": "2-3 hours",
+      "dependencies": ["mikrotik-profiles", "pricing-configuration"]
     }
   },
-  "integration": {
-    "claudeCode": {
-      "agentSystem": "claude-007",
-      "version": "2.0",
-      "agentCount": 19
+  "qualityGates": {
+    "codeReview": {
+      "required": true,
+      "specialistReview": true,
+      "securityReview": true
     },
-    "mcp": {
-      "servers": [
-        "task-master-ai",
-        "github",
-        "context7",
-        "basic-memory",
-        "sequential-thinking",
-        "zen",
-        "playwright",
-        "prisma",
-        "filesystem",
-        "browser-tools",
-        "web-search-prime"
-      ],
-      "enabled": true,
-      "validationRequired": true
-    }
-  },
-  "workflow": {
-    "defaultComplexity": 8,
-    "autoAgentAssignment": true,
-    "parallelExecution": true,
-    "maxConcurrentTasks": 10,
-    "qualityGates": {
-      "codeReview": true,
-      "testing": true,
-      "security": true,
-      "performance": true
-    }
-  },
-  "git": {
-    "enforceCommitFormat": true,
-    "commitFormat": "type(scope): description - @agent1 @agent2",
-    "autoTagAgents": true,
-    "branchProtection": true,
-    "prRequired": true
-  },
-  "testing": {
-    "frameworks": ["jest", "playwright"],
-    "coverage": {
-      "threshold": 80,
-      "enforced": true
+    "testing": {
+      "unitTests": "required",
+      "integrationTests": "required",
+      "e2eTests": "required",
+      "mikrotikSimulation": "recommended"
     },
-    "e2e": {
-      "enabled": true,
-      "headless": true,
-      "parallel": true
+    "deployment": {
+      "stagingValidation": "required",
+      "productionReadiness": "required",
+      "rollbackPlan": "required"
     }
   },
   "monitoring": {
-    "enabled": true,
-    "metrics": ["task_completion", "agent_performance", "quality_scores"],
-    "alerts": {
-      "failure_rate": 0.1,
-      "performance_degradation": 0.2
-    }
-  },
-  "logging": {
-    "level": "info",
-    "file": "./logs/taskmaster.log",
-    "rotation": {
-      "enabled": true,
-      "maxSizeMB": 100,
-      "maxFiles": 10
-    }
-  },
-  "quality_standards": {
-    "commit_format": "type(scope): description - @agent1 @agent2",
-    "mandatory_attribution": true,
-    "code_review_required": true,
-    "specialist_approval_required": true,
-    "testing_coverage_minimum": 80,
-    "security_scan_required": true,
-    "performance_testing": true
+    "mikrotikConnection": true,
+    "databasePerformance": true,
+    "whatsappSessions": true,
+    "paymentGateways": true,
+    "systemHealth": true
   }
 }

@@ -269,20 +269,29 @@ module.exports = async function(fastify) {
           console.warn(`⚠️ WhatsApp connection issue: ${connectionStatus.status} - ${connectionStatus.message}`);
 
           // Log to database for monitoring
-          await QueryHelper.query(`
-            INSERT INTO system_logs (level, module, message, details)
-            VALUES (?, ?, ?, ?)
-          `, [
-            'WARN',
-            'whatsapp_connection',
-            `WhatsApp connection status: ${connectionStatus.status}`,
-            JSON.stringify({
-              status: connectionStatus.status,
-              message: connectionStatus.message,
-              qr_code_available: connectionStatus.qrCodeAvailable,
-              session_active: connectionStatus.sessionActive
-            })
-          ]);
+          try {
+            if (QueryHelper && typeof QueryHelper.query === 'function') {
+              await QueryHelper.query(`
+                INSERT INTO system_logs (level, module, message, details)
+                VALUES (?, ?, ?, ?)
+              `, [
+                'WARN',
+                'whatsapp_connection',
+                `WhatsApp connection status: ${connectionStatus.status}`,
+                JSON.stringify({
+                  status: connectionStatus.status,
+                  message: connectionStatus.message,
+                  qr_code_available: connectionStatus.qrCodeAvailable,
+                  session_active: connectionStatus.sessionActive
+                })
+              ]);
+            } else {
+              console.warn('QueryHelper.query not available, skipping database logging');
+            }
+          } catch (logError) {
+            console.error('Failed to log WhatsApp connection status to database:', logError);
+            // Continue execution - logging failure shouldn't stop the monitoring
+          }
         } else {
           console.log(`📱 WhatsApp connection healthy: ${connectionStatus.status}`);
         }

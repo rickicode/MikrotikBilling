@@ -1,63 +1,70 @@
 {
-  "project": {
-    "name": "MikrotikBilling",
-    "type": "enterprise-system",
-    "complexity": 8,
-    "domain": "telecom-billing",
-    "tech_stack": {
-      "backend": "nodejs-fastify",
-      "database": "postgresql",
-      "frontend": "bootstrap-htmx",
-      "integrations": ["mikrotik-api", "whatsapp-web", "payment-gateways"]
+  "projectInfo": {
+    "name": "Mikrotik Billing System",
+    "domain": "telecommunications-billing",
+    "version": "2.0.0",
+    "lastUpdated": "2025-10-23T20:30:00Z"
+  },
+  "technicalStack": {
+    "backend": {
+      "framework": "Fastify",
+      "language": "Node.js",
+      "version": ">=18.0.0"
+    },
+    "database": {
+      "primary": "PostgreSQL",
+      "hosting": "Supabase",
+      "orm": "Knex.js"
+    },
+    "frontend": {
+      "framework": "Bootstrap 5",
+      "templating": "EJS",
+      "enhancements": "HTMX"
+    },
+    "integrations": {
+      "mikrotik": "RouterOS API",
+      "whatsapp": "WhatsApp Web JS",
+      "payments": "Plugin-based System"
     }
   },
-  "workflows": {
-    "payment-plugin-development": {
-      "agents": ["@payment-systems-expert", "@plugin-developer", "@api-architect"],
-      "required_reviews": 2,
-      "testing_required": true
+  "domainSpecifics": {
+    "mikrotik": {
+      "userTypes": ["hotspot", "pppoe"],
+      "profileManagement": "web-only",
+      "commentPatterns": {
+        "voucher": "VOUCHER_SYSTEM|price_sell|first_login_timestamp|valid_until_timestamp",
+        "subscription": "Complete metadata with customer assignment"
+      },
+      "syncRequirements": "real-time-polling"
     },
-    "mikrotik-integration": {
-      "agents": ["@network-engineer", "@api-architect", "@performance-optimizer"],
-      "required_reviews": 2,
-      "integration_testing": true
+    "billing": {
+      "voucherSystem": "one-time",
+      "subscriptionSystem": "customer-assigned",
+      "paymentMethods": ["duitku", "manual", "bank-transfer"],
+      "pluginArchitecture": "hot-swappable"
     },
-    "whatsapp-notification-system": {
-      "agents": ["@messaging-specialist", "@plugin-developer", "@testing-coordinator"],
-      "required_reviews": 2,
-      "e2e_testing": true
-    },
-    "database-migration": {
-      "agents": ["@database-admin", "@software-engineering-expert"],
-      "required_reviews": 2,
-      "rollback_required": true
-    },
-    "frontend-optimization": {
-      "agents": ["@frontend-optimization-expert", "@code-reviewer"],
-      "required_reviews": 1,
-      "accessibility_testing": true
+    "whatsapp": {
+      "sessions": "multi-session",
+      "rateLimit": "1 message/second",
+      "templateSystem": "advanced-wysiwyg"
     }
   },
-  "agent_specializations": {
-    "backend": ["@nodejs-expert", "@software-engineering-expert", "@api-architect"],
-    "database": ["@database-admin", "@performance-optimizer"],
-    "payments": ["@payment-systems-expert", "@plugin-developer"],
-    "messaging": ["@messaging-specialist", "@network-engineer"],
-    "frontend": ["@frontend-optimization-expert", "@code-reviewer"],
-    "testing": ["@test-automation-expert", "@testing-coordinator"],
-    "devops": ["@devops-engineer", "@deployment-specialist"]
+  "developmentStandards": {
+    "commitFormat": "type(scope): description - @agent1 @agent2",
+    "codeReview": "specialist-required",
+    "testing": "comprehensive-coverage",
+    "documentation": "real-time-updates"
   },
-  "commit_standards": {
-    "format": "type(scope): description - @agent1 @agent2",
-    "mandatory_attribution": true,
-    "footer_required": true,
-    "scope_validation": true
+  "performanceRequirements": {
+    "concurrentUsers": 1000,
+    "responseTime": "<200ms",
+    "mikrotikApiCalls": "<100/minute",
+    "whatsappMessages": "1/second/session"
   },
-  "quality_gates": {
-    "code_review_required": true,
-    "specialist_approval_required": true,
-    "testing_coverage_minimum": 80,
-    "security_scan_required": true,
-    "performance_testing": true
+  "securityRequirements": {
+    "authentication": "JWT with 30-day sessions",
+    "roleBasedAccess": ["Super Admin", "Admin", "Operator"],
+    "apiSecurity": "Rate limiting, CSRF protection, Helmet",
+    "dataProtection": "Encrypted backup storage"
   }
 }

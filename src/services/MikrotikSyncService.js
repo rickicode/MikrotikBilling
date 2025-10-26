@@ -118,12 +118,12 @@ class MikrotikSyncService extends EventEmitter {
     }
 
     /**
-     * Perform full synchronization with offline handling
+     * Perform full synchronization with enhanced error handling and batch processing
      */
     async performFullSync() {
-        // Check if Mikrotik is offline
-        const connectionInfo = this.mikrotik?.getConnectionInfo() || {};
-        if (connectionInfo.isOffline) {
+        // Check if Mikrotik is offline using enhanced connection stats
+        const connectionStats = this.mikrotik?.getConnectionStats() || {};
+        if (connectionStats.offline || !connectionStats.connected) {
             console.log('⚠️ Mikrotik is offline, skipping full sync');
             this.syncStats.lastSync = new Date();
             this.syncStats.lastError = 'Mikrotik is offline';
@@ -136,22 +136,33 @@ class MikrotikSyncService extends EventEmitter {
         const startTime = Date.now();
 
         try {
-            console.log('🔄 Starting full synchronization with Mikrotik...');
+            console.log('🔄 Starting enhanced full synchronization with Mikrotik...');
 
-            // Sync hotspot profiles
-            await this.syncHotspotProfiles();
+            // Use batch processing for better performance
+            const syncOperations = [
+                { type: 'hotspot_profiles', method: () => this.syncHotspotProfiles() },
+                { type: 'pppoe_profiles', method: () => this.syncPPPoEProfiles() },
+                { type: 'hotspot_users', method: () => this.syncHotspotUsers() },
+                { type: 'pppoe_secrets', method: () => this.syncPPPoESecrets() },
+                { type: 'active_sessions', method: () => this.syncActiveSessions() }
+            ];
 
-            // Sync PPPoE profiles
-            await this.syncPPPoEProfiles();
+            let results = [];
+            for (const operation of syncOperations) {
+                try {
+                    const opStartTime = Date.now();
+                    await operation.method();
+                    const opDuration = Date.now() - opStartTime;
+                    results.push({ type: operation.type, success: true, duration: opDuration });
+                    console.log(`✅ Synced ${operation.type} in ${opDuration}ms`);
+                } catch (error) {
+                    console.error(`❌ Failed to sync ${operation.type}:`, error.message);
+                    results.push({ type: operation.type, success: false, error: error.message });
 
-            // Sync hotspot users
-            await this.syncHotspotUsers();
-
-            // Sync PPPoE secrets
-            await this.syncPPPoESecrets();
-
-            // Sync active sessions
-            await this.syncActiveSessions();
+                    // Continue with other operations even if one fails
+                    continue;
+                }
+            }
 
             // Update sync statistics
             this.syncStats.lastSync = new Date();
@@ -159,27 +170,40 @@ class MikrotikSyncService extends EventEmitter {
             this.syncStats.lastError = null;
 
             const duration = Date.now() - startTime;
-            console.log(`✅ Full sync completed in ${duration}ms`);
+            const successfulOps = results.filter(r => r.success).length;
+            const failedOps = results.filter(r => !r.success).length;
+
+            console.log(`✅ Full sync completed in ${duration}ms (${successfulOps}/${results.length} operations successful)`);
 
             this.emit('fullSyncCompleted', {
                 duration,
+                results,
+                successfulOperations: successfulOps,
+                failedOperations: failedOps,
                 timestamp: this.syncStats.lastSync
             });
 
+            return {
+                success: true,
+                duration,
+                results,
+                successfulOperations: successfulOps,
+                failedOperations: failedOps
+            };
+
         } catch (error) {
-            console.error('Error in full sync:', error);
+            console.error('Critical error in full sync:', error);
             this.syncStats.errorCount++;
             this.syncStats.lastError = error.message;
             this.emit('syncError', error);
 
-            // Don't throw error if it's just a connection issue
-            if (error.message.includes('timeout') ||
-                error.message.includes('connection') ||
-                error.message.includes('ECONNREFUSED')) {
+            // Check if it's a connection-related error
+            if (this._isConnectionError(error)) {
                 console.log('Connection lost during sync, will retry later');
                 return {
                     error: error.message,
-                    skipped: true
+                    skipped: true,
+                    connectionError: true
                 };
             }
 
@@ -736,16 +760,216 @@ class MikrotikSyncService extends EventEmitter {
     }
 
     /**
-     * Test Mikrotik connection
-     * @returns {boolean} Connection status
+     * Test Mikrotik connection with enhanced diagnostics
+     * @returns {Object} Connection test result
      */
     async testConnection() {
         try {
-            const resources = await this.mikrotik.getSystemResources();
-            return !!resources;
+            const startTime = Date.now();
+            const healthStatus = await this.mikrotik.getHealthStatus();
+            const connectionStats = this.mikrotik.getConnectionStats();
+            const testDuration = Date.now() - startTime;
+
+            return {
+                success: healthStatus.healthy,
+                responseTime: testDuration,
+                healthStatus,
+                connectionStats,
+                timestamp: new Date().toISOString()
+            };
         } catch (error) {
             console.error('Mikrotik connection test failed:', error);
-            return false;
+            return {
+                success: false,
+                error: error.message,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+    /**
+     * Check if error is connection-related
+     * @param {Error} error - Error to check
+     * @returns {boolean} Whether error is connection-related
+     */
+    _isConnectionError(error) {
+        const connectionErrors = [
+            'timeout',
+            'connection',
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            'EHOSTUNREACH',
+            'socket hang up',
+            'read ECONNRESET',
+            'write ECONNRESET',
+            'Network is unreachable',
+            'circuit breaker',
+            'offline'
+        ];
+
+        return connectionErrors.some(err =>
+            error.message.toLowerCase().includes(err.toLowerCase())
+        );
+    }
+
+    /**
+     * Sync hotspot profiles using batch processing for better performance
+     */
+    async syncHotspotProfiles() {
+        try {
+            console.log('🔄 Syncing hotspot profiles...');
+            const mikrotikProfiles = await this.mikrotik.getHotspotProfiles();
+            const systemProfiles = mikrotikProfiles.filter(p =>
+                p.comment && p.comment.includes('VOUCHER_SYSTEM')
+            );
+
+            console.log(`Found ${systemProfiles.length} system hotspot profiles`);
+
+            // Process profiles in batches
+            const batchSize = 20;
+            const batches = [];
+            for (let i = 0; i < systemProfiles.length; i += batchSize) {
+                batches.push(systemProfiles.slice(i, i + batchSize));
+            }
+
+            let syncedCount = 0;
+            for (let i = 0; i < batches.length; i++) {
+                const batch = batches[i];
+                console.log(`Processing batch ${i + 1}/${batches.length} (${batch.length} profiles)`);
+
+                for (const profile of batch) {
+                    try {
+                        const existing = await QueryHelper.getOne(`
+                            SELECT id FROM profiles
+                            WHERE mikrotik_name = $1 AND type = 'hotspot'
+                        `, [profile.name]);
+
+                        if (!existing) {
+                            // Parse pricing from comment
+                            const commentData = this.mikrotik.parseComment(profile.comment) || {};
+
+                            await QueryHelper.insert(`
+                                INSERT INTO profiles
+                                (name, type, mikrotik_name, price_sell, price_cost, mikrotik_synced, managed_by, created_at)
+                                VALUES ($1, $2, $3, $4, $5, true, 'system', NOW())
+                            `, [
+                                profile.name,
+                                'hotspot',
+                                profile.name,
+                                commentData.price_sell || 0,
+                                commentData.price_cost || 0
+                            ]);
+
+                            syncedCount++;
+                            console.log(`📥 Synced new hotspot profile: ${profile.name}`);
+                        } else {
+                            // Update existing profile
+                            await QueryHelper.query(`
+                                UPDATE profiles
+                                SET mikrotik_synced = true,
+                                    updated_at = NOW()
+                                WHERE id = $1
+                            `, [existing.id]);
+                        }
+                    } catch (profileError) {
+                        console.error(`Error syncing profile ${profile.name}:`, profileError.message);
+                        // Continue with other profiles
+                    }
+                }
+
+                // Small delay between batches to prevent overwhelming
+                if (i < batches.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+
+            console.log(`✅ Synced ${syncedCount} new hotspot profiles`);
+            return { synced: syncedCount, total: systemProfiles.length };
+
+        } catch (error) {
+            console.error('Error syncing hotspot profiles:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Sync PPPoE profiles using batch processing
+     */
+    async syncPPPoEProfiles() {
+        try {
+            console.log('🔄 Syncing PPPoE profiles...');
+            const mikrotikProfiles = await this.mikrotik.getPPPProfiles();
+            const systemProfiles = mikrotikProfiles.filter(p =>
+                p.comment && p.comment.includes('PPPOE_SYSTEM')
+            );
+
+            console.log(`Found ${systemProfiles.length} system PPPoE profiles`);
+
+            // Process profiles in batches
+            const batchSize = 20;
+            const batches = [];
+            for (let i = 0; i < systemProfiles.length; i += batchSize) {
+                batches.push(systemProfiles.slice(i, i + batchSize));
+            }
+
+            let syncedCount = 0;
+            for (let i = 0; i < batches.length; i++) {
+                const batch = batches[i];
+                console.log(`Processing batch ${i + 1}/${batches.length} (${batch.length} profiles)`);
+
+                for (const profile of batch) {
+                    try {
+                        const existing = await QueryHelper.getOne(`
+                            SELECT id FROM profiles
+                            WHERE mikrotik_name = $1 AND type = 'pppoe'
+                        `, [profile.name]);
+
+                        if (!existing) {
+                            // Parse pricing from comment
+                            const commentData = this.mikrotik.parseComment(profile.comment) || {};
+
+                            await QueryHelper.insert(`
+                                INSERT INTO profiles
+                                (name, type, mikrotik_name, price_sell, price_cost, mikrotik_synced, managed_by, created_at)
+                                VALUES ($1, $2, $3, $4, $5, true, 'system', NOW())
+                            `, [
+                                profile.name,
+                                'pppoe',
+                                profile.name,
+                                commentData.price_sell || 0,
+                                commentData.price_cost || 0
+                            ]);
+
+                            syncedCount++;
+                            console.log(`📥 Synced new PPPoE profile: ${profile.name}`);
+                        } else {
+                            // Update existing profile
+                            await QueryHelper.query(`
+                                UPDATE profiles
+                                SET mikrotik_synced = true,
+                                    updated_at = NOW()
+                                WHERE id = $1
+                            `, [existing.id]);
+                        }
+                    } catch (profileError) {
+                        console.error(`Error syncing profile ${profile.name}:`, profileError.message);
+                        // Continue with other profiles
+                    }
+                }
+
+                // Small delay between batches to prevent overwhelming
+                if (i < batches.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+
+            console.log(`✅ Synced ${syncedCount} new PPPoE profiles`);
+            return { synced: syncedCount, total: systemProfiles.length };
+
+        } catch (error) {
+            console.error('Error syncing PPPoE profiles:', error);
+            throw error;
         }
     }
 }

@@ -1,5 +1,6 @@
 const WhatsAppSessionManager = require('./WhatsAppSessionManager');
 const { db } = require('../database/DatabaseManager');
+const QueryHelper = require('../lib/QueryHelper');
 const EventEmitter = require('events');
 
 class WhatsAppService extends EventEmitter {
@@ -31,7 +32,7 @@ class WhatsAppService extends EventEmitter {
             if (dbPool) {
                 // PostgreSQL pool
                 console.log('🐘 WhatsApp Service using PostgreSQL');
-                this.query = new Query(dbPool);
+                this.query = QueryHelper;
                 this.sessionManager.query = this.query;
             }
 

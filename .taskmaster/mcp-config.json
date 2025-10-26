@@ -1,251 +1,217 @@
 {
-  "version": "0.24.0",
-  "createdAt": "2025-10-19T10:00:00.000Z",
-  "lastValidated": "2025-10-19T10:00:00.000Z",
-  "mcpServers": {
-    "task-master-ai": {
-      "command": "npx",
-      "args": ["-y", "--package=task-master-ai", "task-master-ai"],
-      "env": {
-        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
-        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}",
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}"
-      },
-      "timeout": 30000,
-      "capabilities": ["project_management", "task_coordination", "complexity_analysis"],
-      "priority": "critical",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 60000,
-        "endpoint": "/health"
+  "version": "2.0.0",
+  "project": "Mikrotik Billing System",
+  "mcpIntegration": {
+    "enabled": true,
+    "servers": 8,
+    "lastUpdated": "2025-10-23T20:40:00Z"
+  },
+  "activeServers": [
+    {
+      "name": "playwright",
+      "status": "active",
+      "purpose": "E2E testing automation for Mikrotik billing workflows",
+      "capabilities": [
+        "voucher-generation-testing",
+        "payment-flow-testing",
+        "whatsapp-interface-testing",
+        "mikrotik-simulation"
+      ],
+      "configuration": {
+        "browsers": ["chromium", "firefox", "webkit"],
+        "testEnvironment": "production-like",
+        "screenshots": true,
+        "videoRecording": true
       }
     },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/github-mcp"],
-      "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
-      },
-      "timeout": 30000,
-      "capabilities": ["repository_operations", "pr_management", "issue_tracking"],
-      "priority": "high",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 120000,
-        "endpoint": "/api/github/status"
+    {
+      "name": "github",
+      "status": "active",
+      "purpose": "Repository management and CI/CD for billing system",
+      "capabilities": [
+        "pull-request-management",
+        "issue-tracking",
+        "release-automation",
+        "code-review-automation"
+      ],
+      "configuration": {
+        "autoMerge": false,
+        "requireReviews": true,
+        "branchProtection": true
       }
     },
-    "context7": {
-      "command": "npx",
-      "args": ["-y", "context7-mcp"],
-      "env": {},
-      "timeout": 30000,
-      "capabilities": ["library_documentation", "code_examples", "api_references"],
-      "priority": "high",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 300000,
-        "endpoint": "/api/library-status"
+    {
+      "name": "context7",
+      "status": "active",
+      "purpose": "Live documentation and code examples for development",
+      "capabilities": [
+        "fastify-documentation",
+        "mikrotik-api-examples",
+        "knex-js-patterns",
+        "whatsapp-web-js-reference"
+      ],
+      "configuration": {
+        "cacheEnabled": true,
+        "autoUpdate": true,
+        "categories": ["backend", "database", "api", "messaging"]
       }
     },
-    "basic-memory": {
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/basic-memory-mcp"],
-      "env": {},
-      "timeout": 30000,
-      "capabilities": ["knowledge_storage", "organizational_memory", "context_management"],
-      "priority": "high",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 120000,
-        "endpoint": "/memory/health"
+    {
+      "name": "prisma",
+      "status": "backup",
+      "purpose": "Database schema management backup for Knex.js",
+      "capabilities": [
+        "schema-validation",
+        "migration-verification",
+        "query-optimization",
+        "relationship-mapping"
+      ],
+      "configuration": {
+        "primaryORM": "knex",
+        "validationOnly": true,
+        "syncWithKnex": true
       }
     },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "sequential-thinking-mcp"],
-      "env": {
-        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
-      },
-      "timeout": 30000,
-      "capabilities": ["multi_step_reasoning", "adaptive_planning", "problem_solving"],
-      "priority": "medium",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 180000,
-        "endpoint": "/thinking/status"
+    {
+      "name": "filesystem",
+      "status": "active",
+      "purpose": "File system operations and management",
+      "capabilities": [
+        "backup-management",
+        "log-file-analysis",
+        "template-management",
+        "file-integrity-checks"
+      ],
+      "configuration": {
+        "watchDirectories": ["logs", "backups", "uploads"],
+        "autoBackup": true,
+        "integrityChecks": true
       }
     },
-    "zen": {
-      "command": "npx",
-      "args": ["-y", "zen-mcp-server"],
-      "env": {
-        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
-        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
-      },
-      "timeout": 30000,
-      "capabilities": ["multi_ai_orchestration", "collaborative_intelligence", "consensus_building"],
-      "priority": "medium",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 240000,
-        "endpoint": "/zen/health"
+    {
+      "name": "browser-tools",
+      "status": "active",
+      "purpose": "Web automation and testing for billing interfaces",
+      "capabilities": [
+        "ui-automation-testing",
+        "form-validation-testing",
+        "responsive-design-testing",
+        "accessibility-testing"
+      ],
+      "configuration": {
+        "headlessMode": true,
+        "viewports": ["desktop", "tablet", "mobile"],
+        "accessibilityChecks": true
       }
     },
-    "playwright": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp"],
-      "env": {},
-      "timeout": 60000,
-      "capabilities": ["browser_automation", "e2e_testing", "ui_testing"],
-      "priority": "high",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 300000,
-        "endpoint": "/playwright/health"
+    {
+      "name": "web-search-prime",
+      "status": "active",
+      "purpose": "Research and documentation lookup",
+      "capabilities": [
+        "mikrotik-documentation-search",
+        "payment-gateway-research",
+        "security-advisory-lookup",
+        "technology-research"
+      ],
+      "configuration": {
+        "sources": ["official-docs", "stackoverflow", "security-advisories"],
+        "cacheResults": true,
+        "relevanceThreshold": 0.8
       }
     },
-    "prisma": {
-      "command": "npx",
-      "args": ["-y", "prisma-mcp"],
-      "env": {
-        "DATABASE_URL": "${DATABASE_URL}"
-      },
-      "timeout": 30000,
-      "capabilities": ["database_schema", "query_optimization", "migration_management"],
-      "priority": "high",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 120000,
-        "endpoint": "/prisma/health"
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "filesystem-mcp"],
-      "env": {},
-      "timeout": 30000,
-      "capabilities": ["file_operations", "directory_management", "path_resolution"],
-      "priority": "medium",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 300000,
-        "endpoint": "/filesystem/health"
-      }
-    },
-    "browser-tools": {
-      "command": "npx",
-      "args": ["-y", "browser-tools-mcp"],
-      "env": {},
-      "timeout": 60000,
-      "capabilities": ["web_automation", "browser_testing", "performance_audit"],
-      "priority": "medium",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 300000,
-        "endpoint": "/browser/health"
-      }
-    },
-    "web-search-prime": {
-      "command": "npx",
-      "args": ["-y", "web-search-prime-mcp"],
-      "env": {},
-      "timeout": 45000,
-      "capabilities": ["web_search", "research", "documentation_lookup"],
-      "priority": "medium",
-      "healthCheck": {
-        "enabled": true,
-        "interval": 300000,
-        "endpoint": "/search/health"
+    {
+      "name": "database-optimizer",
+      "status": "active",
+      "purpose": "PostgreSQL performance optimization and monitoring",
+      "capabilities": [
+        "query-performance-analysis",
+        "index-optimization",
+        "connection-pool-optimization",
+        "backup-optimization"
+      ],
+      "configuration": {
+        "databaseType": "postgresql",
+        "hosting": "supabase",
+        "monitoringInterval": "5m",
+        "autoOptimize": false
       }
     }
-  },
-  "validation": {
-    "lastValidated": "2025-10-19T10:00:00.000Z",
-    "overallStatus": "healthy",
-    "criticalIssues": [],
-    "warnings": [],
-    "healthyServers": 11,
-    "totalServers": 11
-  },
-  "environmentValidation": {
-    "requiredEnvVars": [
-      "ANTHROPIC_API_KEY",
-      "GITHUB_TOKEN",
-      "DATABASE_URL"
-    ],
-    "optionalEnvVars": [
-      "PERPLEXITY_API_KEY",
-      "OPENAI_API_KEY",
-      "GOOGLE_API_KEY"
-    ],
-    "validationStatus": "pending"
-  },
-  "communicationResilience": {
-    "circuitBreaker": {
-      "failureThreshold": 5,
-      "timeout": 60000,
-      "resetTimeout": 300000
+  ],
+  "integrationPatterns": {
+    "mikrotikTesting": {
+      "servers": ["playwright", "browser-tools"],
+      "workflow": "simulate-mikrotik-api-calls",
+      "description": "Test Mikrotik integration without live router"
     },
-    "healthMonitoring": {
-      "interval": 60000,
-      "degradedThreshold": 2000,
-      "criticalThreshold": 5000
+    "paymentGatewayTesting": {
+      "servers": ["playwright", "web-search-prime"],
+      "workflow": "test-payment-plugins-safely",
+      "description": "Validate payment plugins without real transactions"
     },
-    "failoverStrategy": {
-      "task-master-ai": "local_fallback",
-      "github": "manual_operations",
-      "context7": "cached_docs",
-      "basic-memory": "file_storage",
-      "sequential-thinking": "simple_reasoning",
-      "zen": "single_model",
-      "playwright": "manual_testing",
-      "prisma": "knex_fallback",
-      "filesystem": "native_fs",
-      "browser-tools": "manual_browser",
-      "web-search-prime": "cached_searches"
+    "documentationGeneration": {
+      "servers": ["context7", "filesystem"],
+      "workflow": "generate-api-documentation",
+      "description": "Create and maintain technical documentation"
+    },
+    "performanceOptimization": {
+      "servers": ["database-optimizer", "prisma"],
+      "workflow": "optimize-database-queries",
+      "description": "Analyze and optimize database performance"
+    },
+    "securityValidation": {
+      "servers": ["web-search-prime", "browser-tools"],
+      "workflow": "security-audit-automation",
+      "description": "Automated security vulnerability scanning"
     }
   },
-  "usage": {
-    "recommendedServers": {
-      "development": [
-        "task-master-ai",
-        "github",
-        "context7",
-        "basic-memory",
-        "playwright",
-        "prisma"
-      ],
-      "research": [
-        "task-master-ai",
-        "context7",
-        "web-search-prime",
-        "sequential-thinking"
-      ],
-      "testing": [
-        "playwright",
-        "browser-tools",
-        "task-master-ai"
-      ],
-      "documentation": [
-        "context7",
-        "basic-memory",
-        "web-search-prime"
-      ]
+  "usageGuidelines": {
+    "testing": {
+      "playwright": "Use @playwright to test voucher generation and payment workflows",
+      "browser-tools": "Use @browser-tools for UI component testing and accessibility validation"
+    },
+    "development": {
+      "context7": "Use @context7 to lookup Fastify and Mikrotik API documentation",
+      "filesystem": "Use @filesystem for backup management and log analysis"
+    },
+    "database": {
+      "prisma": "Use @prisma to validate Knex.js migrations and schema design",
+      "database-optimizer": "Use @database-optimizer for PostgreSQL performance tuning"
+    },
+    "research": {
+      "web-search-prime": "Use @web-search-prime for payment gateway research and security advisories",
+      "github": "Use @github for repository management and issue tracking"
     }
   },
-  "integration": {
-    "claudeCode": {
-      "enabled": true,
-      "autoDiscovery": true,
-      "serverSelection": "intelligent"
+  "serverHealth": {
+    "monitoringEnabled": true,
+    "healthCheckInterval": "5m",
+    "alertThresholds": {
+      "responseTime": "2s",
+      "errorRate": "5%",
+      "uptime": "99%"
+    }
+  },
+  "domainSpecificConfigurations": {
+    "mikrotik": {
+      "apiDocumentation": "context7",
+      "testingTools": "playwright",
+      "simulators": "browser-tools"
     },
-    "taskMaster": {
-      "enabled": true,
-      "coordination": true,
-      "monitoring": true
+    "payments": {
+      "research": "web-search-prime",
+      "testing": "playwright",
+      "documentation": "context7"
+    },
+    "whatsapp": {
+      "uiTesting": "browser-tools",
+      "automation": "playwright",
+      "documentation": "context7"
+    },
+    "database": {
+      "primary": "database-optimizer",
+      "backup": "prisma",
+      "fileManagement": "filesystem"
     }
   }
 }

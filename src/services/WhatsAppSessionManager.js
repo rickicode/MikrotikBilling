@@ -72,11 +72,13 @@ class WhatsAppSessionManager {
      */
     async loadActiveSessions() {
         try {
-            const sessions = await db.findMany('whatsapp_sessions', {
-                status: ['connected', 'connecting', 'scanning']
-            }, {
-                orderBy: [{ column: 'priority', direction: 'desc' }, { column: 'session_name', direction: 'asc' }]
-            });
+            // Use raw query to handle enum properly in PostgreSQL
+            const result = await db.query(`
+                SELECT * FROM whatsapp_sessions
+                WHERE status IN ('connected', 'connecting', 'scanning')
+                ORDER BY priority DESC, session_name ASC
+            `);
+            const sessions = result.rows || result;
 
             for (const session of sessions) {
                 this.sessions.set(session.session_id, {

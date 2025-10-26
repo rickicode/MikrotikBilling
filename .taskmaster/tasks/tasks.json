@@ -1,8 +1,242 @@
 {
-  "version": "1.0.0",
-  "tasks": [],
-  "metadata": {
-    "created": "2025-10-18T07:25:32.049Z",
-    "source": "bootstrap-orchestrator"
+  "version": "2.0.0",
+  "project": "Mikrotik Billing System",
+  "lastUpdated": "2025-10-23T20:35:00Z",
+  "tasks": [
+    {
+      "id": "critical-001",
+      "title": "Database Connection Validation",
+      "description": "Verify PostgreSQL connection stability and test Knex.js migrations",
+      "priority": "critical",
+      "status": "pending",
+      "category": "system-validation",
+      "assignedAgent": "@database-admin",
+      "estimatedDuration": "30 minutes",
+      "dependencies": [],
+      "workflow": "database-validation",
+      "deliverables": [
+        "connection-test-report",
+        "migration-validation",
+        "performance-baseline"
+      ],
+      "qualityGates": [
+        "connection-stable",
+        "migration-success",
+        "response-time-acceptable"
+      ]
+    },
+    {
+      "id": "critical-002",
+      "title": "Mikrotik Integration Testing",
+      "description": "Test RouterOS API connectivity and validate profile synchronization",
+      "priority": "critical",
+      "status": "pending",
+      "category": "mikrotik-validation",
+      "assignedAgent": "@network-engineer",
+      "estimatedDuration": "45 minutes",
+      "dependencies": [],
+      "workflow": "mikrotik-integration",
+      "deliverables": [
+        "api-connection-test",
+        "profile-sync-validation",
+        "user-creation-test"
+      ],
+      "qualityGates": [
+        "api-accessible",
+        "profiles-synced",
+        "user-creation-working"
+      ]
+    },
+    {
+      "id": "critical-003",
+      "title": "WhatsApp Session Recovery",
+      "description": "Check existing WhatsApp sessions and test message queue functionality",
+      "priority": "high",
+      "status": "pending",
+      "category": "messaging-validation",
+      "assignedAgent": "@messaging-specialist",
+      "estimatedDuration": "30 minutes",
+      "dependencies": [],
+      "workflow": "whatsapp-validation",
+      "deliverables": [
+        "session-status-report",
+        "qr-code-test",
+        "message-queue-validation"
+      ],
+      "qualityGates": [
+        "sessions-recoverable",
+        "qr-generation-working",
+        "queue-functional"
+      ]
+    },
+    {
+      "id": "optimization-001",
+      "title": "Codebase Cleanup Validation",
+      "description": "Verify all removed files are properly replaced and check for broken imports",
+      "priority": "high",
+      "status": "pending",
+      "category": "code-quality",
+      "assignedAgent": "@software-engineering-expert",
+      "estimatedDuration": "60 minutes",
+      "dependencies": [],
+      "workflow": "code-validation",
+      "deliverables": [
+        "import-validation-report",
+        "dependency-check",
+        "package-integrity-validation"
+      ],
+      "qualityGates": [
+        "no-broken-imports",
+        "dependencies-complete",
+        "package-json-valid"
+      ]
+    },
+    {
+      "id": "optimization-002",
+      "title": "Performance Baseline Testing",
+      "description": "Establish current system performance metrics and test concurrent handling",
+      "priority": "medium",
+      "status": "pending",
+      "category": "performance",
+      "assignedAgent": "@performance-optimizer",
+      "estimatedDuration": "90 minutes",
+      "dependencies": ["critical-001", "critical-002"],
+      "workflow": "performance-testing",
+      "deliverables": [
+        "performance-baseline",
+        "concurrent-user-test",
+        "response-time-analysis"
+      ],
+      "qualityGates": [
+        "baseline-established",
+        "concurrency-handled",
+        "response-times-acceptable"
+      ]
+    },
+    {
+      "id": "security-001",
+      "title": "Security Audit",
+      "description": "Validate JWT authentication, API security, and role-based access control",
+      "priority": "high",
+      "status": "pending",
+      "category": "security",
+      "assignedAgent": "@security-specialist",
+      "estimatedDuration": "75 minutes",
+      "dependencies": ["critical-001"],
+      "workflow": "security-validation",
+      "deliverables": [
+        "authentication-audit",
+        "api-security-report",
+        "rbac-validation"
+      ],
+      "qualityGates": [
+        "jwt-working",
+        "api-secured",
+        "rbac-functional"
+      ]
+    },
+    {
+      "id": "feature-001",
+      "title": "Payment Gateway Plugin Validation",
+      "description": "Test existing DuitKu integration and validate plugin sandbox environment",
+      "priority": "medium",
+      "status": "pending",
+      "category": "payments",
+      "assignedAgent": "@payment-systems-expert",
+      "estimatedDuration": "120 minutes",
+      "dependencies": ["critical-001", "security-001"],
+      "workflow": "payment-validation",
+      "deliverables": [
+        "duitku-integration-test",
+        "plugin-sandbox-validation",
+        "payment-method-configuration"
+      ],
+      "qualityGates": [
+        "duitku-working",
+        "sandbox-isolated",
+        "payment-methods-configured"
+      ]
+    },
+    {
+      "id": "feature-002",
+      "title": "Frontend System Check",
+      "description": "Validate Bootstrap 5, HTMX functionality, and responsive design",
+      "priority": "medium",
+      "status": "pending",
+      "category": "frontend",
+      "assignedAgent": "@frontend-optimization-expert",
+      "estimatedDuration": "90 minutes",
+      "dependencies": ["optimization-001"],
+      "workflow": "frontend-validation",
+      "deliverables": [
+        "bootstrap-validation",
+        "htmx-functionality-test",
+        "responsive-design-check"
+      ],
+      "qualityGates": [
+        "bootstrap-working",
+        "htmx-functional",
+        "design-responsive"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "id": "database-validation",
+      "name": "Database Connection Validation Workflow",
+      "tasks": ["critical-001"],
+      "estimatedDuration": "30 minutes",
+      "assignedAgents": ["@database-admin"]
+    },
+    {
+      "id": "mikrotik-integration",
+      "name": "Mikrotik Integration Testing Workflow",
+      "tasks": ["critical-002"],
+      "estimatedDuration": "45 minutes",
+      "assignedAgents": ["@network-engineer", "@api-architect"]
+    },
+    {
+      "id": "whatsapp-validation",
+      "name": "WhatsApp System Validation Workflow",
+      "tasks": ["critical-003"],
+      "estimatedDuration": "30 minutes",
+      "assignedAgents": ["@messaging-specialist", "@network-engineer"]
+    },
+    {
+      "id": "system-validation",
+      "name": "Complete System Validation Workflow",
+      "tasks": ["critical-001", "critical-002", "critical-003", "optimization-001", "security-001"],
+      "estimatedDuration": "4 hours",
+      "assignedAgents": ["@orchestrator", "@software-engineering-expert"]
+    }
+  ],
+  "agents": {
+    "available": [
+      "@database-admin",
+      "@network-engineer",
+      "@messaging-specialist",
+      "@software-engineering-expert",
+      "@performance-optimizer",
+      "@security-specialist",
+      "@payment-systems-expert",
+      "@frontend-optimization-expert",
+      "@api-architect",
+      "@orchestrator"
+    ],
+    "currentAssignments": {},
+    "workloadBalance": "optimal"
+  },
+  "progress": {
+    "totalTasks": 8,
+    "completedTasks": 0,
+    "inProgressTasks": 0,
+    "blockedTasks": 0,
+    "completionPercentage": 0
+  },
+  "qualityMetrics": {
+    "codeQualityScore": "pending",
+    "testCoverage": "pending",
+    "performanceScore": "pending",
+    "securityScore": "pending"
   }
 }

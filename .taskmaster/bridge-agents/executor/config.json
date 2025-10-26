@@ -1,104 +1,50 @@
 {
-  "name": "task-executor-enhancer",
-  "version": "0.24.0",
-  "role": "implementation_intelligence",
-  "specialization": "telecom-system-execution",
-  "createdAt": "2025-10-19T10:00:00.000Z",
+  "name": "Task Executor",
+  "type": "bridge-agent",
+  "domain": "mikrotik-billing",
   "capabilities": [
-    "contextual_task_execution",
-    "agent_augmentation",
-    "codebase_awareness",
-    "quality_integration",
-    "mikrotik_api_execution",
-    "payment_plugin_implementation",
-    "whatsapp_session_handling"
+    "code-execution",
+    "mikrotik-api-calls",
+    "database-operations",
+    "payment-gateway-integration",
+    "whatsapp-message-queuing"
   ],
-  "integration": {
-    "claudeAgents": "all_19_specialists",
-    "taskMasterCore": "execution_engine"
-  },
-  "execution": {
-    "contextAwareness": true,
-    "architecturalAlignment": true,
-    "continuousValidation": true,
-    "errorRecovery": "automatic"
-  },
-  "specialized_execution": {
-    "nodejs_development": {
-      "agents": ["@nodejs-expert", "@software-engineering-expert"],
-      "patterns": ["fastify_routes", "middleware", "service_classes"],
-      "validation": ["eslint", "unit_tests", "integration_tests"]
+  "specializations": {
+    "mikrotik": {
+      "userManagement": true,
+      "profileSync": true,
+      "connectionPooling": true,
+      "errorRecovery": true
     },
-    "database_operations": {
-      "agents": ["@database-admin", "@performance-optimizer"],
-      "patterns": ["knex_migrations", "query_optimization", "connection_pooling"],
-      "validation": ["schema_validation", "performance_tests", "data_integrity"]
+    "payments": {
+      "pluginExecution": true,
+      "transactionProcessing": true,
+      "webhookHandling": true,
+      "feeCalculation": true
     },
-    "api_development": {
-      "agents": ["@api-architect", "@security-specialist"],
-      "patterns": ["rest_endpoints", "authentication", "input_validation"],
-      "validation": ["api_tests", "security_scans", "documentation"]
-    },
-    "payment_systems": {
-      "agents": ["@payment-systems-expert", "@plugin-developer"],
-      "patterns": ["plugin_interface", "transaction_handling", "webhook_processing"],
-      "validation": ["payment_tests", "security_compliance", "error_handling"]
-    },
-    "mikrotik_integration": {
-      "agents": ["@network-engineer", "@api-architect"],
-      "patterns": ["routeros_api", "connection_pooling", "error_handling"],
-      "validation": ["connectivity_tests", "api_compliance", "error_recovery"]
-    },
-    "whatsapp_integration": {
-      "agents": ["@messaging-specialist", "@network-engineer"],
-      "patterns": ["multi_session", "rate_limiting", "template_system"],
-      "validation": ["message_tests", "session_health", "template_validation"]
-    },
-    "frontend_development": {
-      "agents": ["@frontend-optimization-expert", "@code-reviewer"],
-      "patterns": ["bootstrap_components", "htmx_interactions", "responsive_design"],
-      "validation": ["ui_tests", "accessibility_checks", "cross_browser_tests"]
-    },
-    "plugin_development": {
-      "agents": ["@plugin-developer", "@api-architect"],
-      "patterns": ["plugin_interface", "sandboxing", "hot_swapping"],
-      "validation": ["plugin_tests", "security_scans", "isolation_tests"]
-    },
-    "testing": {
-      "agents": ["@test-automation-expert", "@testing-coordinator"],
-      "patterns": ["unit_tests", "integration_tests", "e2e_tests"],
-      "validation": ["coverage_reports", "test_quality", "performance_tests"]
-    },
-    "deployment": {
-      "agents": ["@devops-engineer", "@deployment-specialist"],
-      "patterns": ["deployment_scripts", "backup_procedures", "monitoring_setup"],
-      "validation": ["deployment_tests", "backup_verification", "monitoring_checks"]
+    "whatsapp": {
+      "messageQueue": true,
+      "sessionManagement": true,
+      "templateRendering": true,
+      "rateLimiting": true
     }
   },
-  "quality_gates": {
-    "pre_commit": {
-      "code_review": true,
-      "test_coverage": 80,
-      "security_scan": true,
-      "performance_check": true
-    },
-    "pre_deployment": {
-      "integration_tests": true,
-      "e2e_tests": true,
-      "security_audit": true,
-      "performance_benchmark": true
-    }
+  "executionLimits": {
+    "maxConcurrentTasks": 5,
+    "timeoutSeconds": 300,
+    "retryAttempts": 3,
+    "mikrotikRateLimit": "100/minute"
   },
-  "performance": {
-    "parallel_execution": true,
-    "caching": true,
-    "resource_optimization": true,
-    "monitoring": true
+  "monitoring": {
+    "trackExecution": true,
+    "logPerformance": true,
+    "errorTracking": true,
+    "resourceUsage": true
   },
-  "error_handling": {
-    "retry_logic": "exponential_backoff",
-    "fallback_strategies": true,
-    "error_reporting": "detailed",
-    "recovery_automation": true
-  }
+  "integrationPoints": [
+    "src/services/MikrotikClient.js",
+    "src/plugins/payments/",
+    "src/services/WhatsAppService.js",
+    "src/database/"
+  ]
 }

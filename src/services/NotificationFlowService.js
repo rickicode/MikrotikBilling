@@ -68,7 +68,7 @@ class NotificationFlowService extends EventEmitter {
 
                 // Get pending notifications
                 const selectedNotifications = await QueryHelper.getMany(
-                    'SELECT id FROM notification_queue WHERE status = ? AND send_after <= datetime("now") ORDER BY priority DESC, created_at ASC LIMIT ?',
+                    'SELECT id FROM notification_queue WHERE status = ? AND send_after <= NOW() ORDER BY priority DESC, created_at ASC LIMIT ?',
                     ['pending', this.batchSize]
                 );
 
@@ -80,7 +80,7 @@ class NotificationFlowService extends EventEmitter {
 
                         // Update selected notifications
                         await QueryHelper.execute(
-                            'UPDATE notification_queue SET status = ?, processed_at = datetime("now") WHERE id IN (' + placeholders + ')',
+                            'UPDATE notification_queue SET status = ?, processed_at = NOW() WHERE id IN (' + placeholders + ')',
                             ['processing', ...ids]
                         );
 

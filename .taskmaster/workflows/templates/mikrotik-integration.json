@@ -1,0 +1,143 @@
+{
+  "name": "Mikrotik Integration Workflow",
+  "version": "1.0.0",
+  "description": "Complete Mikrotik RouterOS integration setup and testing workflow",
+  "category": "mikrotik-billing",
+  "estimatedDuration": "2-4 hours",
+  "priority": "critical",
+
+  "steps": [
+    {
+      "id": 1,
+      "name": "Validate Mikrotik Connection",
+      "description": "Test RouterOS API connectivity and credentials",
+      "agent": "@network-engineer",
+      "tasks": [
+        "Verify RouterOS API accessibility",
+        "Test admin credentials",
+        "Validate API permissions",
+        "Check connection pooling setup"
+      ],
+      "outputs": ["connection-status", "api-version", "permissions-list"],
+      "validation": {
+        "required": true,
+        "criteria": ["connection-successful", "api-access-granted"]
+      }
+    },
+    {
+      "id": 2,
+      "name": "Sync Mikrotik Profiles",
+      "description": "Synchronize hotspot and PPPoE profiles from RouterOS",
+      "agent": "@api-architect",
+      "tasks": [
+        "Scan RouterOS for VOUCHER_SYSTEM profiles",
+        "Scan RouterOS for PPPOE_SYSTEM profiles",
+        "Update local database with profile data",
+        "Validate profile synchronization"
+      ],
+      "outputs": ["synced-profiles", "sync-status", "profile-count"],
+      "dependencies": [1],
+      "validation": {
+        "required": true,
+        "criteria": ["profiles-synced", "database-updated"]
+      }
+    },
+    {
+      "id": 3,
+      "name": "Configure Profile Scripts",
+      "description": "Setup profile scripts for first login detection",
+      "agent": "@network-engineer",
+      "tasks": [
+        "Create first login detection scripts",
+        "Inject scripts into Mikrotik profiles",
+        "Setup callback endpoints",
+        "Test script execution"
+      ],
+      "outputs": ["script-status", "callback-urls", "test-results"],
+      "dependencies": [2],
+      "validation": {
+        "required": true,
+        "criteria": ["scripts-injected", "callbacks-working"]
+      }
+    },
+    {
+      "id": 4,
+      "name": "Test User Creation",
+      "description": "Validate voucher and PPPoE user creation workflows",
+      "agent": "@database-admin",
+      "tasks": [
+        "Create test hotspot voucher",
+        "Create test PPPoE user",
+        "Verify Mikrotik user creation",
+        "Test comment metadata patterns"
+      ],
+      "outputs": ["test-users", "creation-status", "metadata-validation"],
+      "dependencies": [3],
+      "validation": {
+        "required": true,
+        "criteria": ["users-created", "metadata-correct"]
+      }
+    },
+    {
+      "id": 5,
+      "name": "Setup Real-time Monitoring",
+      "description": "Configure background sync and monitoring systems",
+      "agent": "@performance-optimizer",
+      "tasks": [
+        "Configure polling intervals",
+        "Setup scheduler tasks",
+        "Implement offline mode fallback",
+        "Test connection recovery"
+      ],
+      "outputs": ["monitoring-config", "scheduler-status", "recovery-tests"],
+      "dependencies": [4],
+      "validation": {
+        "required": true,
+        "criteria": ["monitoring-active", "recovery-working"]
+      }
+    }
+  ],
+
+  "qualityGates": [
+    {
+      "name": "Connection Stability",
+      "criteria": "Mikrotik connection remains stable for 10 minutes",
+      "validation": "automated-test"
+    },
+    {
+      "name": "Profile Sync Integrity",
+      "criteria": "All profiles synchronized without data loss",
+      "validation": "database-comparison"
+    },
+    {
+      "name": "User Creation Success",
+      "criteria": "95%+ success rate for user creation",
+      "validation": "performance-test"
+    }
+  ],
+
+  "rollbackPlan": {
+    "steps": [
+      "Disable Mikrotik integration",
+      "Restore database from backup",
+      "Clear local cache",
+      "Restart application services"
+    ],
+    "estimatedTime": "15 minutes"
+  },
+
+  "agents": [
+    "@network-engineer",
+    "@api-architect",
+    "@database-admin",
+    "@performance-optimizer"
+  ],
+
+  "deliverables": [
+    "Working Mikrotik integration",
+    "Synchronized profile database",
+    "Automated user creation workflows",
+    "Real-time monitoring system",
+    "Integration test report"
+  ]
+}

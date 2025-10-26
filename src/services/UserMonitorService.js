@@ -465,28 +465,36 @@ class UserMonitorService extends EventEmitter {
         try {
             // Clean up expired vouchers
             const expiredVouchers = await QueryHelper.getMany(
-                'SELECT username, expires_at FROM vouchers WHERE status = ? AND expires_at < datetime("now")',
+                'SELECT code, expires_at FROM vouchers WHERE status = ? AND expires_at < NOW()',
                 ['used']
             );
+
+            // Add null/undefined check to prevent "not iterable" error
+            if (!expiredVouchers || !Array.isArray(expiredVouchers)) {
+                console.warn('⚠️ No expired vouchers found or invalid response from database');
+                return;
+            }
+
+            console.log(`🧹 Found ${expiredVouchers.length} expired vouchers to clean up`);
 
             for (const voucher of expiredVouchers) {
                 try {
                     // Delete from Mikrotik
-                    await this.mikrotik.deleteHotspotUser(voucher.username);
+                    await this.mikrotik.deleteHotspotUser(voucher.code);
 
                     // Update database
                     await QueryHelper.raw(
-                        'UPDATE vouchers SET status = ? WHERE username = ?',
-                        ['expired', voucher.username]
+                        'UPDATE vouchers SET status = ? WHERE code = ?',
+                        ['expired', voucher.code]
                     );
 
                     // Log cleanup
                     await QueryHelper.raw(
-                        'INSERT INTO activity_logs (action, user_type, username, details, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+                        'INSERT INTO activity_logs (action, user_type, username, details, created_at) VALUES (?, ?, ?, ?, NOW())',
                         [
                             'delete_expired',
                             'voucher',
-                            voucher.username,
+                            voucher.code,
                             JSON.stringify({
                                 reason: 'expired',
                                 expires_at: voucher.expires_at
@@ -495,12 +503,12 @@ class UserMonitorService extends EventEmitter {
                     );
 
                     // Remove from cache
-                    this.knownUsers.delete(voucher.username);
+                    this.knownUsers.delete(voucher.code);
 
-                    console.log(`🗑️ Cleaned up expired voucher: ${voucher.username}`);
+                    console.log(`🗑️ Cleaned up expired voucher: ${voucher.code}`);
 
                 } catch (error) {
-                    console.error(`Error cleaning up voucher ${voucher.username}:`, error);
+                    console.error(`Error cleaning up voucher ${voucher.code}:`, error);
                 }
             }
 
@@ -511,7 +519,14 @@ class UserMonitorService extends EventEmitter {
                  WHERE status = 'active' AND expires_at < NOW()`
             );
 
-            for (const user of expiredPPPoE) {
+            // Add null/undefined check for PPPoE users
+            if (!expiredPPPoE || !Array.isArray(expiredPPPoE)) {
+                console.warn('⚠️ No expired PPPoE users found or invalid response from database');
+            } else {
+                console.log(`🧹 Found ${expiredPPPoE.length} expired PPPoE users to disable`);
+            }
+
+            for (const user of expiredPPPoE || []) {
                 try {
                     // Disable in Mikrotik
                     await this.mikrotik.updatePPPoESecret(user.username, {
