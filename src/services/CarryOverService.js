@@ -51,7 +51,7 @@ class CarryOverService extends EventEmitter {
             const expiresAt = new Date();
             expiresAt.setDate(expiresAt.getDate() + validityDays);
 
-            const carryOverId = await this.query.insert(`
+            const carryOverId = await QueryHelper.insert(`
                 INSERT INTO carry_over_balances
                 (customer_id, subscription_id, amount, currency, original_payment_id, expires_at, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -68,7 +68,7 @@ class CarryOverService extends EventEmitter {
             console.log(`💰 Carry over created: ${excessAmount} ${currency} for customer ${customerId}`);
 
             // Log carry over creation
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO subscription_history
                 (subscription_id, customer_id, action, details, created_at)
                 VALUES ($1, $2, $3, $4, NOW())
@@ -126,7 +126,7 @@ class CarryOverService extends EventEmitter {
                 ? [customerId, subscriptionId]
                 : [customerId];
 
-            const balances = await this.query.getMany(`
+            const balances = await QueryHelper.getMany(`
                 SELECT
                     cob.*,
                     c.name as customer_name,
@@ -208,7 +208,7 @@ class CarryOverService extends EventEmitter {
                 // Update or mark as used
                 if (amountToApply >= balanceAmount) {
                     // Fully used
-                    await this.query.query(`
+                    await QueryHelper.query(`
                         UPDATE carry_over_balances
                         SET is_used = true,
                             used_at = NOW(),
@@ -219,7 +219,7 @@ class CarryOverService extends EventEmitter {
                 } else {
                     // Partially used
                     const newAmount = balanceAmount - amountToApply;
-                    await this.query.query(`
+                    await QueryHelper.query(`
                         UPDATE carry_over_balances
                         SET amount = $1,
                             used_amount = used_amount + $2,
@@ -237,7 +237,7 @@ class CarryOverService extends EventEmitter {
                 remainingInvoice -= amountToApply;
 
                 // Log usage
-                await this.query.insert(`
+                await QueryHelper.insert(`
                     INSERT INTO subscription_history
                     (subscription_id, customer_id, action, details, created_at)
                     VALUES ($1, $2, $3, $4, NOW())
@@ -295,7 +295,7 @@ class CarryOverService extends EventEmitter {
                 ? [customerId, subscriptionId]
                 : [customerId];
 
-            const result = await this.query.getOne(`
+            const result = await QueryHelper.getOne(`
                 SELECT COALESCE(SUM(amount), 0) as total
                 FROM carry_over_balances
                 WHERE customer_id = $1
@@ -317,7 +317,7 @@ class CarryOverService extends EventEmitter {
      */
     async cleanupExpiredBalances() {
         try {
-            const expiredBalances = await this.query.getMany(`
+            const expiredBalances = await QueryHelper.getMany(`
                 UPDATE carry_over_balances
                 SET is_used = true,
                     used_at = NOW(),
@@ -333,7 +333,7 @@ class CarryOverService extends EventEmitter {
 
                 // Log cleanup
                 for (const balance of expiredBalances) {
-                    await this.query.insert(`
+                    await QueryHelper.insert(`
                         INSERT INTO subscription_history
                         (subscription_id, customer_id, action, details, created_at)
                         VALUES ($1, $2, $3, $4, NOW())
@@ -374,7 +374,7 @@ class CarryOverService extends EventEmitter {
                 ? [customerId]
                 : [];
 
-            const stats = await this.query.getOne(`
+            const stats = await QueryHelper.getOne(`
                 SELECT
                     COUNT(*) as total_entries,
                     COUNT(CASE WHEN cob.is_used = false AND cob.expires_at > NOW() THEN 1 END) as active_entries,
@@ -412,7 +412,7 @@ class CarryOverService extends EventEmitter {
     async transferBalance(fromSubscriptionId, toSubscriptionId, amount) {
         try {
             // Get available balance from source subscription
-            const sourceBalances = await this.query.getMany(`
+            const sourceBalances = await QueryHelper.getMany(`
                 SELECT * FROM carry_over_balances
                 WHERE subscription_id = $1
                   AND is_used = false
@@ -436,7 +436,7 @@ class CarryOverService extends EventEmitter {
                 const amountToTransfer = Math.min(balanceAmount, remainingToTransfer);
 
                 // Create new carry over entry for target subscription
-                await this.query.insert(`
+                await QueryHelper.insert(`
                     INSERT INTO carry_over_balances
                     (customer_id, subscription_id, amount, currency, original_payment_id, expires_at, notes, created_at)
                     SELECT customer_id, $2, $3, currency, original_payment_id, expires_at, 'Transferred from subscription ' || $1, NOW()
@@ -446,7 +446,7 @@ class CarryOverService extends EventEmitter {
 
                 // Update source balance
                 if (amountToTransfer >= balanceAmount) {
-                    await this.query.query(`
+                    await QueryHelper.query(`
                         UPDATE carry_over_balances
                         SET is_used = true,
                             used_at = NOW(),
@@ -455,7 +455,7 @@ class CarryOverService extends EventEmitter {
                         WHERE id = $1
                     `, [balance.id]);
                 } else {
-                    await this.query.query(`
+                    await QueryHelper.query(`
                         UPDATE carry_over_balances
                         SET amount = amount - $1,
                             used_amount = used_amount + $1,

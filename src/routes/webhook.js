@@ -1,6 +1,7 @@
 const webhookRoutes = (fastify, options, done) => {
   const PaymentService = require('../services/PaymentService');
   const PaymentTransaction = require('../models/PaymentTransaction');
+  const { ApiErrorHandler } = require('../middleware/apiErrorHandler');
 
   // Initialize services
   const paymentService = new PaymentService(fastify.db);
@@ -12,173 +13,123 @@ const webhookRoutes = (fastify, options, done) => {
       // Disable authentication for webhook endpoints (they will be authenticated via signature)
       skipAuth: true
     }
-  }, async (request, reply) => {
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
     const startTime = Date.now();
     let webhookTransaction = null;
 
-    try {
-      const callbackData = request.body;
+    const callbackData = request.body;
 
-      // Log incoming webhook
-      fastify.log.info('DuitKu webhook received:', {
-        headers: request.headers,
-        body: callbackData,
-        timestamp: new Date().toISOString()
-      });
+    // Log incoming webhook
+    fastify.log.info('DuitKu webhook received:', {
+      headers: request.headers,
+      body: callbackData,
+      timestamp: new Date().toISOString()
+    });
 
-      // Basic validation of required fields
-      const requiredFields = ['merchantCode', 'invoiceNumber', 'amount', 'signature', 'paymentStatus'];
-      const missingFields = requiredFields.filter(field => !callbackData[field]);
+    // Basic validation of required fields
+    const requiredFields = ['merchantCode', 'invoiceNumber', 'amount', 'signature', 'paymentStatus'];
+    const missingFields = requiredFields.filter(field => !callbackData[field]);
 
-      if (missingFields.length > 0) {
-        fastify.log.warn('DuitKu webhook missing required fields:', missingFields);
-        return reply.code(400).send({
-          status: 'ERROR',
-          message: `Missing required fields: ${missingFields.join(', ')}`
-        });
-      }
-
-      // Create webhook transaction record
-      webhookTransaction = await transactionModel.logCallback(null, {
-        type: 'duitku_webhook',
-        callbackData,
-        receivedAt: new Date().toISOString(),
-        userAgent: request.headers['user-agent'],
-        ip: request.ip
-      });
-
-      // Process the callback
-      const result = await paymentService.processCallback(callbackData);
-
-      // Update webhook transaction with result
-      if (webhookTransaction) {
-        await transactionModel.updateStatus(webhookTransaction.id, 'success');
-        await transactionModel.updateStatus(webhookTransaction.id, 'success');
-      }
-
-      const processingTime = Date.now() - startTime;
-
-      // Log successful processing
-      fastify.log.info('DuitKu webhook processed successfully:', {
-        invoiceNumber: callbackData.invoiceNumber,
-        paymentStatus: callbackData.paymentStatus,
-        processingTime: `${processingTime}ms`,
-        result: result
-      });
-
-      // Return success response to DuitKu
-      return reply.code(200).send({
-        status: 'SUCCESS',
-        message: 'Callback processed successfully',
-        processingTime: `${processingTime}ms`
-      });
-
-    } catch (error) {
-      const processingTime = Date.now() - startTime;
-
-      // Log error
-      fastify.log.error('DuitKu webhook processing failed:', {
-        error: error.message,
-        stack: error.stack,
-        callbackData: request.body,
-        processingTime: `${processingTime}ms`,
-        timestamp: new Date().toISOString()
-      });
-
-      // Update webhook transaction with error
-      if (webhookTransaction) {
-        await transactionModel.markFailed(webhookTransaction.id, error.message);
-      }
-
-      // Return error response to DuitKu
-      return reply.code(500).send({
+    if (missingFields.length > 0) {
+      fastify.log.warn('DuitKu webhook missing required fields:', missingFields);
+      return reply.code(400).send({
         status: 'ERROR',
-        message: 'Internal server error',
-        processingTime: `${processingTime}ms`
+        message: `Missing required fields: ${missingFields.join(', ')}`
       });
     }
-  });
+
+    // Create webhook transaction record
+    webhookTransaction = await transactionModel.logCallback(null, {
+      type: 'duitku_webhook',
+      callbackData,
+      receivedAt: new Date().toISOString(),
+      userAgent: request.headers['user-agent'],
+      ip: request.ip
+    });
+
+    // Process the callback
+    const result = await paymentService.processCallback(callbackData);
+
+    // Update webhook transaction with result
+    if (webhookTransaction) {
+      await transactionModel.updateStatus(webhookTransaction.id, 'success');
+      await transactionModel.updateStatus(webhookTransaction.id, 'success');
+    }
+
+    const processingTime = Date.now() - startTime;
+
+    // Log successful processing
+    fastify.log.info('DuitKu webhook processed successfully:', {
+      invoiceNumber: callbackData.invoiceNumber,
+      paymentStatus: callbackData.paymentStatus,
+      processingTime: `${processingTime}ms`,
+      result: result
+    });
+
+    // Return success response to DuitKu
+    return reply.code(200).send({
+      status: 'SUCCESS',
+      message: 'Callback processed successfully',
+      processingTime: `${processingTime}ms`
+    });
+  }));
 
   // GET /api/webhook/duitku/test - Test webhook endpoint
   fastify.get('/webhook/duitku/test', {
     preHandler: require('../middleware/auth').verifyToken
-  }, async (request, reply) => {
-    try {
-      const testPayload = {
-        merchantCode: 'TEST',
-        invoiceNumber: `TEST-${Date.now()}`,
-        amount: '10000',
-        signature: 'test-signature',
-        paymentStatus: 'SUCCESS',
-        paymentMethod: 'VA',
-        reference: 'TEST-REF-123',
-        vaNumber: '1234567890',
-        createdAt: new Date().toISOString()
-      };
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const testPayload = {
+      merchantCode: 'TEST',
+      invoiceNumber: `TEST-${Date.now()}`,
+      amount: '10000',
+      signature: 'test-signature',
+      paymentStatus: 'SUCCESS',
+      paymentMethod: 'VA',
+      reference: 'TEST-REF-123',
+      vaNumber: '1234567890',
+      createdAt: new Date().toISOString()
+    };
 
-      // Log test webhook
-      fastify.log.info('Test DuitKu webhook triggered:', {
+    // Log test webhook
+    fastify.log.info('Test DuitKu webhook triggered:', {
+      testPayload,
+      timestamp: new Date().toISOString()
+    });
+
+    return reply.code(200).send({
+      success: true,
+      data: {
         testPayload,
+        webhookUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/api/webhook/duitku`,
         timestamp: new Date().toISOString()
-      });
-
-      return reply.code(200).send({
-        success: true,
-        data: {
-          testPayload,
-          webhookUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/api/webhook/duitku`,
-          timestamp: new Date().toISOString()
-        },
-        message: 'Test webhook payload generated. Use POST to test actual processing.'
-      });
-
-    } catch (error) {
-      fastify.log.error('Error generating test webhook:', error);
-      return reply.code(500).send({
-        success: false,
-        error: error.message,
-        message: 'Failed to generate test webhook'
-      });
-    }
-  });
+      },
+      message: 'Test webhook payload generated. Use POST to test actual processing.'
+    });
+  }));
 
   // POST /api/webhook/duitku/test - Test webhook processing
   fastify.post('/webhook/duitku/test', {
     preHandler: require('../middleware/auth').verifyToken
-  }, async (request, reply) => {
-    try {
-      const { testPayload } = request.body;
+  }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const { testPayload } = request.body;
 
-      if (!testPayload) {
-        return reply.code(400).send({
-          success: false,
-          error: 'testPayload is required',
-          message: 'Please provide testPayload in request body'
-        });
-      }
-
-      // Process test webhook
-      const result = await paymentService.processCallback(testPayload);
-
-      return reply.code(200).send({
-        success: true,
-        data: {
-          testPayload,
-          result,
-          timestamp: new Date().toISOString()
-        },
-        message: 'Test webhook processed successfully'
-      });
-
-    } catch (error) {
-      fastify.log.error('Error processing test webhook:', error);
-      return reply.code(500).send({
-        success: false,
-        error: error.message,
-        message: 'Failed to process test webhook'
-      });
+    if (!testPayload) {
+      return ApiErrorHandler.validationError(reply, 'testPayload is required - Please provide testPayload in request body');
     }
-  });
+
+    // Process test webhook
+    const result = await paymentService.processCallback(testPayload);
+
+    return reply.code(200).send({
+      success: true,
+      data: {
+        testPayload,
+        result,
+        timestamp: new Date().toISOString()
+      },
+      message: 'Test webhook processed successfully'
+    });
+  }));
 
   // GET /api/webhook/duitku/logs - Get webhook processing logs
   fastify.get('/webhook/duitku/logs', {
@@ -225,7 +176,7 @@ const webhookRoutes = (fastify, options, done) => {
 
       // Get webhook logs
       const logs = db.query(`
-        SELECT pt.*, pl.invoice_number, c.nama as customer_name
+        SELECT pt.*, pl.invoice_number, c.name as customer_name
         FROM payment_transactions pt
         LEFT JOIN payment_links pl ON pt.payment_link_id = pl.id
         LEFT JOIN customers c ON pl.customer_id = c.id

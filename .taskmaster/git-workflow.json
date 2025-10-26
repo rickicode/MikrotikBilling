@@ -1,0 +1,219 @@
+{
+  "version": "2.0.0",
+  "project": "Mikrotik Billing System",
+  "gitWorkflow": {
+    "strategy": "GitFlow with agent attribution",
+    "enforcedStandards": true,
+    "attributionRequired": true
+  },
+  "branches": {
+    "main": {
+      "name": "fresh-main",
+      "purpose": "Production-ready code",
+      "protection": true,
+      "requiredReviews": 2,
+      "statusChecks": ["test-all", "lint", "security-audit"]
+    },
+    "develop": {
+      "name": "development",
+      "purpose": "Integration branch for features",
+      "protection": true,
+      "requiredReviews": 1,
+      "statusChecks": ["test-unit", "lint"]
+    },
+    "feature": {
+      "prefix": "feature/",
+      "purpose": "New feature development",
+      "fromBranch": "development",
+      "autoDelete": true
+    },
+    "hotfix": {
+      "prefix": "hotfix/",
+      "purpose": "Critical production fixes",
+      "fromBranch": "fresh-main",
+      "autoDelete": false,
+      "requiredReviews": 2
+    },
+    "release": {
+      "prefix": "release/",
+      "purpose": "Release preparation",
+      "fromBranch": "development",
+      "autoDelete": true
+    }
+  },
+  "commitMessageStandards": {
+    "format": "type(scope): description - @agent1 @agent2",
+    "enforced": true,
+    "types": [
+      "feat", "fix", "docs", "style", "refactor",
+      "test", "chore", "perf", "ci", "build", "revert"
+    ],
+    "scopes": [
+      "mikrotik", "payments", "whatsapp", "database",
+      "api", "frontend", "auth", "vouchers", "pppoe",
+      "customers", "subscriptions", "plugins", "security",
+      "performance", "ui", "backup", "monitoring"
+    ],
+    "examples": [
+      "feat(mikrotik): implement PPPoE user lifecycle management - @network-engineer @database-admin",
+      "fix(payments): resolve DuitKu callback timeout issue - @payment-systems-expert @api-architect",
+      "feat(whatsapp): add multi-session load balancing - @messaging-specialist @network-engineer",
+      "test(database): comprehensive migration test suite - @database-admin @test-automation-expert",
+      "docs(api): update Mikrotik integration documentation - @documentation-specialist @network-engineer",
+      "perf(vouchers): optimize batch generation performance - @performance-optimizer @nodejs-expert",
+      "fix(auth): resolve JWT session validation bug - @security-specialist @software-engineering-expert",
+      "feat(plugins): implement sandbox environment for payment plugins - @plugin-developer @security-specialist"
+    ]
+  },
+  "pullRequestRequirements": {
+    "template": "mikrotik-billing-pr-template",
+    "requiredSections": [
+      "## Summary",
+      "## Test Plan",
+      "## Mikrotik Impact",
+      "## Database Changes",
+      "## Security Considerations",
+      "## Backward Compatibility"
+    ],
+    "agentAttribution": {
+      "required": true,
+      "format": "Contributing Agents: @agent1, @agent2",
+      "validateAgents": true
+    },
+    "automatedChecks": [
+      {
+        "name": "Code Quality",
+        "check": "npm run lint",
+        "required": true
+      },
+      {
+        "name": "Unit Tests",
+        "check": "npm run test:unit",
+        "required": true
+      },
+      {
+        "name": "Integration Tests",
+        "check": "npm run test:integration",
+        "required": true
+      },
+      {
+        "name": "E2E Tests",
+        "check": "npm run test:e2e",
+        "required": false
+      },
+      {
+        "name": "Security Audit",
+        "check": "npm audit --audit-level moderate",
+        "required": true
+      },
+      {
+        "name": "Mikrotik Integration Test",
+        "check": "node scripts/test-mikrotik-integration.js",
+        "required": true
+      }
+    ]
+  },
+  "agentWorkflows": {
+    "featureDevelopment": {
+      "steps": [
+        "Create feature branch from development",
+        "Assign lead agent based on feature scope",
+        "Implement feature with agent coordination",
+        "Run comprehensive tests",
+        "Create pull request with agent attribution",
+        "Code review by specialist agents",
+        "Merge to development after approval"
+      ],
+      "estimatedDuration": "4-8 hours"
+    },
+    "hotfixProcess": {
+      "steps": [
+        "Create hotfix branch from fresh-main",
+        "Assign emergency response agents",
+        "Implement critical fix",
+        "Run essential tests only",
+        "Create pull request with critical label",
+        "Expedited review by system experts",
+        "Merge to fresh-main and cherry-pick to development"
+      ],
+      "estimatedDuration": "1-2 hours"
+    },
+    "releaseProcess": {
+      "steps": [
+        "Create release branch from development",
+        "Final testing and validation",
+        "Update version numbers",
+        "Generate release notes with agent credits",
+        "Merge to fresh-main",
+        "Tag release with semantic version",
+        "Deploy to production"
+      ],
+      "estimatedDuration": "2-3 hours"
+    }
+  },
+  "qualityGates": {
+    "codeQuality": {
+      "eslintScore": ">=8/10",
+      "complexityLimit": 10,
+      "coverageThreshold": "80%"
+    },
+    "testing": {
+      "unitTests": "100% pass rate",
+      "integrationTests": "100% pass rate",
+      "e2eTests": "95% pass rate"
+    },
+    "security": {
+      "vulnerabilities": "0 high/critical",
+      "dependencyAudit": "clean",
+      "apiSecurity": "validated"
+    },
+    "performance": {
+      "responseTime": "<200ms",
+      "memoryUsage": "<512MB",
+      "cpuUsage": "<70%"
+    }
+  },
+  "integrationWithTaskMaster": {
+    "autoAssignment": true,
+    "workflowTriggers": [
+      "pull-request-created",
+      "branch-merged",
+      "test-failed",
+      "security-vulnerability"
+    ],
+    "agentCoordination": {
+      "codeReview": "@code-reviewer",
+      "securityReview": "@security-specialist",
+      "databaseReview": "@database-admin",
+      "apiReview": "@api-architect",
+      "performanceReview": "@performance-optimizer"
+    }
+  },
+  "branchProtectionRules": {
+    "fresh-main": {
+      "requiredStatusChecks": [
+        "lint",
+        "test-unit",
+        "test-integration",
+        "security-audit",
+        "mikrotik-integration-test"
+      ],
+      "requiredApprovingReviewCount": 2,
+      "enforceAdmins": true,
+      "requireLinearHistory": true,
+      "allowForcePushes": false,
+      "allowDeletions": false
+    },
+    "development": {
+      "requiredStatusChecks": [
+        "lint",
+        "test-unit"
+      ],
+      "requiredApprovingReviewCount": 1,
+      "enforceAdmins": false,
+      "requireLinearHistory": false,
+      "allowForcePushes": true,
+      "allowDeletions": true
+    }
+  }
+}

@@ -70,43 +70,23 @@
                             <option value="a4" <%= settings?.template_type === 'a4' ? 'selected' : '' %>>A4 (Kertas Standar)</option>
                             <option value="thermal" <%= settings?.template_type === 'thermal' ? 'selected' : '' %>>Thermal Printer (80mm)</option>
                         </select>
-                        <p class="text-sm text-slate-500 mt-1">Pilih jenis template</p>
+                        <p class="text-sm text-slate-500 mt-1">Pilih jenis template: A4 atau Thermal</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-2">Nama Template</label>
-                        <input type="text" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="templateName" name="template_name"
-                               value="<%= settings?.template_name || 'Default' %>"
-                               placeholder="Nama template">
-                        <p class="text-sm text-slate-500 mt-1">Nama untuk identifikasi template</p>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Template Default untuk Print</label>
+                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="printTemplateType" name="print_template_type">
+                            <option value="a4" <%= settings?.print_template_type === 'a4' ? 'selected' : '' %>>A4 (Kertas Standar)</option>
+                            <option value="thermal" <%= settings?.print_template_type === 'thermal' ? 'selected' : '' %>>Thermal Printer (80mm)</option>
+                        </select>
+                        <p class="text-sm text-slate-500 mt-1">Template yang akan digunakan saat mencetak voucher</p>
                     </div>
                 </div>
 
-                <div class="border-t pt-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-300 mb-2">Template Default untuk Print</label>
-                            <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="printTemplateType" name="print_template_type">
-                                <option value="a4" <%= settings?.print_template_type === 'a4' ? 'selected' : '' %>>A4 (Kertas Standar)</option>
-                                <option value="thermal" <%= settings?.print_template_type === 'thermal' ? 'selected' : '' %>>Thermal Printer (80mm)</option>
-                            </select>
-                            <p class="text-sm text-slate-500 mt-1">Template yang akan digunakan saat mencetak voucher</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-300 mb-2">Status Template Default</label>
-                            <div class="flex items-center space-x-2">
-                                <span class="px-3 py-1 text-xs font-semibold rounded-full <%= settings?.print_template_type === 'thermal' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400' %>">
-                                    <%= settings?.print_template_type === 'thermal' ? 'Thermal' : 'A4' %>
-                                </span>
-                            </div>
-                            <p class="text-sm text-slate-500 mt-1">Template yang aktif digunakan untuk print voucher</p>
-                        </div>
-                    </div>
-                </div>
-
+  
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-2">Template HTML</label>
                     <textarea class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm" id="templateContent" name="template_content"
-                              rows="25" required><%= settings?.template_type === 'thermal' ? (settings?.template_thermal || '') : (settings?.template_a4 || '') %></textarea>
+                              rows="25" required><%= currentTemplate || '' %></textarea>
                     <div class="mt-2">
                         <p class="text-sm text-slate-400">
                             <strong>Variabel yang tersedia:</strong> {KodeVoucher}, {NamaPerusahaan}, {DurasiHari}, {TanggalExpired}, {HargaJual}
@@ -674,12 +654,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Template type change handler
-    templateType.addEventListener('change', function() {
+    templateType.addEventListener('change', async function() {
         const newType = this.value;
         const shouldLoad = confirm(`Apakah Anda ingin memuat template ${newType.toUpperCase()}?`);
         if (shouldLoad) {
-            // This would typically load from server, but for now we'll just update preview
-            updatePreview();
+            try {
+                // Load template from server
+                const response = await fetch(`/api/templates/default/${newType}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    templateContent.value = data.template;
+                    updatePreview();
+                    showToast(`Template ${newType.toUpperCase()} berhasil dimuat`, 'success');
+                } else {
+                    showToast('Gagal memuat template: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showToast('Gagal memuat template: ' + error.message, 'error');
+            }
         }
     });
 
@@ -688,7 +681,6 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const templateTypeValue = templateType.value;
             const templateContentValue = templateContent.value;
-            const templateNameValue = document.getElementById('templateName').value;
             const printTemplateTypeValue = document.getElementById('printTemplateType').value;
 
             // Show loading state
@@ -707,7 +699,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     template_type: templateTypeValue,
                     template_content: templateContentValue,
-                    template_name: templateNameValue,
                     print_template_type: printTemplateTypeValue
                 })
             });
@@ -760,11 +751,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Reset template
-    function resetTemplate() {
+    async function resetTemplate() {
         if (confirm('Apakah Anda yakin ingin mereset template ke default?')) {
-            templateContent.value = '';
-            updatePreview();
-            showToast('Template telah direset ke default', 'info');
+            try {
+                const templateType = document.getElementById('templateType').value;
+                const response = await fetch(`/api/templates/default/${templateType}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    templateContent.value = data.template;
+                    updatePreview();
+                    showToast(`Template ${templateType.toUpperCase()} telah direset ke default`, 'success');
+                } else {
+                    throw new Error(data.message || 'Gagal mengambil template default');
+                }
+            } catch (error) {
+                showToast('Gagal mereset template: ' + error.message, 'error');
+            }
         }
     }
 

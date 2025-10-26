@@ -32,9 +32,37 @@ async function profileRoutes(fastify, options) {
         ORDER BY p.profile_type, p.name
       `, params);
 
+    // Check sync status with Mikrotik for each profile
+    const connectionInfo = fastify.mikrotik.getConnectionInfo();
+    let mikrotikProfiles = [];
+
+    if (connectionInfo.connected) {
+      try {
+        if (!type || type === 'hotspot') {
+          const hotspotProfiles = await fastify.mikrotik.getHotspotProfiles();
+          mikrotikProfiles = mikrotikProfiles.concat(hotspotProfiles);
+        }
+        if (!type || type === 'pppoe') {
+          const pppoeProfiles = await fastify.mikrotik.getPPPoEProfiles();
+          mikrotikProfiles = mikrotikProfiles.concat(pppoeProfiles);
+        }
+      } catch (error) {
+        console.error('Error checking Mikrotik profiles:', error);
+      }
+    }
+
+    // Add sync status to each profile
+    const profilesWithSync = profiles.rows.map(profile => {
+      const existsInMikrotik = mikrotikProfiles.some(mp => mp.name === profile.name);
+      return {
+        ...profile,
+        is_synced: existsInMikrotik
+      };
+    });
+
       return reply.view('profiles/index', {
         admin: request.admin,
-        profiles,
+        profiles: profilesWithSync,
         type
       });
     } catch (error) {
@@ -140,35 +168,12 @@ async function profileRoutes(fastify, options) {
 
       return reply.redirect('/profiles?success=Profile created successfully');
     } catch (error) {
-      fastify.log.error(error);
+      console.error('Error creating profile:', error);
       return reply.view('profiles/create', {
         admin: request.admin,
         profile: { name, type, bandwidth_up, bandwidth_down, time_limit, price_sell, price_cost, managed_by },
-        error: 'Failed to create profile'
+        error: 'Failed to create profile: ' + error.message
       });
-    }
-  });
-
-  // Edit profile form
-  fastify.get('/:id/edit', {
-    preHandler: [auth.requireRole(['admin'])]
-  }, async (request, reply) => {
-    try {
-      const profileResult = await db.query('SELECT * FROM profiles WHERE id = $1', [request.params.id]);
-
-      if (!profileResult.rows || profileResult.rows.length === 0) {
-        return reply.code(404).send('Profile not found');
-      }
-
-      const profile = profileResult.rows[0];
-
-      return reply.view('profiles/edit', {
-        admin: request.admin,
-        profile
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.code(500).send('Internal Server Error');
     }
   });
 
@@ -176,21 +181,28 @@ async function profileRoutes(fastify, options) {
   fastify.put('/:id', {
     preHandler: [auth.requireRole(['admin'])]
   }, async (request, reply) => {
+    const { id } = request.params;
     const { name, type, bandwidth_up, bandwidth_down, time_limit, price_sell, price_cost, managed_by } = request.body;
 
     try {
-      // Check if profile name exists (excluding current)
-      const existing = await db.query(`SELECT id FROM profiles WHERE name = $1 AND id != $2`, [name, request.params.id]);
-
-      if (existing.rows && existing.rows.length > 0) {
-        return reply.code(400).send({ error: 'Profile name already exists' });
+      // Check if profile exists
+      const existing = await db.query(`SELECT id FROM profiles WHERE id = $1`, [id]);
+      if (!existing.rows || existing.rows.length === 0) {
+        return reply.code(404).send({ success: false, message: 'Profile not found' });
       }
 
-      // Update profile
+      // Check if new name conflicts with existing profiles (excluding current)
+      const nameConflict = await db.query(`SELECT id FROM profiles WHERE name = $1 AND id != $2`, [name, id]);
+      if (nameConflict.rows && nameConflict.rows.length > 0) {
+        return reply.send({ success: false, message: 'Profile name already exists' });
+      }
+
+      // Update profile in database
       await db.query(`
         UPDATE profiles
         SET name = $1, profile_type = $2, cost_price = $3, selling_price = $4,
-            speed_limit = $5, data_limit = $6, mikrotik_name = $7, updated_at = CURRENT_TIMESTAMP
+            speed_limit = $5, data_limit = $6, updated_at = CURRENT_TIMESTAMP,
+            mikrotik_name = $7
         WHERE id = $8
       `, [
         name,
@@ -200,15 +212,46 @@ async function profileRoutes(fastify, options) {
         bandwidth_down ? `${bandwidth_up}/${bandwidth_down}` : null,
         time_limit,
         name,
-        request.params.id
+        id
       ]);
+
+      // Check Mikrotik connection and update RouterOS
+      const connectionInfo = fastify.mikrotik.getConnectionInfo();
+      if (connectionInfo.connected) {
+        try {
+          // Update profile in RouterOS
+          if (type === 'hotspot') {
+            await fastify.mikrotik.updateHotspotProfile(name, price_sell, price_cost);
+            // Re-inject scripts
+            try {
+              await fastify.mikrotik.injectHotspotProfileScripts(name);
+              console.log(`HIJINETWORK: Scripts re-injected into hotspot profile: ${name}`);
+            } catch (scriptError) {
+              console.error('Error re-injecting scripts:', scriptError);
+            }
+          } else if (type === 'pppoe') {
+            await fastify.mikrotik.updatePPPoEProfile(name, price_sell, price_cost);
+            // Re-inject scripts
+            try {
+              await fastify.mikrotik.injectPPPoEProfileScripts(name);
+              console.log(`HIJINETWORK: Scripts re-injected into PPPoE profile: ${name}`);
+            } catch (scriptError) {
+              console.error('Error re-injecting scripts:', scriptError);
+            }
+          }
+          console.log(`HIJINETWORK: Profile ${name} updated and synced to RouterOS successfully`);
+        } catch (mikrotikError) {
+          console.error('Error updating profile in RouterOS:', mikrotikError);
+          // Profile updated in database but not in RouterOS
+        }
+      }
 
       // Log activity
       await auth.logActivity(
         request.admin.id,
         'update_profile',
         'profile',
-        request.params.id,
+        id,
         { name, type, price_sell, price_cost },
         request
       );
@@ -216,150 +259,7 @@ async function profileRoutes(fastify, options) {
       return reply.send({ success: true, message: 'Profile updated successfully' });
     } catch (error) {
       fastify.log.error(error);
-      throw error;
-    }
-  });
-
-  // Update profile (POST for backward compatibility)
-  fastify.post('/:id', {
-    preHandler: [auth.requireRole(['admin'])]
-  }, async (request, reply) => {
-    const { name, type, bandwidth_up, bandwidth_down, time_limit, price_sell, price_cost, managed_by } = request.body;
-
-    try {
-      // Check if profile name exists (excluding current)
-      const existing = await db.query(`SELECT id FROM profiles WHERE name = $1 AND id != $2`, [name, request.params.id]);
-
-      if (existing.rows && existing.rows.length > 0) {
-        return reply.view('profiles/edit', {
-          admin: request.admin,
-          profile: { id: request.params.id, name, type, bandwidth_up, bandwidth_down, time_limit, price_sell, price_cost, managed_by },
-          error: 'Profile name already exists'
-        });
-      }
-
-      // Update profile
-      await db.query(`
-        UPDATE profiles
-        SET name = $1, profile_type = $2, cost_price = $3, selling_price = $4,
-            speed_limit = $5, data_limit = $6, mikrotik_name = $7, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $8
-      `, [
-        name,
-        type,
-        price_cost || 0,
-        price_sell || 0,
-        bandwidth_down ? `${bandwidth_up}/${bandwidth_down}` : null,
-        time_limit,
-        name,
-        request.params.id
-      ]);
-
-      // Log activity
-      await auth.logActivity(
-        request.admin.id,
-        'update_profile',
-        'profile',
-        request.params.id,
-        { name, type, price_sell, price_cost },
-        request
-      );
-
-      return reply.redirect('/profiles?success=Profile updated successfully');
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.view('profiles/edit', {
-        admin: request.admin,
-        profile: { id: request.params.id, name, type, bandwidth_up, bandwidth_down, time_limit, price_sell, price_cost, managed_by },
-        error: 'Failed to update profile'
-      });
-    }
-  });
-
-  // Sync with Mikrotik
-  fastify.post('/:id/sync', {
-    preHandler: [auth.requireRole(['admin'])]
-  }, async (request, reply) => {
-    try {
-      const profileResult = await db.query('SELECT * FROM profiles WHERE id = $1', [request.params.id]);
-
-      if (!profileResult.rows || profileResult.rows.length === 0) {
-        return reply.code(404).send('Profile not found');
-      }
-
-      const profile = profileResult.rows[0];
-
-      // Check Mikrotik connection
-      const connectionInfo = fastify.mikrotik.getConnectionInfo();
-      if (!connectionInfo.connected) {
-        fastify.log.error('Mikrotik connection not established:', connectionInfo);
-        return reply.redirect('/profiles?error=Mikrotik connection not established. Check connection settings.');
-      }
-
-      // Use profile name directly as Mikrotik profile name
-      if (!profile.name) {
-        return reply.redirect('/profiles?error=Profile name is required');
-      }
-
-      // Sync profile with Mikrotik
-      let mikrotikProfiles = [];
-      try {
-        if (profile.profile_type === 'hotspot') {
-          mikrotikProfiles = await fastify.mikrotik.getHotspotProfiles();
-          fastify.log.info(`Found ${mikrotikProfiles.length} hotspot profiles in Mikrotik`);
-        } else if (profile.profile_type === 'pppoe') {
-          mikrotikProfiles = await fastify.mikrotik.getPPPProfiles();
-          fastify.log.info(`Found ${mikrotikProfiles.length} PPP profiles in Mikrotik`);
-        }
-      } catch (mikrotikError) {
-        fastify.log.error('Error fetching profiles from Mikrotik:', mikrotikError);
-        return reply.redirect('/profiles?error=Failed to fetch profiles from Mikrotik: ' + mikrotikError.message);
-      }
-
-      const mikrotikProfile = mikrotikProfiles.find(p => p.name === profile.name);
-
-      if (mikrotikProfile) {
-        // Profile already exists in RouterOS - confirm sync status
-        fastify.log.info(`HIJINETWORK: Profile ${profile.name} found in RouterOS`);
-
-        // For 'system'-managed profiles, inject automatic scripts
-        if (profile.managed_by === 'system') {
-          try {
-            if (profile.profile_type === 'hotspot') {
-              await fastify.mikrotik.injectHotspotProfileScripts(profile.name);
-              fastify.log.info(`HIJINETWORK: Automatic scripts injected into hotspot profile: ${profile.name}`);
-            } else if (profile.profile_type === 'pppoe') {
-              await fastify.mikrotik.injectPPPoEProfileScripts(profile.name);
-              fastify.log.info(`HIJINETWORK: Automatic scripts injected into PPPoE profile: ${profile.name}`);
-            }
-          } catch (scriptError) {
-            fastify.log.error('Error injecting automatic scripts:', scriptError);
-            // Continue with sync even if script injection fails
-          }
-        }
-
-        // Note: mikrotik_synced column doesn't exist in the new schema
-        // await db.update('profiles', { mikrotik_synced: 1 }, { id: request.params.id });
-
-        // Log activity
-        await auth.logActivity(
-          request.admin.id,
-          'sync_profile',
-          'profile',
-          request.params.id,
-          { profile_name: profile.name, profile_type: profile.profile_type, managed_by: profile.managed_by },
-          request
-        );
-
-        fastify.log.info(`Profile ${profile.name} synced successfully with Mikrotik profile ${profile.name}`);
-        return reply.redirect('/profiles?success=Profile synced with Mikrotik successfully');
-      } else {
-        fastify.log.warn(`Profile ${profile.name} not found in Mikrotik. Available profiles:`, mikrotikProfiles.map(p => p.name));
-        return reply.redirect(`/profiles?error=Profile "${profile.name}" not found in Mikrotik. Available profiles: ${mikrotikProfiles.map(p => p.name).join(", ")}`);
-      }
-    } catch (error) {
-      fastify.log.error('Error syncing profile with Mikrotik:', error);
-      return reply.redirect('/profiles?error=Failed to sync profile with Mikrotik: ' + error.message);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
     }
   });
 
@@ -368,275 +268,57 @@ async function profileRoutes(fastify, options) {
     preHandler: [auth.requireRole(['admin'])]
   }, async (request, reply) => {
     try {
-      const profileResult = await db.query('SELECT * FROM profiles WHERE id = $1', [request.params.id]);
+      const { id } = request.params;
 
-      if (!profileResult.rows || profileResult.rows.length === 0) {
-        return reply.code(404).send('Profile not found');
+      // Get profile info for deletion
+      const profile = await db.query('SELECT * FROM profiles WHERE id = $1', [id]);
+      if (!profile.rows || profile.rows.length === 0) {
+        return reply.code(404).send({ success: false, message: 'Profile not found' });
       }
 
-      const profile = profileResult.rows[0];
+      // Check if profile has associated vouchers or PPPoE users
+      const voucherCount = await db.query('SELECT COUNT(*) as count FROM vouchers WHERE profile_id = $1', [id]);
+      const pppoeCount = await db.query('SELECT COUNT(*) as count FROM pppoe_users WHERE profile_id = $1', [id]);
 
-      // Check if profile is in use
-      const inUseResult = await db.query(`
-        SELECT
-          (SELECT COUNT(*) FROM vouchers WHERE profile_id = $1) +
-          (SELECT COUNT(*) FROM pppoe_users WHERE profile_id = $2) as total
-      `, [request.params.id, request.params.id]);
-
-      const inUse = inUseResult.rows[0]?.total || 0;
-
-      if (inUse > 0) {
-        return reply.code(400).send('Cannot delete profile that is in use');
+      if (voucherCount.rows[0].count > 0 || pppoeCount.rows[0].count > 0) {
+        return reply.send({
+          success: false,
+          message: 'Cannot delete profile with associated vouchers or PPPoE users'
+        });
       }
 
-      // Delete profile
-      await db.query('DELETE FROM profiles WHERE id = $1', [request.params.id]);
+      // Delete from Mikrotik if connected
+      const connectionInfo = fastify.mikrotik.getConnectionInfo();
+      if (connectionInfo.connected) {
+        try {
+          const profileData = profile.rows[0];
+          if (profileData.profile_type === 'hotspot') {
+            await fastify.mikrotik.deleteHotspotProfile(profileData.name);
+          } else if (profileData.profile_type === 'pppoe') {
+            await fastify.mikrotik.deletePPPoEProfile(profileData.name);
+          }
+        } catch (mikrotikError) {
+          console.error('Error deleting profile from Mikrotik:', mikrotikError);
+        }
+      }
+
+      // Delete from database
+      await db.query('DELETE FROM profiles WHERE id = $1', [id]);
 
       // Log activity
       await auth.logActivity(
         request.admin.id,
         'delete_profile',
         'profile',
-        request.params.id,
-        { profile_data: profile },
+        id,
+        { name: profile.rows[0].name, type: profile.rows[0].profile_type },
         request
       );
 
-      return reply.send({ success: true });
+      return reply.send({ success: true, message: 'Profile deleted successfully' });
     } catch (error) {
       fastify.log.error(error);
-      throw error;
-    }
-  });
-
-  // Sync all profiles from Mikrotik
-  fastify.post('/sync-all', {
-    preHandler: [auth.requireRole(['admin'])]
-  }, async (request, reply) => {
-    try {
-      // Check Mikrotik connection
-      const connectionInfo = fastify.mikrotik.getConnectionInfo();
-      if (!connectionInfo.connected) {
-        fastify.log.error('Mikrotik connection not established:', connectionInfo);
-        return reply.redirect('/profiles?error=Mikrotik connection not established. Check connection settings.');
-      }
-
-      let syncedCount = 0;
-      let hotspotCount = 0;
-      let pppCount = 0;
-
-      // Sync hotspot profiles
-      try {
-        const hotspotProfiles = await fastify.mikrotik.getHotspotProfiles();
-        fastify.log.info(`Found ${hotspotProfiles.length} total hotspot profiles in Mikrotik`);
-
-        // Get existing hotspot profiles from database
-        const existingHotspotProfiles = await db.query(
-          'SELECT name FROM profiles WHERE profile_type = $1', ['hotspot']
-        );
-        const existingNames = existingHotspotProfiles.rows.map(p => p.name);
-
-        // Add profiles that exist in RouterOS but not in database
-        for (const profile of hotspotProfiles) {
-          if (!existingNames.includes(profile.name)) {
-            await db.query(`
-              INSERT INTO profiles (name, profile_type, cost_price, selling_price, managed_by)
-              VALUES ($1, $2, $3, $4, $5)
-            `, [
-              profile.name,
-              'hotspot',
-              0, // Default cost
-              0, // Default price
-              'system'
-            ]);
-
-            // Inject automatic scripts for 'system'-managed profiles
-            try {
-              await fastify.mikrotik.injectHotspotProfileScripts(profile.name);
-              fastify.log.info(`HIJINETWORK: Automatic scripts injected into hotspot profile: ${profile.name}`);
-            } catch (scriptError) {
-              fastify.log.error(`Error injecting scripts for hotspot profile ${profile.name}:`, scriptError);
-            }
-
-            syncedCount++;
-            hotspotCount++;
-            fastify.log.info(`Added hotspot profile: ${profile.name}`);
-          }
-        }
-      } catch (hotspotError) {
-        fastify.log.error('Error syncing hotspot profiles:', hotspotError);
-        return reply.redirect('/profiles?error=Failed to sync hotspot profiles: ' + hotspotError.message);
-      }
-
-      // Sync PPP profiles
-      try {
-        const pppProfiles = await fastify.mikrotik.getPPPProfiles();
-        fastify.log.info(`Found ${pppProfiles.length} total PPP profiles in Mikrotik`);
-
-        // Get existing PPP profiles from database
-        const existingPPPProfiles = await db.query(
-          'SELECT name FROM profiles WHERE profile_type = $1',
-          ['pppoe']
-        );
-        const existingPPNames = existingPPPProfiles.rows.map(p => p.name);
-
-        // Add profiles that exist in RouterOS but not in database
-        for (const profile of pppProfiles) {
-          if (!existingPPNames.includes(profile.name)) {
-            await db.query(`
-              INSERT INTO profiles (name, profile_type, cost_price, selling_price, managed_by)
-              VALUES ($1, $2, $3, $4, $5)
-            `, [
-              profile.name,
-              'pppoe',
-              0, // Default cost
-              0, // Default price
-              'system'
-            ]);
-
-            // Inject automatic scripts for 'system'-managed profiles
-            try {
-              await fastify.mikrotik.injectPPPoEProfileScripts(profile.name);
-              fastify.log.info(`HIJINETWORK: Automatic scripts injected into PPPoE profile: ${profile.name}`);
-            } catch (scriptError) {
-              fastify.log.error(`Error injecting scripts for PPPoE profile ${profile.name}:`, scriptError);
-            }
-
-            syncedCount++;
-            pppCount++;
-            fastify.log.info(`Added PPP profile: ${profile.name}`);
-          }
-        }
-      } catch (pppError) {
-        fastify.log.error('Error syncing PPP profiles:', pppError);
-        return reply.redirect('/profiles?error=Failed to sync PPP profiles: ' + pppError.message);
-      }
-
-      // Log activity
-      await auth.logActivity(
-        request.admin.id,
-        'sync_all_profiles',
-        null,
-        null,
-        {
-          total_synced: syncedCount,
-          hotspot_profiles: hotspotCount,
-          ppp_profiles: pppCount
-        },
-        request
-      );
-
-      fastify.log.info(`Sync completed: ${syncedCount} profiles added (${hotspotCount} 'hotspot', ${pppCount} PPP)`);
-
-      // After sync, automatically inject scripts to all 'system'-managed profiles
-      setTimeout(async () => {
-        try {
-          const systemProfiles = await db.query(`
-            SELECT id, name, profile_type
-            FROM profiles
-            WHERE managed_by = 'system'
-          `);
-
-          fastify.log.info(`HIJINETWORK: Auto-injecting scripts to ${systemProfiles.length} system-managed profiles after sync...`);
-
-          for (const profile of systemProfiles.rows) {
-            try {
-              if (profile.profile_type === 'hotspot') {
-                await fastify.mikrotik.injectHotspotProfileScripts(profile.name);
-                fastify.log.info(`HIJINETWORK: Auto-injected scripts into hotspot profile: ${profile.name}`);
-              } else if (profile.profile_type === 'pppoe') {
-                await fastify.mikrotik.injectPPPoEProfileScripts(profile.name);
-                fastify.log.info(`HIJINETWORK: Auto-injected scripts into PPPoE profile: ${profile.name}`);
-              }
-            } catch (scriptError) {
-              fastify.log.error(`HIJINETWORK: Error auto-injecting scripts for profile ${profile.name}:`, scriptError);
-            }
-          }
-
-          fastify.log.info(`HIJINETWORK: Auto script injection after sync completed`);
-        } catch (error) {
-          fastify.log.error('HIJINETWORK: Error during auto script injection after sync:', error);
-        }
-      }, 1000);
-
-      return reply.redirect(`/profiles?success=Sync completed successfully. Added ${syncedCount} new profiles (${hotspotCount} hotspot, ${pppCount} PPP)`);
-    } catch (error) {
-      fastify.log.error('Error syncing profiles:', error);
-      return reply.redirect('/profiles?error=Failed to sync profiles: ' + error.message);
-    }
-  });
-
-  // Inject scripts to all existing synced profiles
-  fastify.post('/inject-scripts', {
-    preHandler: [auth.requireRole(['admin'])]
-  }, async (request, reply) => {
-    try {
-      let injectedCount = 0;
-      let hotspotCount = 0;
-      let pppoeCount = 0;
-
-      // Get all system-managed profiles that are synced
-      const systemProfiles = await db.query(`
-        SELECT id, name, profile_type
-        FROM profiles
-        WHERE managed_by = 'system'
-      `);
-
-      fastify.log.info(`Found ${systemProfiles.rows.length} system-managed synced profiles to check for script injection`);
-
-      for (const profile of systemProfiles.rows) {
-        try {
-          if (profile.profile_type === 'hotspot') {
-            await fastify.mikrotik.injectHotspotProfileScripts(profile.name);
-            fastify.log.info(`HIJINETWORK: Scripts injected into hotspot profile: ${profile.name}`);
-            hotspotCount++;
-          } else if (profile.profile_type === 'pppoe') {
-            await fastify.mikrotik.injectPPPoEProfileScripts(profile.name);
-            fastify.log.info(`HIJINETWORK: Scripts injected into PPPoE profile: ${profile.name}`);
-            pppoeCount++;
-          }
-          injectedCount++;
-
-          // Log script injection activity
-          await auth.logActivity(
-            request.admin.id,
-            'script_injection',
-            'profile',
-            profile.id,
-            {
-              profile_name: profile.name,
-              profile_type: profile.type,
-              action: 'script_injection_existing'
-            },
-            request
-          );
-
-        } catch (scriptError) {
-          fastify.log.error(`Error injecting scripts for profile ${profile.name}:`, scriptError);
-          // Continue with other profiles even if one fails
-        }
-      }
-
-      // Log activity
-      await auth.logActivity(
-        request.admin.id,
-        'bulk_script_injection',
-        null,
-        null,
-        {
-          total_profiles: systemProfiles.length,
-          successfully_injected: injectedCount,
-          hotspot_profiles: hotspotCount,
-          pppoe_profiles: pppoeCount
-        },
-        request
-      );
-
-      fastify.log.info(`Script injection completed: ${injectedCount}/${systemProfiles.rows.length} profiles injected scripts (${hotspotCount} hotspot, ${pppCount} PPP)`);
-      return reply.redirect(`/profiles?success=Script injection completed successfully. Injected scripts to ${injectedCount} profiles (${hotspotCount} hotspot, ${pppCount} PPP)`);
-    } catch (error) {
-      fastify.log.error('Error injecting scripts to profiles:', error);
-      return reply.redirect('/profiles?error=Failed to inject scripts: ' + error.message);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
     }
   });
 }

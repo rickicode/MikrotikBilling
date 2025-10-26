@@ -43,7 +43,9 @@ class AlertingService {
       condition: (metrics) => {
         // Handle both old and new metric structures
         const memoryUsage = metrics?.metrics?.memory?.percentage || metrics?.system?.memory || 0;
-        return memoryUsage > 85;
+        // Be more lenient in development environment
+        const threshold = process.env.NODE_ENV === 'production' ? 85 : 95;
+        return memoryUsage > threshold;
       },
       threshold: 85,
       duration: 300,
@@ -201,6 +203,10 @@ class AlertingService {
       severity: 'warning',
       condition: (metrics) => {
         const lastBackup = metrics?.backup?.lastSuccessful;
+        // Skip backup alerts in development environment
+        if (process.env.NODE_ENV !== 'production') {
+          return false;
+        }
         return !lastBackup || (Date.now() - lastBackup) > 86400000; // 24 hours
       },
       threshold: 86400000,

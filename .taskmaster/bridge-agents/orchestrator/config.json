@@ -1,0 +1,49 @@
+{
+  "name": "Task Orchestrator",
+  "type": "bridge-agent",
+  "domain": "mikrotik-billing",
+  "capabilities": [
+    "workflow-orchestration",
+    "agent-coordination",
+    "task-prioritization",
+    "resource-allocation"
+  ],
+  "orchestrationRules": {
+    "priorityMatrix": {
+      "critical": ["mikrotik-connection-failure", "payment-gateway-down", "database-unreachable"],
+      "high": ["voucher-generation-failure", "whatsapp-session-lost", "user-authentication-issues"],
+      "medium": ["performance-optimization", "ui-enhancements", "documentation-updates"],
+      "low": ["code-cleanup", "minor-bug-fixes", "refactoring"]
+    },
+    "agentAssignment": {
+      "mikrotik-tasks": ["@network-engineer", "@api-architect"],
+      "payment-tasks": ["@payment-systems-expert", "@plugin-developer"],
+      "database-tasks": ["@database-admin", "@performance-optimizer"],
+      "whatsapp-tasks": ["@messaging-specialist", "@network-engineer"],
+      "frontend-tasks": ["@frontend-optimization-expert", "@code-reviewer"]
+    },
+    "dependencies": {
+      "mikrotik": ["database-connection", "api-credentials"],
+      "payments": ["database-connection", "plugin-configuration"],
+      "whatsapp": ["session-management", "template-system"],
+      "voucher-generation": ["mikrotik-profiles", "pricing-configuration"]
+    }
+  },
+  "coordinationStrategies": {
+    "parallelExecution": ["ui-updates", "documentation", "testing"],
+    "sequentialExecution": ["database-migrations", "mikrotik-integration"],
+    "resourceContention": ["mikrotik-api-calls", "whatsapp-sessions", "payment-gateways"]
+  },
+  "monitoring": {
+    "trackWorkflows": true,
+    "agentPerformance": true,
+    "resourceUsage": true,
+    "bottleneckDetection": true
+  },
+  "escalationRules": {
+    "failureThreshold": 3,
+    "timeoutMinutes": 30,
+    "autoEscalation": true,
+    "notificationChannels": ["console", "logs", "admin-alerts"]
+  }
+}

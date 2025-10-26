@@ -234,7 +234,7 @@ class ProfileManager {
 
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center text-muted">
+                    <td colspan="8" class="text-center text-muted">
                         <div class="spinner-border spinner-border-sm me-2" role="status"></div>
                         Memuat data...
                     </td>
@@ -250,13 +250,24 @@ class ProfileManager {
             const response = await fetch(`/api/profiles?${params}`);
             const result = await response.json();
 
+            if (response.status === 401) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-warning">
+                            <i class="bi bi-exclamation-triangle"></i> Sesi telah berakhir, <a href="/login" class="text-primary">login kembali</a>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
             if (result.success) {
                 this.renderProfilesTable(result.data);
                 this.renderPagination(result.pagination);
             } else {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="text-center text-danger">
+                        <td colspan="8" class="text-center text-danger">
                             <i class="bi bi-exclamation-triangle"></i> ${result.message || 'Gagal memuat data'}
                         </td>
                     </tr>
@@ -268,7 +279,7 @@ class ProfileManager {
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="text-center text-danger">
+                        <td colspan="8" class="text-center text-danger">
                             <i class="bi bi-exclamation-triangle"></i> Kesalahan koneksi
                         </td>
                     </tr>
@@ -284,7 +295,7 @@ class ProfileManager {
         if (profiles.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center text-muted">
+                    <td colspan="8" class="text-center text-muted">
                         <i class="bi bi-inbox"></i> Tidak ada data profil
                     </td>
                 </tr>
@@ -293,50 +304,53 @@ class ProfileManager {
         }
 
         tbody.innerHTML = profiles.map(profile => `
-            <tr>
-                <td>${profile.id}</td>
-                <td>
-                    <strong>${this.escapeHtml(profile.name)}</strong>
-                                    </td>
-                <td>
-                    <span class="badge bg-${profile.profile_type === 'hotspot' ? 'primary' : 'warning'}">
-                        <i class="bi bi-${profile.profile_type === 'hotspot' ? 'wifi' : 'ethernet'}"></i>
+            <tr class="hover:bg-slate-700/50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="text-slate-300">${profile.id}</span>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-white font-medium">${this.escapeHtml(profile.name)}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${profile.profile_type === 'hotspot' ? 'blue' : 'yellow'}-100 text-${profile.profile_type === 'hotspot' ? 'blue' : 'yellow'}-800">
+                        <i class="fas fa-${profile.profile_type === 'hotspot' ? 'wifi' : 'network-wired'} mr-1"></i>
                         ${(profile.profile_type || '').toUpperCase()}
                     </span>
                 </td>
-                <td>
-                    ${profile.bandwidth_up || profile.bandwidth_down ?
-                        `<small>${profile.bandwidth_up || '-'}/${profile.bandwidth_down || '-'}</small>` :
-                        '<span class="text-muted">-</span>'
-                    }
-                    ${profile.burst_up || profile.burst_down ?
-                        `<br><small class="text-warning">burst: ${profile.burst_up || '-'}/${profile.burst_down || '-'}</small>` :
-                        ''
-                    }
+                <td class="px-6 py-4">
+                    <div class="text-sm text-slate-300">
+                        ${profile.bandwidth_up || profile.bandwidth_down ?
+                            `<div>${profile.bandwidth_up || '-'}/${profile.bandwidth_down || '-'}</div>` :
+                            '<div class="text-slate-500">-</div>'
+                        }
+                        ${profile.burst_up || profile.burst_down ?
+                            `<div class="text-xs text-yellow-400">burst: ${profile.burst_up || '-'}/${profile.burst_down || '-'}</div>` :
+                            ''
+                        }
+                    </div>
                 </td>
-                <td>Rp ${Number(profile.selling_price || 0).toLocaleString('id-ID')}</td>
-                <td>Rp ${Number(profile.cost_price || 0).toLocaleString('id-ID')}</td>
-                <td>
-                    <span class="badge bg-${profile.managed_by === 'system' ? 'success' : 'secondary'}">
-                        <i class="bi bi-${profile.managed_by === 'system' ? 'gear' : 'person'}"></i>
-                        ${profile.managed_by === 'system' ? 'System' : 'Manual'}
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-white">Rp ${Number(profile.selling_price || 0).toLocaleString('id-ID')}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-slate-300">Rp ${Number(profile.cost_price || 0).toLocaleString('id-ID')}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${profile.is_synced ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                        <i class="fas fa-${profile.is_synced ? 'check-circle' : 'exclamation-triangle'} mr-1"></i>
+                        ${profile.is_synced ? 'Tersinkron' : 'Belum Sync'}
                     </span>
                 </td>
-                <td>
-                    <span class="badge bg-success">
-                        <i class="bi bi-check-circle"></i> Tersinkron
-                    </span>
-                </td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary" onclick="profileManager.editProfile(${profile.id})" title="Edit">
-                            <i class="bi bi-pencil"></i>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div class="flex justify-end space-x-2">
+                        <button onclick="profileManager.editProfile(${profile.id})" class="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 p-2 rounded-lg transition-colors" title="Edit">
+                            <i class="fas fa-edit"></i>
                         </button>
-                        <button class="btn btn-outline-success" onclick="profileManager.syncProfile(${profile.id})" title="Sync dengan Mikrotik">
-                            <i class="bi bi-arrow-clockwise"></i>
+                        <button onclick="profileManager.syncProfile(${profile.id})" class="text-green-400 hover:text-green-300 hover:bg-green-900/20 p-2 rounded-lg transition-colors" title="Sync dengan Mikrotik">
+                            <i class="fas fa-sync"></i>
                         </button>
-                        <button class="btn btn-outline-danger" onclick="profileManager.deleteProfile(${profile.id})" title="Hapus">
-                            <i class="bi bi-trash"></i>
+                        <button onclick="profileManager.deleteProfile(${profile.id})" class="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-2 rounded-lg transition-colors" title="Hapus">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </td>
@@ -465,24 +479,96 @@ class ProfileManager {
             const response = await fetch('/api/profiles/stats');
             const result = await response.json();
 
-            if (result.success) {
-                document.getElementById('totalProfiles').innerHTML = result.data.total;
-                document.getElementById('hotspotProfiles').innerHTML = result.data.hotspot;
-                document.getElementById('pppoeProfiles').innerHTML = result.data.pppoe;
+            if (response.status === 401) {
+                console.warn('Session expired for stats, user needs to re-login');
+                return;
+            }
 
-                const syncStatus = document.getElementById('syncStatus');
-                let syncPercentage = 0;
-                if (result.data.total > 0) {
-                    syncPercentage = (result.data.synced / result.data.total * 100).toFixed(0);
+            if (result.success) {
+                // Update total profiles with counter animation
+                const totalEl = document.getElementById('totalProfiles');
+                if (totalEl) {
+                    const target = result.data.total || 0;
+                    totalEl.dataset.target = target;
+                    totalEl.textContent = target;
+                    if (window.animateCounter && target > 0) {
+                        window.animateCounter(totalEl, target);
+                    }
                 }
-                syncStatus.innerHTML = `
-                    <span class="badge bg-${syncPercentage == 100 ? 'success' : 'warning'}">
-                        ${syncPercentage}% (${result.data.synced}/${result.data.total})
-                    </span>
-                `;
+
+                // Update hotspot profiles
+                const hotspotEl = document.getElementById('hotspotProfiles');
+                if (hotspotEl) {
+                    const target = result.data.hotspot || 0;
+                    hotspotEl.dataset.target = target;
+                    hotspotEl.textContent = target;
+                    if (window.animateCounter && target > 0) {
+                        window.animateCounter(hotspotEl, target);
+                    }
+                }
+
+                // Update PPPoE profiles
+                const pppoeEl = document.getElementById('pppoeProfiles');
+                if (pppoeEl) {
+                    const target = result.data.pppoe || 0;
+                    pppoeEl.dataset.target = target;
+                    pppoeEl.textContent = target;
+                    if (window.animateCounter && target > 0) {
+                        window.animateCounter(pppoeEl, target);
+                    }
+                }
+
+                // Update sync status with actual sync calculation
+                const syncStatus = document.getElementById('syncStatus');
+                if (syncStatus) {
+                    const total = result.data.total || 0;
+                    const synced = result.data.synced || 0;
+                    const syncPercentage = total > 0 ? Math.round((synced / total) * 100) : 0;
+
+                    syncStatus.innerHTML = `
+                        <span class="px-3 py-1 ${syncPercentage === 100 ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'} rounded-full text-sm font-medium">
+                            ${syncPercentage}% (${synced}/${total})
+                        </span>
+                    `;
+                }
+
+                // Update sync percentage display
+                const syncPercentageEl = document.getElementById('syncPercentage');
+                if (syncPercentageEl) {
+                    const total = result.data.total || 0;
+                    const synced = result.data.synced || 0;
+                    const syncPercentage = total > 0 ? Math.round((synced / total) * 100) : 0;
+                    syncPercentageEl.textContent = `${syncPercentage}%`;
+                }
+
+                // Update percentages
+                this.updatePercentages(result.data);
+            } else {
+                this.setDefaultStats();
             }
         } catch (error) {
             console.error('Error loading stats:', error);
+            this.setDefaultStats();
+        }
+    }
+
+    setDefaultStats() {
+        document.getElementById('totalProfiles').innerHTML = '<span class="text-3xl font-bold text-white">0</span>';
+        document.getElementById('hotspotProfiles').innerHTML = '<span class="text-3xl font-bold text-white">0</span>';
+        document.getElementById('pppoeProfiles').innerHTML = '<span class="text-3xl font-bold text-white">0</span>';
+        document.getElementById('syncStatus').innerHTML = '<span class="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm font-medium">Error</span>';
+    }
+
+    updatePercentages(data) {
+        if (data.total > 0) {
+            const hotspotPercentage = Math.round((data.hotspot / data.total) * 100);
+            const pppoePercentage = Math.round((data.pppoe / data.total) * 100);
+
+            const hotspotPercentageEl = document.getElementById('hotspotPercentage');
+            if (hotspotPercentageEl) hotspotPercentageEl.textContent = `${hotspotPercentage}%`;
+
+            const pppoePercentageEl = document.getElementById('pppoePercentage');
+            if (pppoePercentageEl) pppoePercentageEl.textContent = `${pppoePercentage}%`;
         }
     }
 
@@ -546,8 +632,7 @@ class ProfileManager {
 
         this.toggleProfileTypeFields(profile?.type || '');
 
-        const modalInstance = new bootstrap.Modal(modal);
-        modalInstance.show();
+        modal.classList.remove('hidden');
     }
 
     async saveProfile() {
@@ -562,9 +647,25 @@ class ProfileManager {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
+        // Map form fields to backend field names
+        const mappedData = {
+            name: data.name,
+            type: data.profile_type || data.type,
+            bandwidth_up: data.bandwidth_up,
+            bandwidth_down: data.bandwidth_down,
+            time_limit: data.duration_hours, // Map duration_hours to time_limit
+            price_sell: data.price_sell,
+            price_cost: data.price_cost,
+            managed_by: data.managed_by || 'system',
+            burst_up: data.burst_up,
+            burst_down: data.burst_down,
+            burst_threshold: data.burst_threshold,
+            burst_time: data.burst_time
+        };
+
         // Parse duration_hours - ensure it's a number
-        if (data.duration_hours) {
-            data.duration_hours = parseInt(data.duration_hours) || 0;
+        if (mappedData.time_limit) {
+            mappedData.time_limit = parseInt(mappedData.time_limit) || 0;
         }
 
         try {
@@ -579,14 +680,13 @@ class ProfileManager {
                     'Content-Type': 'application/json',
                     'CSRF-Token': this.getCSRFToken()
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(mappedData)
             });
 
             const result = await response.json();
 
             if (result.success) {
-                const modal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
-                modal.hide();
+                document.getElementById('profileModal').classList.add('hidden');
 
                 this.showToast('Profil berhasil disimpan, menyinkronkan ke RouterOS...', 'success');
 
@@ -650,14 +750,35 @@ class ProfileManager {
             const response = await fetch(`/api/profiles/${id}/sync`, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'CSRF-Token': this.getCSRFToken()
-                }
+                },
+                body: JSON.stringify({})
             });
 
             const result = await response.json();
 
+            if (response.status === 401) {
+                this.showToast('Sesi telah berakhir, silakan login kembali', 'error');
+                // Redirect to login after a short delay
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+                throw new Error('Authentication required');
+            }
+
+            if (response.status === 403) {
+                this.showToast('Anda tidak memiliki izin untuk melakukan sinkronisasi', 'error');
+                throw new Error('Permission denied');
+            }
+
             if (result.success) {
                 this.showToast('Profil berhasil disinkronkan', 'success');
+
+                // Update sync status immediately in the UI without waiting for server refresh
+                this.updateProfileSyncStatus(id, true);
+
+                // Then refresh the full data
                 this.loadProfiles();
                 this.loadStats();
                 return result; // Return result for auto-sync
@@ -666,6 +787,10 @@ class ProfileManager {
             }
         } catch (error) {
             console.error('Error syncing profile:', error);
+            if (error.message === 'Authentication required' || error.message === 'Permission denied') {
+                throw error; // Re-throw authentication errors
+            }
+            this.showToast('Kesalahan koneksi ke server', 'error');
             throw error; // Re-throw for auto-sync error handling
         }
     }
@@ -790,33 +915,45 @@ class ProfileManager {
         }, 30000);
     }
 
+    updateProfileSyncStatus(profileId, isSynced) {
+        // Update sync status immediately in the UI
+        const rows = document.querySelectorAll('#profilesTableBody tr');
+        rows.forEach(row => {
+            const syncButton = row.querySelector(`button[onclick*="syncProfile(${profileId})"]`);
+            if (syncButton) {
+                // Find the sync status cell in this row
+                const cells = row.querySelectorAll('td');
+                cells.forEach(cell => {
+                    if (cell.textContent.includes('Belum Sync') || cell.textContent.includes('Tersinkron')) {
+                        if (isSynced) {
+                            cell.innerHTML = `
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    Tersinkron
+                                </span>
+                            `;
+                        } else {
+                            cell.innerHTML = `
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    Belum Sync
+                                </span>
+                            `;
+                        }
+                    }
+                });
+            }
+        });
+    }
+
     showToast(message, type = 'info') {
-        const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
-
-        const toast = document.createElement('div');
-        toast.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : type} border-0`;
-        toast.setAttribute('role', 'alert');
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        `;
-
-        toastContainer.appendChild(toast);
-
-        const bsToast = new bootstrap.Toast(toast, {
-            autohide: true,
-            delay: 3000
-        });
-
-        bsToast.show();
-
-        toast.addEventListener('hidden.bs.toast', () => {
-            toast.remove();
-        });
+        // Gunakan global toast helper untuk konsistensi
+        if (window.showToast) {
+            window.showToast(message, type);
+        } else {
+            // Fallback jika global toast tidak tersedia
+            console.log(`Toast (${type}): ${message}`);
+        }
     }
 
     createToastContainer() {
@@ -926,6 +1063,9 @@ window.refreshProfiles = function() {
     }
 };
 
+// Global Toast Helper sudah di-load dari toast-helper.js
+// Tidak perlu duplikasi di sini
+
 window.changePage = function(direction) {
     if (window.profileManager) {
         if (direction === 'prev' && window.profileManager.currentPage > 1) {
@@ -941,16 +1081,14 @@ window.changePage = function(direction) {
 window.closeProfileModal = function() {
     const modal = document.getElementById('profileModal');
     if (modal) {
-        const modalInstance = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
-        modalInstance.hide();
+        modal.classList.add('hidden');
     }
 };
 
 window.closeDeleteModal = function() {
     const modal = document.getElementById('deleteConfirmModal');
     if (modal) {
-        const modalInstance = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
-        modalInstance.hide();
+        modal.classList.add('hidden');
     }
 };
 

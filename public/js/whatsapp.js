@@ -1941,3 +1941,277 @@ async function generateQRCodeAutomatically() {
         showError('Terjadi kesalahan saat auto-generate QR code, silakan coba manual');
     }
 }
+
+// Template Management Functions
+
+// Edit template
+function editTemplate(templateId) {
+    try {
+        console.log('Editing template:', templateId);
+
+        // Find template data
+        const template = templates.find(t => t.id === templateId);
+        if (!template) {
+            showError('Template tidak ditemukan');
+            return;
+        }
+
+        // Create edit modal (simplified implementation)
+        const modalHtml = `
+            <div id="editTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-slate-800 rounded-lg p-6 w-full max-w-2xl mx-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Edit Template</h3>
+                        <button onclick="closeEditTemplateModal()" class="text-slate-400 hover:text-white">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <form id="editTemplateForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Nama Template</label>
+                            <input type="text" id="templateName" value="${template.name}"
+                                   class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Kategori</label>
+                            <select id="templateCategory"
+                                    class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                <option value="welcome" ${template.category === 'welcome' ? 'selected' : ''}>Welcome</option>
+                                <option value="payment" ${template.category === 'payment' ? 'selected' : ''}>Payment</option>
+                                <option value="expiry" ${template.category === 'expiry' ? 'selected' : ''}>Expiry</option>
+                                <option value="renewal" ${template.category === 'renewal' ? 'selected' : ''}>Renewal</option>
+                                <option value="general" ${template.category === 'general' ? 'selected' : ''}>General</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Isi Pesan</label>
+                            <textarea id="templateContent" rows="6"
+                                      class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none">${template.content || ''}</textarea>
+                            <p class="text-xs text-slate-500 mt-1">Gunakan {variable_name} untuk variabel dinamis</p>
+                        </div>
+
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" onclick="closeEditTemplateModal()"
+                                    class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Simpan Template
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Setup form submission
+        document.getElementById('editTemplateForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await saveTemplateChanges(templateId);
+        });
+
+    } catch (error) {
+        console.error('Error editing template:', error);
+        showError('Gagal membuka editor template');
+    }
+}
+
+// Close edit template modal
+function closeEditTemplateModal() {
+    const modal = document.getElementById('editTemplateModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Save template changes
+async function saveTemplateChanges(templateId) {
+    try {
+        const formData = {
+            name: document.getElementById('templateName').value,
+            category: document.getElementById('templateCategory').value,
+            content: document.getElementById('templateContent').value
+        };
+
+        const response = await fetch(`/whatsapp/api/templates/${templateId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSuccess('Template berhasil diperbarui');
+            closeEditTemplateModal();
+            loadTemplates(); // Refresh templates list
+        } else {
+            showError(result.message || 'Gagal memperbarui template');
+        }
+    } catch (error) {
+        console.error('Error saving template:', error);
+        showError('Gagal menyimpan perubahan template');
+    }
+}
+
+// Test template with ID
+async function testTemplateWithId(templateId) {
+    try {
+        console.log('Testing template:', templateId);
+
+        // Find template data
+        const template = templates.find(t => t.id === templateId);
+        if (!template) {
+            showError('Template tidak ditemukan');
+            return;
+        }
+
+        // Create test modal
+        const modalHtml = `
+            <div id="testTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-slate-800 rounded-lg p-6 w-full max-w-lg mx-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Test Template</h3>
+                        <button onclick="closeTestTemplateModal()" class="text-slate-400 hover:text-white">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <form id="testTemplateForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Nomor WhatsApp Tujuan</label>
+                            <input type="text" id="testPhone" placeholder="628123456789"
+                                   class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Variabel (JSON)</label>
+                            <textarea id="testVariables" rows="4" placeholder='{"customer_name": "John Doe", "service_type": "Hotspot"}'
+                                      class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"></textarea>
+                        </div>
+
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" onclick="closeTestTemplateModal()"
+                                    class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                    class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+                                Kirim Test
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Setup form submission
+        document.getElementById('testTemplateForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await sendTestMessage(templateId);
+        });
+
+    } catch (error) {
+        console.error('Error testing template:', error);
+        showError('Gagal membuka test template');
+    }
+}
+
+// Close test template modal
+function closeTestTemplateModal() {
+    const modal = document.getElementById('testTemplateModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Send test message
+async function sendTestMessage(templateId) {
+    try {
+        const phone = document.getElementById('testPhone').value;
+        let variables = {};
+
+        try {
+            const variablesText = document.getElementById('testVariables').value;
+            if (variablesText.trim()) {
+                variables = JSON.parse(variablesText);
+            }
+        } catch (e) {
+            showError('Format variabel JSON tidak valid');
+            return;
+        }
+
+        const testData = {
+            template_id: templateId,
+            phone: phone,
+            variables: variables
+        };
+
+        const response = await fetch('/whatsapp/api/send-test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(testData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSuccess('Pesan test berhasil dikirim');
+            closeTestTemplateModal();
+        } else {
+            showError(result.message || 'Gagal mengirim pesan test');
+        }
+    } catch (error) {
+        console.error('Error sending test message:', error);
+        showError('Gagal mengirim pesan test');
+    }
+}
+
+// Delete template
+async function deleteTemplate(templateId) {
+    try {
+        console.log('Deleting template:', templateId);
+
+        // Find template data
+        const template = templates.find(t => t.id === templateId);
+        if (!template) {
+            showError('Template tidak ditemukan');
+            return;
+        }
+
+        // Confirm deletion
+        if (!confirm(`Apakah Anda yakin ingin menghapus template "${template.name}"?`)) {
+            return;
+        }
+
+        const response = await fetch(`/whatsapp/api/templates/${templateId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSuccess('Template berhasil dihapus');
+            loadTemplates(); // Refresh templates list
+        } else {
+            showError(result.message || 'Gagal menghapus template');
+        }
+    } catch (error) {
+        console.error('Error deleting template:', error);
+        showError('Gagal menghapus template');
+    }
+}

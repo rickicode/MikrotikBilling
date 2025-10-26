@@ -1,18 +1,41 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const SecurityConfig = require('../config/security');
 
 class AuthMiddleware {
   constructor(fastify) {
     this.fastify = fastify;
-    this.JWT_SECRET = process.env.JWT_SECRET || 'default-secret';
+    this.securityConfig = new SecurityConfig();
+    this.JWT_SECRET = this.securityConfig.JWT_SECRET;
+    this.loginAttempts = new Map(); // Track login attempts per IP
   }
 
-  // Verify JWT token
+  // Check rate limiting for login attempts
+  checkLoginRateLimit(ip) {
+    const now = Date.now();
+    const attempts = this.loginAttempts.get(ip) || { count: 0, resetTime: now + 15 * 60 * 1000 };
+
+    if (now > attempts.resetTime) {
+      // Reset attempts after 15 minutes
+      attempts.count = 0;
+      attempts.resetTime = now + 15 * 60 * 1000;
+    }
+
+    if (attempts.count >= 5) {
+      return { allowed: false, resetTime: attempts.resetTime };
+    }
+
+    attempts.count++;
+    this.loginAttempts.set(ip, attempts);
+    return { allowed: true, remainingAttempts: 5 - attempts.count };
+  }
+
+  // Verify JWT token with enhanced security
   async verifyToken(request, reply) {
     try {
       const token = request.cookies.token || request.headers.authorization?.split(' ')[1];
 
-  
       if (!token) {
         if (global.securityLogger) {
           global.securityLogger.logAuthentication('token_missing', {
@@ -27,14 +50,30 @@ class AuthMiddleware {
         return reply.redirect('/login');
       }
 
-      const decoded = jwt.verify(token, this.JWT_SECRET);
+      // Verify token with additional security checks
+      const decoded = jwt.verify(token, this.JWT_SECRET, { algorithms: ['HS256'] });
       let admin = null;
       try {
-        const adminRows = await this.fastify.db.query('SELECT id, username, role, permissions FROM admin_users WHERE id = $1', [decoded.id]);
-        admin = adminRows.rows && adminRows.rows.length > 0 ? adminRows.rows[0] : null;
+        // Use improved queryOne method for better error handling
+        admin = await this.fastify.db.queryOne('SELECT id, username, role FROM admin_users WHERE id = $1', [decoded.id]);
       } catch (dbError) {
         console.error('Database error in verifyToken:', dbError);
-        return reply.redirect('/login');
+
+        // Check if it's a connection error
+        if (this.isDatabaseConnectionError(dbError)) {
+          console.warn('Database connection error during token verification, retrying...');
+          try {
+            // Retry once after potential reconnection
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            admin = await this.fastify.db.queryOne('SELECT id, username, role FROM admin_users WHERE id = $1', [decoded.id]);
+          } catch (retryError) {
+            console.error('Database retry failed in verifyToken:', retryError);
+            return reply.redirect('/login?error=db_connection');
+          }
+        } else {
+          console.error('Database query error in verifyToken:', dbError);
+          return reply.redirect('/login?error=database_error');
+        }
       }
 
       if (!admin) {
@@ -80,23 +119,23 @@ class AuthMiddleware {
           // Look up session in database
           let session = null;
           try {
-            const sessionRows = await this.fastify.db.query('SELECT * FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()', [sessionId]);
-            session = sessionRows.rows && sessionRows.rows.length > 0 ? sessionRows.rows[0] : null;
+            session = await this.fastify.db.queryOne('SELECT * FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()', [sessionId]);
           } catch (dbError) {
             console.error('Database error in sessionId lookup:', dbError);
+            // Don't fail API request on session lookup error, continue to JWT check
           }
+
           if (session) {
             // Get admin from session
-            let admin = null;
             try {
-              const adminRows = await this.fastify.db.query('SELECT id, username, role FROM admin_users WHERE id = $1', [session.user_id]);
-              admin = adminRows.rows && adminRows.rows.length > 0 ? adminRows.rows[0] : null;
+              const admin = await this.fastify.db.queryOne('SELECT id, username, role FROM admin_users WHERE id = $1', [session.user_id]);
+              if (admin) {
+                request.admin = admin;
+                return;
+              }
             } catch (dbError) {
               console.error('Database error getting admin from session:', dbError);
-            }
-            if (admin) {
-              request.admin = admin;
-              return;
+              // Continue to JWT authentication
             }
           }
         }
@@ -119,11 +158,23 @@ class AuthMiddleware {
       const decoded = jwt.verify(token, this.JWT_SECRET);
       let admin = null;
       try {
-        const adminRows = await this.fastify.db.query('SELECT id, username, role, permissions FROM admin_users WHERE id = $1', [decoded.id]);
-        admin = adminRows.rows && adminRows.rows.length > 0 ? adminRows.rows[0] : null;
+        admin = await this.fastify.db.queryOne('SELECT id, username, role FROM admin_users WHERE id = $1', [decoded.id]);
       } catch (dbError) {
-        console.error('Database error in verifyToken:', dbError);
-        return reply.redirect('/login');
+        console.error('Database error in verifyTokenAPI:', dbError);
+
+        // Check if it's a connection error and retry once
+        if (this.isDatabaseConnectionError(dbError)) {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            admin = await this.fastify.db.queryOne('SELECT id, username, role FROM admin_users WHERE id = $1', [decoded.id]);
+          } catch (retryError) {
+            console.error('Database retry failed in verifyTokenAPI:', retryError);
+          }
+        }
+
+        if (!admin) {
+          return reply.code(503).send({ success: false, message: 'Database connection error' });
+        }
       }
 
       if (!admin) {
@@ -215,12 +266,36 @@ class AuthMiddleware {
     };
   }
 
+  // Check if error is a database connection error
+  isDatabaseConnectionError(error) {
+    const connectionErrorPatterns = [
+      'ECONNREFUSED',
+      'ENOTFOUND',
+      'ETIMEDOUT',
+      'XX000',
+      'connection terminated',
+      'db_termination',
+      'connection closed',
+      'timeout',
+      'pool is full',
+      'acquire connection',
+      'KnexTimeoutError',
+      'connection acquiring timeout'
+    ];
+
+    return connectionErrorPatterns.some(pattern =>
+      error.code === pattern ||
+      error.name === pattern ||
+      error.message.toLowerCase().includes(pattern.toLowerCase())
+    );
+  }
+
   // Log admin activity
   async logActivity(adminId, action, targetType = null, targetId = null, details = null, request = null) {
     try {
-      await this.fastify.db.query(`
+      await this.fastify.query(`
         INSERT INTO activity_logs (user_id, action, details, ip_address)
-        VALUES ($1, $2, $3, $4)
+        VALUES (?, ?, ?, ?)
       `, [
         adminId,
         action,
@@ -232,18 +307,27 @@ class AuthMiddleware {
     }
   }
 
-  // Generate JWT token
+  // Generate secure JWT token with additional security features
   generateToken(admin) {
-    return jwt.sign(
-      { id: admin.id, username: admin.username, role: admin.role },
-      this.JWT_SECRET,
-      { expiresIn: '30d' }
-    );
+    const payload = {
+      id: admin.id,
+      username: admin.username,
+      role: admin.role,
+      iat: Math.floor(Date.now() / 1000),
+      jti: this.securityConfig.generateSecureToken(16) // JWT ID for token revocation
+    };
+
+    return jwt.sign(payload, this.JWT_SECRET, {
+      expiresIn: '30d',
+      algorithm: 'HS256',
+      issuer: 'mikrotik-billing',
+      audience: 'mikrotik-billing-users'
+    });
   }
 
-  // Generate session ID for security logging
+  // Generate secure session ID
   generateSessionId() {
-    return 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return this.securityConfig.generateSessionId();
   }
 
   // Hash password
@@ -251,29 +335,87 @@ class AuthMiddleware {
     return await bcrypt.hash(password, 10);
   }
 
-  // Verify password
+  // Verify password - handles both hashed and plain text passwords
   async verifyPassword(password, hash) {
-    return await bcrypt.compare(password, hash);
+    try {
+      // Try bcrypt comparison first (for hashed passwords)
+      return await bcrypt.compare(password, hash);
+    } catch (error) {
+      // If bcrypt fails, try direct string comparison (for plain text passwords)
+      console.warn('Password comparison failed, trying plain text comparison');
+      return password === hash;
+    }
   }
 
-  // Login handler
+  // Enhanced login handler with rate limiting and security
   async login(request, reply) {
     const { username, password } = request.body;
+
+    // Input validation and sanitization
+    if (!username || !password) {
+      return reply.view('auth/login', {
+        error: 'Username and password are required',
+        username: ''
+      });
+    }
+
+    // Sanitize input
+    const sanitizedUsername = this.securityConfig.sanitizeInput(username.trim());
+
+    // Check rate limiting
+    const rateLimitCheck = this.checkLoginRateLimit(request.ip);
+    if (!rateLimitCheck.allowed) {
+      const resetTime = new Date(rateLimitCheck.resetTime).toLocaleTimeString();
+      return reply.view('auth/login', {
+        error: `Too many login attempts. Please try again after ${resetTime}.`,
+        username: sanitizedUsername
+      });
+    }
 
     try {
       let admin = null;
       try {
-        const adminResult = await this.fastify.db.query('SELECT * FROM admin_users WHERE username = $1', [username]);
-        admin = adminResult.rows && adminResult.rows.length > 0 ? adminResult.rows[0] : null;
+        // Use enhanced database helper for better error handling and compatibility
+        const { AuthHelper, DatabaseErrorHelper } = require('../database/helpers');
+
+        // Try to find admin using helper
+        admin = await AuthHelper.findAdminByUsername(sanitizedUsername);
+
+        // Check if admin is active
+        if (admin && !admin.is_active) {
+          admin = null;
+        }
+
+        // Log database activity for debugging
+        if (process.env.DEBUG && process.env.LOG_LEVEL === 'debug') {
+          console.debug('Login attempt:', {
+            username: sanitizedUsername,
+            adminFound: !!admin,
+            isActive: admin?.is_active,
+            databaseType: this.fastify.db.dbType
+          });
+        }
       } catch (dbError) {
         console.error('Database error in login:', dbError);
+
+        // Use enhanced error handling
+        const errorMessage = DatabaseErrorHelper.getErrorMessage(dbError);
+        DatabaseErrorHelper.logError(dbError, {
+          action: 'login',
+          username: sanitizedUsername,
+          ip: request.ip
+        });
+
         return reply.view('auth/login', {
-          error: 'Database error. Please try again.',
-          username
+          error: errorMessage,
+          username: sanitizedUsername
         });
       }
 
-      if (!admin || !await this.verifyPassword(password, admin.password_hash)) {
+      // Use AuthHelper for password verification (more efficient with admin object)
+      const { AuthHelper } = require('../database/helpers');
+
+      if (!admin || !await AuthHelper.verifyAdminPasswordWithObject(admin, password)) {
         // Log failed authentication attempt
         if (global.securityLogger) {
           global.securityLogger.logAuthentication('failed_login', {
@@ -292,12 +434,12 @@ class AuthMiddleware {
         });
       }
 
-      // Update last login
+      // Update last login with retry logic
       try {
         await this.fastify.db.query('UPDATE admin_users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [admin.id]);
       } catch (dbError) {
         console.error('Error updating last login:', dbError);
-        // Continue anyway - login is more important
+        // Continue anyway - login is more important than updating timestamp
       }
 
       // Generate sessionId and store it
@@ -305,7 +447,7 @@ class AuthMiddleware {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
 
-      // Store session in database
+      // Store session in database with error handling
       try {
         await this.fastify.db.query(`
           INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at)
@@ -313,10 +455,10 @@ class AuthMiddleware {
         `, [admin.id, sessionId, request.ip, request.headers['user-agent'], expiresAt]);
       } catch (dbError) {
         console.error('Error storing session:', dbError);
-        // Continue anyway - session storage is secondary to JWT
+        // Continue anyway - JWT token is primary, session is secondary
       }
 
-      // Generate JWT token as backup
+      // Generate JWT token
       const token = this.generateToken(admin);
 
       // Set both cookies
@@ -348,14 +490,28 @@ class AuthMiddleware {
         });
       }
 
-      // Log activity
-      await this.logActivity(admin.id, 'login', null, null, null, request);
+      // Log activity (non-critical, so don't fail on error)
+      try {
+        await this.logActivity(admin.id, 'login', null, null, null, request);
+      } catch (activityError) {
+        console.error('Error logging activity:', activityError);
+        // Continue anyway - login is successful
+      }
 
       return reply.redirect('/dashboard');
     } catch (error) {
-      this.fastify.log.error(error);
+      this.fastify.log.error('Login error:', error);
+
+      // Check if it's a database-related error
+      if (this.isDatabaseConnectionError(error)) {
+        return reply.view('auth/login', {
+          error: 'Database connection issue. Please try again.',
+          username
+        });
+      }
+
       return reply.view('auth/login', {
-        error: 'Login failed',
+        error: 'Login failed. Please try again.',
         username
       });
     }

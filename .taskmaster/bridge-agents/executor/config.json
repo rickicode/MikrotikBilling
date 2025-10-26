@@ -1,0 +1,50 @@
+{
+  "name": "Task Executor",
+  "type": "bridge-agent",
+  "domain": "mikrotik-billing",
+  "capabilities": [
+    "code-execution",
+    "mikrotik-api-calls",
+    "database-operations",
+    "payment-gateway-integration",
+    "whatsapp-message-queuing"
+  ],
+  "specializations": {
+    "mikrotik": {
+      "userManagement": true,
+      "profileSync": true,
+      "connectionPooling": true,
+      "errorRecovery": true
+    },
+    "payments": {
+      "pluginExecution": true,
+      "transactionProcessing": true,
+      "webhookHandling": true,
+      "feeCalculation": true
+    },
+    "whatsapp": {
+      "messageQueue": true,
+      "sessionManagement": true,
+      "templateRendering": true,
+      "rateLimiting": true
+    }
+  },
+  "executionLimits": {
+    "maxConcurrentTasks": 5,
+    "timeoutSeconds": 300,
+    "retryAttempts": 3,
+    "mikrotikRateLimit": "100/minute"
+  },
+  "monitoring": {
+    "trackExecution": true,
+    "logPerformance": true,
+    "errorTracking": true,
+    "resourceUsage": true
+  },
+  "integrationPoints": [
+    "src/services/MikrotikClient.js",
+    "src/plugins/payments/",
+    "src/services/WhatsAppService.js",
+    "src/database/"
+  ]
+}

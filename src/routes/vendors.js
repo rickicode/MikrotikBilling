@@ -135,11 +135,11 @@ async function vendorRoutes(fastify, options) {
         });
       }
 
-      // Insert vendor
+      // Insert vendor (without status column for now)
       const result = await db.query(`
-        INSERT INTO vendors (name, contact_person, phone, email, address, status)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [name, contact_person, phone, email, address, status || 'active']);
+        INSERT INTO vendors (name, contact_person, phone, email, address)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [name, contact_person, phone, email, address]);
 
       return reply.redirect('/vendors?success=Vendor berhasil ditambahkan');
     } catch (error) {

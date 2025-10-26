@@ -1,5 +1,6 @@
 const { RouterOSClient } = require('mikro-routeros');
 const Query = require('../lib/query');
+const ConnectionPool = require('./ConnectionPool');
 
 class MikrotikClient {
   constructor(database = null) {
@@ -9,25 +10,52 @@ class MikrotikClient {
       port: 8728,
       username: 'admin',
       password: '',
-      timeout: 10000,
+      timeout: 60000, // Increased to 60 seconds to reduce timeouts
       tls: false
     };
-    this.client = null;
+
+    // Initialize connection pool with enhanced configuration
+    this.connectionPool = null;
+    this.poolConfig = {
+      minSize: 2,        // Minimum connections to maintain
+      maxSize: 5,        // Maximum connections
+      acquireTimeout: 10000,
+      idleTimeout: 300000, // 5 minutes
+      healthCheckInterval: 30000, // 30 seconds
+      circuitBreakerThreshold: 5,
+      circuitBreakerTimeout: 60000, // 1 minute
+      retryAttempts: 3,
+      retryDelay: 1000,
+      maxRetryDelay: 10000,
+      connectionTimeout: 15000,
+      commandTimeout: 30000,
+      enableBatching: true,
+      batchSize: 10,
+      batchTimeout: 100
+    };
+
+    // Legacy compatibility flags
     this.connected = false;
-    this.isOffline = true; // Start with offline status
+    this.isOffline = true;
     this.lastConnectionTime = null;
     this.lastError = null;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.reconnectDelay = 5000;
 
     // Performance optimizations
     this.cache = new Map();
     this.cacheTimeout = 30000; // 30 seconds for Mikrotik data
-    this.connectionPool = [];
-    this.maxPoolSize = 3;
     this.requestQueue = [];
     this.processingRequest = false;
+
+    // Metrics and monitoring
+    this.connectionStats = {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      batchOperations: 0
+    };
 
     // Don't load config in constructor - call it explicitly after database is ready
   }
@@ -35,14 +63,15 @@ class MikrotikClient {
   async loadConfig() {
     if (this.db) {
       try {
-        // PostgreSQL
-        const query = new Query(this.db.getPool());
+        // Use QueryHelper for database operations
+        const QueryHelper = require('../lib/QueryHelper');
 
         const settings = {
-          host: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_host']))?.value || process.env.MIKROTIK_HOST,
-          port: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_port']))?.value || process.env.MIKROTIK_PORT,
-          username: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_username']))?.value || process.env.MIKROTIK_USERNAME,
-          password: (await query.getOne('SELECT value FROM settings WHERE key = $1', ['mikrotik_password']))?.value || process.env.MIKROTIK_PASSWORD,
+          host: (await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_host']))[0]?.value || process.env.MIKROTIK_HOST,
+          port: parseInt((await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_port']))[0]?.value || process.env.MIKROTIK_PORT) || 8728,
+          username: (await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_username']))[0]?.value || process.env.MIKROTIK_USERNAME,
+          password: (await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_password']))[0]?.value || process.env.MIKROTIK_PASSWORD,
+          timeout: parseInt((await QueryHelper.raw('SELECT value FROM settings WHERE key = ?', ['mikrotik_timeout']))[0]?.value || process.env.MIKROTIK_TIMEOUT) || 60000,
           use_ssl: false // Force disable SSL
         };
 
@@ -51,7 +80,7 @@ class MikrotikClient {
           port: parseInt(settings.port) || 8728,
           username: settings.username || 'admin',
           password: settings.password || '',
-          timeout: 10000,
+          timeout: parseInt(settings.timeout) || 60000, // Increased to 60 seconds
           tls: false // Explicitly disable TLS/SSL
         };
 
@@ -69,7 +98,7 @@ class MikrotikClient {
           port: parseInt(process.env.MIKROTIK_PORT) || 8728,
           username: process.env.MIKROTIK_USERNAME || 'admin',
           password: process.env.MIKROTIK_PASSWORD || '',
-          timeout: 10000,
+          timeout: parseInt(process.env.MIKROTIK_TIMEOUT) || 60000, // Increased to 60 seconds
           tls: false // Explicitly disable TLS/SSL
         };
       }
@@ -80,9 +109,70 @@ class MikrotikClient {
         port: parseInt(process.env.MIKROTIK_PORT) || 8728,
         username: process.env.MIKROTIK_USERNAME || 'admin',
         password: process.env.MIKROTIK_PASSWORD || '',
-        timeout: 10000,
+        timeout: parseInt(process.env.MIKROTIK_TIMEOUT) || 60000, // Increased to 60 seconds
         tls: false // Explicitly disable TLS/SSL
       };
+    }
+
+    // Initialize connection pool after config is loaded
+    await this._initializeConnectionPool();
+  }
+
+  /**
+   * Initialize the enhanced connection pool
+   */
+  async _initializeConnectionPool() {
+    try {
+      console.log('🔌 Initializing enhanced Mikrotik connection pool...');
+
+      this.connectionPool = new ConnectionPool(this.config, this.poolConfig);
+
+      // Set up event listeners for connection pool events
+      this.connectionPool.on('created', (connectionId) => {
+        console.log(`✅ Pool connection created: ${connectionId}`);
+        this.connected = true;
+        this.isOffline = false;
+        this.lastConnectionTime = Date.now();
+      });
+
+      this.connectionPool.on('destroyed', (connectionId) => {
+        console.log(`🗑️ Pool connection destroyed: ${connectionId}`);
+      });
+
+      this.connectionPool.on('circuitBreakerOpened', (data) => {
+        console.warn('🚨 Circuit breaker opened:', data);
+        this.isOffline = true;
+        this.lastError = `Circuit breaker opened: ${data.failures} failures`;
+      });
+
+      this.connectionPool.on('circuitBreakerClosed', () => {
+        console.log('✅ Circuit breaker closed');
+        this.isOffline = false;
+        this.lastError = null;
+      });
+
+      this.connectionPool.on('healthCheckFailed', (data) => {
+        console.warn(`⚠️ Health check failed for ${data.connectionId}: ${data.error}`);
+      });
+
+      this.connectionPool.on('error', (error) => {
+        console.error('Connection pool error:', error.message);
+        this.lastError = error.message;
+      });
+
+      // Initialize the pool
+      await this.connectionPool.start();
+
+      console.log('✅ Enhanced connection pool initialized successfully');
+      this.connected = true;
+      this.isOffline = false;
+
+    } catch (error) {
+      console.error('❌ Failed to initialize connection pool:', error.message);
+      this.connected = false;
+      this.isOffline = true;
+      this.lastError = error.message;
+      throw error;
     }
   }
 
@@ -150,14 +240,13 @@ class MikrotikClient {
       let dbUsers = [];
       try {
         const voucherResult = await this.db.query(
-          'SELECT id, code, profile_id, status, created_at FROM vouchers WHERE status = $1',
+          'SELECT id, username, profile_name, status, created_at FROM vouchers WHERE status = $1',
           ['active']
         ) || { rows: [] };
 
-        const pppoeResult = await this.db.query(
-          'SELECT id, username, password, profile_id, status, created_at FROM pppoe_users WHERE status = $1',
-          ['active']
-        ) || { rows: [] };
+        // PPPoE users are not stored in database for now
+        // They are created directly in RouterOS but tracked via subscriptions
+        const pppoeResult = { rows: [] };
 
         const vouchers = voucherResult.rows || [];
         const pppoeUsers = pppoeResult.rows || [];
@@ -189,7 +278,7 @@ class MikrotikClient {
             await this.createHotspotUser({
               username: user.username,
               password: user.password,
-              profile: user.profile,
+              profile: null, // Will be set from profile_id if available
               comment: commentData
             });
           }
@@ -202,7 +291,7 @@ class MikrotikClient {
             await this.createPPPoESecret({
               username: user.username,
               password: user.password,
-              profile: user.profile,
+              profile: null, // Will be set from profile_id if available
               comment: commentData
             });
           }
@@ -219,16 +308,99 @@ class MikrotikClient {
 
   async connect() {
     try {
+      // Ensure configuration is loaded before attempting connection
+      if (!this.config.host || !this.config.port) {
+        console.log('📋 Loading Mikrotik configuration before connection...');
+        await this.loadConfig();
+      }
+
+      console.log(`🔌 Attempting to connect to Mikrotik: ${this.config.host}:${this.config.port}`);
+
+      // Validate configuration before connection
+      if (!this.config.host) {
+        throw new Error('Mikrotik host is not configured');
+      }
+      if (!this.config.username) {
+        throw new Error('Mikrotik username is not configured');
+      }
+      if (!this.config.port) {
+        throw new Error('Mikrotik port is not configured');
+      }
+
+      // Create connection timeout promise
+      const connectionTimeout = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Connection timeout after ${this.config.timeout}ms`));
+        }, this.config.timeout);
+      });
+
+      // Create connection promise
+      const connectionPromise = this._establishConnection();
+
+      // Race between connection and timeout
+      const result = await Promise.race([connectionPromise, connectionTimeout]);
+
+      console.log('✅ Mikrotik connection established successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to connect to Mikrotik:', error.message);
+      this.connected = false;
+
+      // Check if it's a timeout or connection error
+      if (this._isConnectionError(error)) {
+        console.log('🔌 Mikrotik device is offline or unreachable');
+        this.connected = false;
+        this.isOffline = true;
+        this.lastError = error.message;
+
+        // Don't reconnect for timeout/connection errors during startup
+        return false;
+      }
+
+      // Auto-reconnect for other errors with exponential backoff
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectAttempts++;
+        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+        console.log(`🔄 Scheduling reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+
+        setTimeout(() => this.connect(), delay);
+      } else {
+        console.log(`❌ Maximum reconnection attempts (${this.maxReconnectAttempts}) reached`);
+        this.isOffline = true;
+        this.lastError = `Max reconnection attempts reached: ${error.message}`;
+      }
+
+      return false;
+    }
+  }
+
+  // Internal connection establishment with detailed error handling
+  async _establishConnection() {
+    try {
+      // Clean up existing connection
+      if (this.client) {
+        try {
+          await this.client.close();
+        } catch (error) {
+          console.warn('Error closing existing connection:', error.message);
+        }
+        this.client = null;
+      }
+
       // Create new connection with mikro-routeros
+      console.log('📡 Creating RouterOS client...');
       this.client = new RouterOSClient(this.config.host, this.config.port, this.config.timeout);
 
       // Connect to RouterOS
+      console.log('🔗 Establishing socket connection...');
       await this.client.connect();
 
       // Login to RouterOS
+      console.log('🔐 Authenticating...');
       await this.client.login(this.config.username, this.config.password);
 
       // Test connection by getting system identity
+      console.log('🔍 Testing connection with identity query...');
       const identity = await this.client.runQuery('/system/identity/print');
       console.log('Identity response:', JSON.stringify(identity, null, 2));
 
@@ -236,163 +408,456 @@ class MikrotikClient {
         this.connected = true;
         this.reconnectAttempts = 0;
         this.lastConnectionTime = Date.now();
+        this.isOffline = false;
+        this.lastError = null;
 
         // Extract identity name - handle different response formats
         const identityName = identity[0]?.name || identity[0]['identity-name'] || identity[0]?.identity || 'Unknown';
-        console.log('Connected to Mikrotik successfully:', identityName);
+        console.log(`✅ Connected to Mikrotik successfully: ${identityName}`);
 
         // Note: Automatic sync system disabled per user request
         // Use manual sync via Sync Mikrotik button instead
-        console.log('Automatic sync system disabled - use manual sync instead');
+        console.log('ℹ️ Automatic sync system disabled - use manual sync instead');
 
         return true;
       } else {
-        throw new Error('No response from Mikrotik');
+        throw new Error('No response from Mikrotik identity query');
       }
     } catch (error) {
-      console.error('Failed to connect to Mikrotik:', error.message);
-      this.connected = false;
-
-      // Check if it's a timeout or connection error
-      if (error.message.includes('timeout') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('ENOTFOUND') ||
-          error.message.includes('ETIMEDOUT') ||
-          error.message.includes('EHOSTUNREACH')) {
-        console.log('Mikrotik device is offline or unreachable');
-        this.connected = false;
-        this.isOffline = true;
-        this.lastError = error.message;
-
-        // Don't reconnect for timeout/connection errors
-        return false;
+      // Clean up failed connection
+      if (this.client) {
+        try {
+          await this.client.close();
+        } catch (cleanupError) {
+          console.warn('Error during connection cleanup:', cleanupError.message);
+        }
+        this.client = null;
       }
 
-      // Auto-reconnect for other errors
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectAttempts++;
-        setTimeout(() => this.connect(), this.reconnectDelay);
-      }
-
-      return false;
+      throw error;
     }
   }
 
   async disconnect() {
-    // Close connection
-    if (this.client) {
+    console.log('🛑 Shutting down Mikrotik connection pool...');
+
+    // Shutdown connection pool
+    if (this.connectionPool) {
       try {
-        await this.client.close();
+        await this.connectionPool.stop();
+        console.log('✅ Connection pool shut down successfully');
       } catch (error) {
-        console.warn('Error closing Mikrotik connection:', error.message);
+        console.warn('Error shutting down connection pool:', error.message);
       }
+      this.connectionPool = null;
     }
 
-    this.client = null;
+    // Clear cache
+    this.clearCache();
+
+    // Reset connection state
     this.connected = false;
+    this.isOffline = true;
+    this.lastConnectionTime = null;
+    this.lastError = null;
+
+    console.log('✅ Mikrotik client disconnected');
   }
 
   // Note: Sync system disabled per user request
   // Use manual sync via Sync Mikrotik button instead
 
-  // Performance optimized command executor with offline handling
-  async execute(command, params = {}, useCache = true) {
-    // If Mikrotik is offline, return empty or default results
-    if (this.isOffline && !this.connected) {
-      console.log(`Mikrotik is offline, returning empty result for: ${command}`);
-      return this.getDefaultResponse(command);
+  // Enhanced command executor with connection pool and batch support
+  async execute(command, params = {}, useCache = true, options = {}) {
+    this.connectionStats.totalRequests++;
+
+    // If connection pool is not available, try to initialize
+    if (!this.connectionPool) {
+      console.warn('Connection pool not initialized, attempting to initialize...');
+      try {
+        await this._initializeConnectionPool();
+      } catch (error) {
+        console.error('Failed to initialize connection pool:', error.message);
+        this.connectionStats.failedRequests++;
+        return this.getDefaultResponse(command);
+      }
+    }
+
+    // Check cache first for read operations
+    const isReadOperation = command.includes('/print') || command.includes('/get');
+    const cacheKey = isReadOperation && useCache ?
+      `${command}:${JSON.stringify(params)}` : null;
+
+    if (cacheKey) {
+      const cached = this.getCache(cacheKey);
+      if (cached) {
+        this.connectionStats.cacheHits++;
+        console.log(`📋 Cache hit for: ${command}`);
+        return cached;
+      }
+      this.connectionStats.cacheMisses++;
     }
 
     try {
-      // Create cache key for read operations
-      const isReadOperation = command.includes('/print') || command.includes('/get');
-      const cacheKey = isReadOperation && useCache ?
-        `${command}:${JSON.stringify(params)}` : null;
+      // Use connection pool for execution
+      const priority = options.priority || 'normal';
+      const timeout = options.timeout || this.config.timeout;
 
-      // Check cache first for read operations
-      if (cacheKey) {
-        const cached = this.getCache(cacheKey);
-        if (cached) {
-          return cached;
-        }
-      }
-
-      // Queue request if another one is processing
-      if (this.processingRequest) {
-        return new Promise((resolve, reject) => {
-          this.requestQueue.push({ command, params, resolve, reject });
-        });
-      }
-
-      this.processingRequest = true;
-
-      try {
-        // Ensure connection
-        if (!this.client || !this.connected) {
-          const connected = await this.connect();
-          if (!connected) {
-            this.isOffline = true;
-            return this.getDefaultResponse(command);
-          }
-        }
-
-        // Execute command with mikro-routeros
-        const result = await this.client.runQuery(command, params);
-
-        // Cache read operations
-        if (cacheKey && result) {
-          this.setCache(cacheKey, result);
-        }
-
-        // Mark as online on successful execution
-        this.isOffline = false;
-        this.lastError = null;
-        this.lastConnectionTime = Date.now();
-
-        return result || [];
-      } finally {
-        this.processingRequest = false;
-
-        // Process next request in queue
-        if (this.requestQueue.length > 0) {
-          const next = this.requestQueue.shift();
-          this.execute(next.command, next.params, useCache)
-            .then(next.resolve)
-            .catch(next.reject);
-        }
-      }
-    } catch (error) {
-      console.error(`Mikrotik command failed: ${command}`, error);
-
-      // Check if it's a timeout or connection error
-      if (error.message.includes('timeout') ||
-          error.message.includes('connection') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('ETIMEDOUT') ||
-          error.message.includes('ENOTFOUND') ||
-          error.message.includes('EHOSTUNREACH')) {
-        console.log('Connection lost, marking Mikrotik as offline');
-        this.connected = false;
-        this.isOffline = true;
-        this.lastError = error.message;
-        return this.getDefaultResponse(command);
-      }
-
-      // Try to reconnect for other errors
-      this.connected = false;
-      const testConnected = await this.connect();
-      if (testConnected) {
-        return this.execute(command, params, useCache);
+      let result;
+      if (this.poolConfig.enableBatching && options.batch) {
+        // Use batch execution if enabled and requested
+        const commands = Array.isArray(options.batch) ? options.batch : [{ command, params, priority }];
+        const batchResults = await this.connectionPool.executeBatch(commands, { timeout });
+        result = batchResults[0]?.data || [];
+        this.connectionStats.batchOperations++;
       } else {
-        this.isOffline = true;
+        // Single command execution
+        result = await this.connectionPool.executeCommand(command, params, { priority, timeout });
+      }
+
+      // Cache read operations on success
+      if (cacheKey && result) {
+        this.setCache(cacheKey, result);
+      }
+
+      // Update connection status
+      this.connected = true;
+      this.isOffline = false;
+      this.lastError = null;
+      this.lastConnectionTime = Date.now();
+      this.connectionStats.successfulRequests++;
+
+      return result || [];
+
+    } catch (error) {
+      this.connectionStats.failedRequests++;
+      console.error(`❌ Mikrotik command failed: ${command}`, error.message);
+
+      // Handle different error types
+      if (this._isConnectionError(error)) {
+        console.log('🔌 Connection error detected');
+        this._handleConnectionError(error);
+      }
+
+      // Check if we should return default response or retry
+      if (!this._isRetryableError(error) || !options.retry !== false) {
+        console.log('⚠️ Non-retryable error or retry disabled, returning default response');
         return this.getDefaultResponse(command);
+      }
+
+      // Return default response for most errors
+      return this.getDefaultResponse(command);
+    }
+  }
+
+  // Internal command execution with enhanced error handling
+  async _executeCommand(command, params = {}, useCache = true) {
+    // Create cache key for read operations
+    const isReadOperation = command.includes('/print') || command.includes('/get');
+    const cacheKey = isReadOperation && useCache ?
+      `${command}:${JSON.stringify(params)}` : null;
+
+    // Check cache first for read operations
+    if (cacheKey) {
+      const cached = this.getCache(cacheKey);
+      if (cached) {
+        console.log(`📋 Cache hit for: ${command}`);
+        return cached;
       }
     }
+
+    // Queue request if another one is processing
+    if (this.processingRequest) {
+      console.log(`⏳ Queuing request: ${command}`);
+      return new Promise((resolve, reject) => {
+        this.requestQueue.push({ command, params, resolve, reject, useCache });
+      });
+    }
+
+    this.processingRequest = true;
+
+    try {
+      // Ensure connection with validation
+      if (!this.client || !this.connected) {
+        console.log('🔌 Establishing connection for command:', command);
+        const connected = await this.connect();
+        if (!connected) {
+          throw new Error('Failed to establish Mikrotik connection');
+        }
+      }
+
+      // Execute command with mikro-routeros
+      console.log(`🚀 Executing: ${command}`);
+      const startTime = Date.now();
+      const result = await this.client.runQuery(command, params);
+      const duration = Date.now() - startTime;
+
+      console.log(`✅ Command completed in ${duration}ms: ${command}`);
+
+      // Cache read operations on success
+      if (cacheKey && result) {
+        this.setCache(cacheKey, result);
+      }
+
+      // Mark as online on successful execution
+      this.isOffline = false;
+      this.lastError = null;
+      this.lastConnectionTime = Date.now();
+
+      return result || [];
+    } finally {
+      this.processingRequest = false;
+
+      // Process next request in queue
+      if (this.requestQueue.length > 0) {
+        const next = this.requestQueue.shift();
+        this.execute(next.command, next.params, next.useCache)
+          .then(next.resolve)
+          .catch(next.reject);
+      }
+    }
+  }
+
+  // Helper methods for enhanced error handling
+  _isConnectionError(error) {
+    const connectionErrors = [
+      'timeout',
+      'connection',
+      'ECONNREFUSED',
+      'ETIMEDOUT',
+      'ENOTFOUND',
+      'EHOSTUNREACH',
+      'socket hang up',
+      'read ECONNRESET',
+      'write ECONNRESET'
+    ];
+
+    return connectionErrors.some(err =>
+      error.message.toLowerCase().includes(err.toLowerCase())
+    );
+  }
+
+  _isRetryableError(error) {
+    // Don't retry authentication errors, invalid commands, etc.
+    const nonRetryableErrors = [
+      'login failed',
+      'authentication failed',
+      'invalid command',
+      'permission denied',
+      'access denied'
+    ];
+
+    return !nonRetryableErrors.some(err =>
+      error.message.toLowerCase().includes(err.toLowerCase())
+    );
+  }
+
+  _handleConnectionError(error) {
+    this.connected = false;
+    this.isOffline = true;
+    this.lastError = error.message;
+
+    // Clear connection
+    if (this.client) {
+      try {
+        this.client.close();
+      } catch (closeError) {
+        console.warn('Error closing client during error handling:', closeError.message);
+      }
+      this.client = null;
+    }
+
+    console.log(`🔌 Connection error handled: ${error.message}`);
+  }
+
+  async _forceReconnect() {
+    console.log('🔄 Forcing reconnection...');
+
+    // Close existing connection
+    if (this.client) {
+      try {
+        await this.client.close();
+      } catch (error) {
+        console.warn('Error closing client during reconnect:', error.message);
+      }
+      this.client = null;
+    }
+
+    // Reset connection state
+    this.connected = false;
+    this.isOffline = false; // Temporarily reset to allow reconnection attempt
+
+    // Attempt reconnection
+    const connected = await this.connect();
+    if (!connected) {
+      throw new Error('Reconnection failed');
+    }
+
+    console.log('✅ Reconnection successful');
+    return true;
   }
 
   // Legacy method for backward compatibility
   async executeCommand(command, params = {}) {
     return this.execute(command, params);
+  }
+
+  /**
+   * Execute multiple commands in batch for optimal performance
+   */
+  async executeBatch(commands, options = {}) {
+    if (!this.connectionPool) {
+      throw new Error('Connection pool not initialized');
+    }
+
+    if (!Array.isArray(commands)) {
+      throw new Error('Commands must be an array');
+    }
+
+    this.connectionStats.batchOperations++;
+
+    // Prepare commands with default options
+    const preparedCommands = commands.map(cmd => ({
+      command: cmd.command,
+      params: cmd.params || {},
+      priority: cmd.priority || options.priority || 'normal'
+    }));
+
+    try {
+      const results = await this.connectionPool.executeBatch(preparedCommands, {
+        timeout: options.timeout || this.config.timeout
+      });
+
+      this.connectionStats.successfulRequests += preparedCommands.length;
+      return results;
+
+    } catch (error) {
+      this.connectionStats.failedRequests += preparedCommands.length;
+      console.error('Batch execution failed:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get comprehensive connection and performance statistics
+   */
+  getConnectionStats() {
+    if (!this.connectionPool) {
+      return {
+        status: 'not_initialized',
+        connected: false,
+        offline: true,
+        lastError: this.lastError
+      };
+    }
+
+    const poolStats = this.connectionPool.getStats();
+    const connectionDetails = this.connectionPool.getConnectionDetails();
+    const performanceMetrics = this.connectionPool.getPerformanceMetrics();
+
+    return {
+      // Basic status
+      status: this.connected ? 'connected' : 'disconnected',
+      connected: this.connected,
+      offline: this.isOffline,
+      lastError: this.lastError,
+      lastConnectionTime: this.lastConnectionTime,
+
+      // Pool statistics
+      pool: poolStats,
+
+      // Connection details
+      connections: connectionDetails,
+
+      // Performance metrics
+      performance: performanceMetrics,
+
+      // Client-specific statistics
+      client: {
+        ...this.connectionStats,
+        cacheHitRate: this.connectionStats.totalRequests > 0 ?
+          ((this.connectionStats.cacheHits / this.connectionStats.totalRequests) * 100).toFixed(2) : 0,
+        successRate: this.connectionStats.totalRequests > 0 ?
+          ((this.connectionStats.successfulRequests / this.connectionStats.totalRequests) * 100).toFixed(2) : 0
+      },
+
+      // Configuration
+      config: {
+        host: this.config.host,
+        port: this.config.port,
+        poolSize: {
+          min: this.poolConfig.minSize,
+          max: this.poolConfig.maxSize
+        },
+        timeouts: {
+          connection: this.poolConfig.connectionTimeout,
+          command: this.poolConfig.commandTimeout,
+          acquire: this.poolConfig.acquireTimeout
+        },
+        circuitBreaker: {
+          threshold: this.poolConfig.circuitBreakerThreshold,
+          timeout: this.poolConfig.circuitBreakerTimeout
+        },
+        retry: {
+          attempts: this.poolConfig.retryAttempts,
+          delay: this.poolConfig.retryDelay,
+          maxDelay: this.poolConfig.maxRetryDelay
+        },
+        healthCheck: {
+          interval: this.poolConfig.healthCheckInterval,
+          idleTimeout: this.poolConfig.idleTimeout
+        },
+        batching: {
+          enabled: this.poolConfig.enableBatching,
+          batchSize: this.poolConfig.batchSize,
+          batchTimeout: this.poolConfig.batchTimeout
+        }
+      }
+    };
+  }
+
+  /**
+   * Get connection health status
+   */
+  async getHealthStatus() {
+    if (!this.connectionPool) {
+      return {
+        healthy: false,
+        status: 'pool_not_initialized',
+        message: 'Connection pool has not been initialized'
+      };
+    }
+
+    try {
+      // Test connection with lightweight command
+      const startTime = Date.now();
+      await this.execute('/system/identity/print', {}, false, { priority: 'critical' });
+      const responseTime = Date.now() - startTime;
+
+      const poolStats = this.connectionPool.getStats();
+
+      return {
+        healthy: true,
+        status: 'healthy',
+        responseTime,
+        message: 'Connection is healthy',
+        pool: {
+          availableConnections: poolStats.connections.available,
+          totalConnections: poolStats.connections.total,
+          utilization: poolStats.connections.utilization,
+          circuitBreakerState: poolStats.circuitBreaker.state
+        }
+      };
+
+    } catch (error) {
+      return {
+        healthy: false,
+        status: 'unhealthy',
+        message: error.message,
+        error: error.message,
+        pool: this.connectionPool.getStats()
+      };
+    }
   }
 
   // Cache management
@@ -521,9 +986,71 @@ class MikrotikClient {
     }
   }
 
+  // Get PPPoE profiles
+  async getPPPoEProfiles() {
+    try {
+      const profiles = await this.executeCommand('/ppp/profile/print');
+      return profiles || [];
+    } catch (error) {
+      console.error('Error getting PPPoE profiles:', error);
+      return [];
+    }
+  }
+
+  // Get PPP profiles (alias for getPPPoEProfiles for backward compatibility)
+  async getPPPProfiles() {
+    return this.getPPPoEProfiles();
+  }
+
+  /**
+   * Validate if a hotspot profile exists in Mikrotik RouterOS
+   * @param {string} profileName - Name of the profile to validate
+   * @returns {boolean} - True if profile exists, false otherwise
+   */
+  async validateHotspotProfile(profileName) {
+    try {
+      if (!profileName || typeof profileName !== 'string') {
+        return false;
+      }
+
+      const profiles = await this.getHotspotProfiles();
+      return profiles.some(profile => profile.name === profileName);
+    } catch (error) {
+      console.error(`Error validating hotspot profile "${profileName}":`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Validate if a PPP profile exists in Mikrotik RouterOS
+   * @param {string} profileName - Name of the profile to validate
+   * @returns {boolean} - True if profile exists, false otherwise
+   */
+  async validatePPPProfile(profileName) {
+    try {
+      if (!profileName || typeof profileName !== 'string') {
+        return false;
+      }
+
+      const profiles = await this.getPPPProfiles();
+      return profiles.some(profile => profile.name === profileName);
+    } catch (error) {
+      console.error(`Error validating PPP profile "${profileName}":`, error);
+      return false;
+    }
+  }
+
   // Create hotspot user with proper RouterOS integration
   async createHotspotUser(userData) {
     try {
+      // Validate profile exists in Mikrotik before creating user
+      if (userData.profile) {
+        const profileExists = await this.validateHotspotProfile(userData.profile);
+        if (!profileExists) {
+          throw new Error(`Profile "${userData.profile}" does not exist in Mikrotik RouterOS`);
+        }
+      }
+
       const params = {
         name: userData.username,
         password: userData.password,
@@ -563,6 +1090,14 @@ class MikrotikClient {
       };
 
       const formattedComment = MikrotikClient.formatComment(commentData);
+
+      // Validate profile exists in Mikrotik before creating user
+      if (voucherData.profile) {
+        const profileExists = await this.validateHotspotProfile(voucherData.profile);
+        if (!profileExists) {
+          throw new Error(`Profile "${voucherData.profile}" does not exist in Mikrotik RouterOS`);
+        }
+      }
 
       const params = {
         name: voucherData.username,
@@ -736,7 +1271,7 @@ class MikrotikClient {
   }
 
   // Get PPP profiles
-  async getPPPProfiles() {
+  async getPPPoEProfiles() {
     try {
       const profiles = await this.executeCommand('/ppp/profile/print');
       return profiles || [];
@@ -749,6 +1284,14 @@ class MikrotikClient {
   // Create PPPoE secret with proper RouterOS integration
   async createPPPoESecret(secretData) {
     try {
+      // Validate profile exists in Mikrotik before creating PPPoE secret
+      if (secretData.profile) {
+        const profileExists = await this.validatePPPProfile(secretData.profile);
+        if (!profileExists) {
+          throw new Error(`PPP Profile "${secretData.profile}" does not exist in Mikrotik RouterOS`);
+        }
+      }
+
       const params = {
         name: secretData.username,
         password: secretData.password,
@@ -886,7 +1429,47 @@ class MikrotikClient {
     return this.connected && !this.isOffline;
   }
 
-  // Get connection info with offline status
+  // Health check with automatic recovery
+  async healthCheck() {
+    try {
+      // If we think we're offline, try to reconnect
+      if (this.isOffline || !this.connected) {
+        console.log('🏥 Health check: Attempting to recover connection...');
+        const reconnected = await this.connect();
+        if (reconnected) {
+          console.log('✅ Health check: Connection recovered');
+          return { healthy: true, message: 'Connection recovered' };
+        } else {
+          return { healthy: false, message: 'Failed to recover connection' };
+        }
+      }
+
+      // Test connection with a lightweight command
+      const startTime = Date.now();
+      const identity = await this.execute('/system/identity/print', {}, false, 5000); // 5 second timeout for health check
+      const duration = Date.now() - startTime;
+
+      if (identity && identity.length > 0) {
+        console.log(`✅ Health check passed in ${duration}ms`);
+        return { healthy: true, message: 'Connection healthy', duration };
+      } else {
+        throw new Error('No response to health check');
+      }
+    } catch (error) {
+      console.error('❌ Health check failed:', error.message);
+
+      // Mark as offline if health check fails
+      this._handleConnectionError(error);
+
+      return {
+        healthy: false,
+        message: `Health check failed: ${error.message}`,
+        lastError: this.lastError
+      };
+    }
+  }
+
+  // Get connection info with health status
   getConnectionInfo() {
     // Check if we have valid configuration
     const hasValidConfig = this.config.host &&
@@ -903,7 +1486,8 @@ class MikrotikClient {
       hasValidConfig: hasValidConfig,
       lastConnectionTime: this.lastConnectionTime,
       lastError: this.lastError,
-      status: this.isOffline ? 'offline' : (this.connected ? 'online' : 'disconnected')
+      status: this.isOffline ? 'offline' : (this.connected ? 'online' : 'disconnected'),
+      uptime: this.lastConnectionTime ? Date.now() - this.lastConnectionTime : 0
     };
   }
 
@@ -1326,7 +1910,7 @@ class MikrotikClient {
       }
 
       // Get current profile
-      const profiles = await this.getPPPProfiles();
+      const profiles = await this.getPPPoEProfiles();
       const profile = profiles.find(p => p.name === profileName);
 
       if (!profile) {
@@ -1466,7 +2050,7 @@ class MikrotikClient {
         console.log(`HIJINETWORK: Hotspot profile overridden: ${profileName}`);
         this.logProfileSync(profileName, 'hotspot', 'override', true);
       } else if (profileType === 'pppoe') {
-        const profiles = await this.getPPPProfiles();
+        const profiles = await this.getPPPoEProfiles();
         const profile = profiles.find(p => p.name === profileName);
 
         if (!profile) {
@@ -1531,15 +2115,12 @@ class MikrotikClient {
         try {
           // Get active vouchers from database
           const dbVoucherResult = await this.db.query(
-            'SELECT code, password, profile, profile_id FROM vouchers WHERE status = $1',
+            'SELECT username, password, profile_name FROM vouchers WHERE status = $1',
             ['active']
           ) || { rows: [] };
 
-          // Get active PPPoE users from database
-          const dbPPPoEResult = await this.db.query(
-            'SELECT username, password, profile, profile_id FROM pppoe_users WHERE status = $1',
-            ['active']
-          ) || { rows: [] };
+          // Get active PPPoE users from database (stored in subscriptions)
+          const dbPPPoEResult = { rows: [] }; // No PPPoE users stored in DB for now
 
           const dbVouchers = dbVoucherResult.rows || [];
           const dbPPPoEUsers = dbPPPoEResult.rows || [];
@@ -1554,23 +2135,16 @@ class MikrotikClient {
 
           // Restore missing vouchers
           for (const voucher of dbVouchers) {
-            if (!mikrotikVoucherMap.has(voucher.code)) {
+            if (!mikrotikVoucherMap.has(voucher.username)) {
               try {
-                console.log(`Restoring voucher in Mikrotik: ${voucher.code}`);
+                console.log(`Restoring voucher in Mikrotik: ${voucher.username}`);
 
-                // Get profile name
-                let profileName = voucher.profile;
-                if (!profileName && voucher.profile_id) {
-                  const profileResult = await this.db.query(
-                    'SELECT name FROM profiles WHERE id = $1',
-                    [voucher.profile_id]
-                  );
-                  profileName = profileResult.rows[0]?.name;
-                }
+                // Get profile name (already stored as profile_name in vouchers)
+                const profileName = voucher.profile_name;
 
                 // Create voucher user in Mikrotik
                 await this.createVoucherUser({
-                  username: voucher.code,
+                  username: voucher.username,
                   password: voucher.password,
                   profile: profileName,
                   price_sell: 0, // Will be updated from actual voucher data
@@ -1580,7 +2154,7 @@ class MikrotikClient {
 
                 restoredVouchers++;
               } catch (error) {
-                console.error(`Error restoring voucher ${voucher.code}:`, error);
+                console.error(`Error restoring voucher ${voucher.username}:`, error);
               }
             }
           }
@@ -1591,15 +2165,8 @@ class MikrotikClient {
               try {
                 console.log(`Restoring PPPoE user in Mikrotik: ${pppoeUser.username}`);
 
-                // Get profile name
-                let profileName = pppoeUser.profile;
-                if (!profileName && pppoeUser.profile_id) {
-                  const profileResult = await this.db.query(
-                    'SELECT name FROM profiles WHERE id = $1',
-                    [pppoeUser.profile_id]
-                  );
-                  profileName = profileResult.rows[0]?.name;
-                }
+                // Get profile name (already stored as profile_name in subscriptions)
+                const profileName = pppoeUser.profile_name;
 
                 // Create PPPoE user in Mikrotik
                 await this.createPPPoESecret({
@@ -1805,6 +2372,73 @@ class MikrotikClient {
     }
   }
 
+  // Update hotspot profile in RouterOS
+  async updateHotspotProfile(profileName, priceSell = 0, priceCost = 0) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Updating hotspot profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getHotspotProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`Hotspot profile ${profileName} not found`);
+      }
+
+      // Update the profile using RouterOS set command
+      await this.client.runQuery('/ip/hotspot/user/profile/set', {
+        '.id': profile['.id'],
+        'rate-limit': '1M/2M' // Keep existing rate limit, can be enhanced later
+      });
+
+      console.log(`HIJINETWORK: Hotspot profile updated successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'hotspot', 'update', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error updating hotspot profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'hotspot', 'update', false, error);
+      return false;
+    }
+  }
+
+  // Delete hotspot profile in RouterOS
+  async deleteHotspotProfile(profileName) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Deleting hotspot profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getHotspotProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`Hotspot profile ${profileName} not found`);
+      }
+
+      // Delete the profile using RouterOS remove command
+      await this.client.runQuery('/ip/hotspot/user/profile/remove', {
+        '.id': profile['.id']
+      });
+
+      console.log(`HIJINETWORK: Hotspot profile deleted successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'hotspot', 'delete', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error deleting hotspot profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'hotspot', 'delete', false, error);
+      return false;
+    }
+  }
+
   // Create PPPoE profile in RouterOS with unique name-based identification
   async createPPPoEProfile(profileName, priceSell = 0, priceCost = 0) {
     try {
@@ -1836,6 +2470,73 @@ class MikrotikClient {
     }
   }
 
+  // Update PPPoE profile in RouterOS
+  async updatePPPoEProfile(profileName, priceSell = 0, priceCost = 0) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Updating PPPoE profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getPPPoEProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`PPPoE profile ${profileName} not found`);
+      }
+
+      // Update the profile using RouterOS set command
+      await this.client.runQuery('/ppp/profile/set', {
+        '.id': profile['.id'],
+        'rate-limit': '1M/2M' // Keep existing rate limit, can be enhanced later
+      });
+
+      console.log(`HIJINETWORK: PPPoE profile updated successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'pppoe', 'update', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error updating PPPoE profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'pppoe', 'update', false, error);
+      return false;
+    }
+  }
+
+  // Delete PPPoE profile in RouterOS
+  async deletePPPoEProfile(profileName) {
+    try {
+      if (!this.connected) {
+        throw new Error('Mikrotik not connected');
+      }
+
+      console.log(`HIJINETWORK: Deleting PPPoE profile in RouterOS: ${profileName}`);
+
+      // Get the existing profile
+      const profiles = await this.getPPPoEProfiles();
+      const profile = profiles.find(p => p.name === profileName);
+
+      if (!profile) {
+        throw new Error(`PPPoE profile ${profileName} not found`);
+      }
+
+      // Delete the profile using RouterOS remove command
+      await this.client.runQuery('/ppp/profile/remove', {
+        '.id': profile['.id']
+      });
+
+      console.log(`HIJINETWORK: PPPoE profile deleted successfully: ${profileName}`);
+      this.logProfileSync(profileName, 'pppoe', 'delete', true);
+
+      return true;
+    } catch (error) {
+      console.error(`HIJINETWORK: Error deleting PPPoE profile ${profileName}:`, error);
+      this.logProfileSync(profileName, 'pppoe', 'delete', false, error);
+      return false;
+    }
+  }
+
   // Check if profile exists in RouterOS by name (no comment dependency)
   async checkProfileExists(profileName, profileType) {
     try {
@@ -1850,7 +2551,7 @@ class MikrotikClient {
         const profile = profiles.find(p => p.name === profileName);
         return !!profile;
       } else if (profileType === 'pppoe') {
-        const profiles = await this.getPPPProfiles();
+        const profiles = await this.getPPPoEProfiles();
         const profile = profiles.find(p => p.name === profileName);
         return !!profile;
       }

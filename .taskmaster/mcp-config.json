@@ -1,0 +1,217 @@
+{
+  "version": "2.0.0",
+  "project": "Mikrotik Billing System",
+  "mcpIntegration": {
+    "enabled": true,
+    "servers": 8,
+    "lastUpdated": "2025-10-23T20:40:00Z"
+  },
+  "activeServers": [
+    {
+      "name": "playwright",
+      "status": "active",
+      "purpose": "E2E testing automation for Mikrotik billing workflows",
+      "capabilities": [
+        "voucher-generation-testing",
+        "payment-flow-testing",
+        "whatsapp-interface-testing",
+        "mikrotik-simulation"
+      ],
+      "configuration": {
+        "browsers": ["chromium", "firefox", "webkit"],
+        "testEnvironment": "production-like",
+        "screenshots": true,
+        "videoRecording": true
+      }
+    },
+    {
+      "name": "github",
+      "status": "active",
+      "purpose": "Repository management and CI/CD for billing system",
+      "capabilities": [
+        "pull-request-management",
+        "issue-tracking",
+        "release-automation",
+        "code-review-automation"
+      ],
+      "configuration": {
+        "autoMerge": false,
+        "requireReviews": true,
+        "branchProtection": true
+      }
+    },
+    {
+      "name": "context7",
+      "status": "active",
+      "purpose": "Live documentation and code examples for development",
+      "capabilities": [
+        "fastify-documentation",
+        "mikrotik-api-examples",
+        "knex-js-patterns",
+        "whatsapp-web-js-reference"
+      ],
+      "configuration": {
+        "cacheEnabled": true,
+        "autoUpdate": true,
+        "categories": ["backend", "database", "api", "messaging"]
+      }
+    },
+    {
+      "name": "prisma",
+      "status": "backup",
+      "purpose": "Database schema management backup for Knex.js",
+      "capabilities": [
+        "schema-validation",
+        "migration-verification",
+        "query-optimization",
+        "relationship-mapping"
+      ],
+      "configuration": {
+        "primaryORM": "knex",
+        "validationOnly": true,
+        "syncWithKnex": true
+      }
+    },
+    {
+      "name": "filesystem",
+      "status": "active",
+      "purpose": "File system operations and management",
+      "capabilities": [
+        "backup-management",
+        "log-file-analysis",
+        "template-management",
+        "file-integrity-checks"
+      ],
+      "configuration": {
+        "watchDirectories": ["logs", "backups", "uploads"],
+        "autoBackup": true,
+        "integrityChecks": true
+      }
+    },
+    {
+      "name": "browser-tools",
+      "status": "active",
+      "purpose": "Web automation and testing for billing interfaces",
+      "capabilities": [
+        "ui-automation-testing",
+        "form-validation-testing",
+        "responsive-design-testing",
+        "accessibility-testing"
+      ],
+      "configuration": {
+        "headlessMode": true,
+        "viewports": ["desktop", "tablet", "mobile"],
+        "accessibilityChecks": true
+      }
+    },
+    {
+      "name": "web-search-prime",
+      "status": "active",
+      "purpose": "Research and documentation lookup",
+      "capabilities": [
+        "mikrotik-documentation-search",
+        "payment-gateway-research",
+        "security-advisory-lookup",
+        "technology-research"
+      ],
+      "configuration": {
+        "sources": ["official-docs", "stackoverflow", "security-advisories"],
+        "cacheResults": true,
+        "relevanceThreshold": 0.8
+      }
+    },
+    {
+      "name": "database-optimizer",
+      "status": "active",
+      "purpose": "PostgreSQL performance optimization and monitoring",
+      "capabilities": [
+        "query-performance-analysis",
+        "index-optimization",
+        "connection-pool-optimization",
+        "backup-optimization"
+      ],
+      "configuration": {
+        "databaseType": "postgresql",
+        "hosting": "supabase",
+        "monitoringInterval": "5m",
+        "autoOptimize": false
+      }
+    }
+  ],
+  "integrationPatterns": {
+    "mikrotikTesting": {
+      "servers": ["playwright", "browser-tools"],
+      "workflow": "simulate-mikrotik-api-calls",
+      "description": "Test Mikrotik integration without live router"
+    },
+    "paymentGatewayTesting": {
+      "servers": ["playwright", "web-search-prime"],
+      "workflow": "test-payment-plugins-safely",
+      "description": "Validate payment plugins without real transactions"
+    },
+    "documentationGeneration": {
+      "servers": ["context7", "filesystem"],
+      "workflow": "generate-api-documentation",
+      "description": "Create and maintain technical documentation"
+    },
+    "performanceOptimization": {
+      "servers": ["database-optimizer", "prisma"],
+      "workflow": "optimize-database-queries",
+      "description": "Analyze and optimize database performance"
+    },
+    "securityValidation": {
+      "servers": ["web-search-prime", "browser-tools"],
+      "workflow": "security-audit-automation",
+      "description": "Automated security vulnerability scanning"
+    }
+  },
+  "usageGuidelines": {
+    "testing": {
+      "playwright": "Use @playwright to test voucher generation and payment workflows",
+      "browser-tools": "Use @browser-tools for UI component testing and accessibility validation"
+    },
+    "development": {
+      "context7": "Use @context7 to lookup Fastify and Mikrotik API documentation",
+      "filesystem": "Use @filesystem for backup management and log analysis"
+    },
+    "database": {
+      "prisma": "Use @prisma to validate Knex.js migrations and schema design",
+      "database-optimizer": "Use @database-optimizer for PostgreSQL performance tuning"
+    },
+    "research": {
+      "web-search-prime": "Use @web-search-prime for payment gateway research and security advisories",
+      "github": "Use @github for repository management and issue tracking"
+    }
+  },
+  "serverHealth": {
+    "monitoringEnabled": true,
+    "healthCheckInterval": "5m",
+    "alertThresholds": {
+      "responseTime": "2s",
+      "errorRate": "5%",
+      "uptime": "99%"
+    }
+  },
+  "domainSpecificConfigurations": {
+    "mikrotik": {
+      "apiDocumentation": "context7",
+      "testingTools": "playwright",
+      "simulators": "browser-tools"
+    },
+    "payments": {
+      "research": "web-search-prime",
+      "testing": "playwright",
+      "documentation": "context7"
+    },
+    "whatsapp": {
+      "uiTesting": "browser-tools",
+      "automation": "playwright",
+      "documentation": "context7"
+    },
+    "database": {
+      "primary": "database-optimizer",
+      "backup": "prisma",
+      "fileManagement": "filesystem"
+    }
+  }
+}

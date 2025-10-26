@@ -1,0 +1,249 @@
+<%- include('../partials/header', { title: 'Tambah Pembayaran', currentUrl: '/payments/create' }) %>
+
+<div class="mb-4 row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0 h3">Tambah Pembayaran Baru</h1>
+            <div>
+                <a href="/payments" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Kembali
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Informasi Pembayaran</h5>
+            </div>
+            <div class="card-body">
+                <form id="paymentForm">
+                    <div class="row g-3">
+                        <!-- Customer Selection -->
+                        <div class="col-md-6">
+                            <label for="customerId" class="form-label">Pelanggan</label>
+                            <select class="form-select" id="customerId" name="customer_id">
+                                <option value="">-- Pilih Pelanggan --</option>
+                                <% customers.forEach(customer => { %>
+                                    <option value="<%= customer.id %>" data-name="<%= customer.nama %>" data-phone="<%= customer.nomor_hp %>" data-email="<%= customer.email %>">
+                                        <%= customer.nama %> - <%= customer.nomor_hp || 'No phone' %>
+                                    </option>
+                                <% }); %>
+                            </select>
+                        </div>
+
+                        <!-- Subscription Selection -->
+                        <div class="col-md-6">
+                            <label for="subscriptionId" class="form-label">Berlangganan (Opsional)</label>
+                            <select class="form-select" id="subscriptionId" name="subscription_id">
+                                <option value="">-- Pilih Berlangganan --</option>
+                                <% subscriptions.forEach(sub => { %>
+                                    <option value="<%= sub.id %>" data-customer="<%= sub.customer_id %>">
+                                        <%= sub.customer_name %> - <%= sub.profile_name %> (Rp <%= Number(sub.price_sell).toLocaleString('id-ID') %>/bulan)
+                                    </option>
+                                <% }); %>
+                            </select>
+                        </div>
+
+                        <!-- Payment Amount -->
+                        <div class="col-md-6">
+                            <label for="amount" class="form-label">Jumlah Pembayaran <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" class="form-control" id="amount" name="amount" required min="1000" step="1000">
+                            </div>
+                            <small class="form-text text-muted">Minimal Rp 1.000</small>
+                        </div>
+
+                        <!-- Payment Method -->
+                        <div class="col-md-6">
+                            <label for="paymentMethod" class="form-label">Metode Pembayaran <span class="text-danger">*</span></label>
+                            <select class="form-select" id="paymentMethod" name="method" required>
+                                <option value="">-- Pilih Metode --</option>
+                                <optgroup label="Metode Manual">
+                                    <option value="cash">Cash (Tunai)</option>
+                                    <option value="transfer">Transfer Bank (Manual)</option>
+                                </optgroup>
+                                <optgroup label="Metode Online">
+                                    <% paymentMethods.filter(method => method.plugin).forEach(method => { %>
+                                        <option value="plugin" data-method="<%= method.code %>" data-plugin="<%= method.plugin %>">
+                                            <%= method.name %> - <%= method.description %>
+                                        </option>
+                                    <% }); %>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- Bank Selection (for bank transfer) -->
+                        <div class="col-md-6" id="bankSelection" style="display: none;">
+                            <label for="bankCode" class="form-label">Bank Tujuan</label>
+                            <select class="form-select" id="bankCode" name="bank_code">
+                                <option value="">-- Pilih Bank --</option>
+                                <option value="bca">BCA - Bank Central Asia</option>
+                                <option value="bni">BNI - Bank Negara Indonesia</option>
+                                <option value="bri">BRI - Bank Rakyat Indonesia</option>
+                                <option value="mandiri">Bank Mandiri</option>
+                            </select>
+                        </div>
+
+                        <!-- Plugin Method Selection -->
+                        <div class="col-md-6" id="pluginMethodSelection" style="display: none;">
+                            <label for="paymentMethodCode" class="form-label">Jenis Pembayaran</label>
+                            <input type="hidden" id="paymentMethodCode" name="payment_method_code">
+                            <div class="form-control-plaintext" id="selectedMethodDisplay"></div>
+                        </div>
+
+                        <!-- Customer Contact Info -->
+                        <div class="col-md-6">
+                            <label for="customerEmail" class="form-label">Email Pelanggan</label>
+                            <input type="email" class="form-control" id="customerEmail" name="customer_email" placeholder="customer@example.com">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="customerPhone" class="form-label">Nomor HP Pelanggan</label>
+                            <input type="tel" class="form-control" id="customerPhone" name="customer_phone" placeholder="081234567890">
+                        </div>
+
+                        <!-- Description -->
+                        <div class="col-12">
+                            <label for="description" class="form-label">Deskripsi Pembayaran</label>
+                            <textarea class="form-control" id="description" name="description" rows="2" placeholder="Contoh: Pembayaran langganan bulanan"></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="col-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary" id="submitBtn">
+                                    <i class="bi bi-cash me-2"></i>Buat Pembayaran
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="resetBtn">
+                                    <i class="bi bi-arrow-clockwise me-2"></i>Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Payment Summary -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">Ringkasan Pembayaran</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Metode</label>
+                    <div class="fw-bold" id="summaryMethod">-</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Jumlah</label>
+                    <div class="fw-bold text-primary" id="summaryAmount">Rp 0</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Biaya Admin</label>
+                    <div class="fw-bold text-warning" id="summaryFee">Rp 0</div>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label">Total</label>
+                    <div class="fw-bold text-success fs-5" id="summaryTotal">Rp 0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Aksi Cepat</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="quickCashBtn">
+                        <i class="bi bi-cash me-2"></i>Cash Langsung
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" id="quickTransferBtn">
+                        <i class="bi bi-bank me-2"></i>Transfer Bank
+                    </button>
+                    <button type="button" class="btn btn-outline-success btn-sm" id="quickDuitKuBtn">
+                        <i class="bi bi-credit-card me-2"></i>Bayar via DuitKu
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="card mt-3" id="instructionsCard" style="display: none;">
+            <div class="card-header">
+                <h6 class="mb-0">Instruksi Pembayaran</h6>
+            </div>
+            <div class="card-body">
+                <div id="instructionsContent">
+                    <!-- Instructions will be populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Result Modal -->
+<div class="modal fade" id="paymentResultModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Pembayaran Berhasil Dibuat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="paymentResultBody">
+                <!-- Result will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" id="printReceiptBtn">
+                    <i class="bi bi-printer me-2"></i>Cetak Struk
+                </button>
+                <a href="/payments" class="btn btn-success">
+                    <i class="bi bi-list me-2"></i>Lihat Daftar Pembayaran
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h6>Memproses Pembayaran...</h6>
+                <small class="text-muted">Mohon tunggu sebentar</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.payment-summary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+.payment-summary .card-body {
+    background: transparent;
+}
+.instructions-list {
+    font-size: 0.9em;
+}
+.instructions-list li {
+    margin-bottom: 0.5rem;
+}
+</style>
+
+<%- include('../partials/footer', { scripts: ['/public/js/payments-create.js'] }) %>

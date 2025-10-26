@@ -1,0 +1,107 @@
+{
+  "version": "2.0.0",
+  "project": {
+    "name": "Mikrotik Billing System",
+    "type": "enterprise-mikrotik-billing",
+    "complexity": 8,
+    "description": "Enterprise-grade Mikrotik billing system with voucher management, PPPoE users, WhatsApp notifications, and payment gateway plugins"
+  },
+  "taskMaster": {
+    "enabled": true,
+    "level": "enterprise",
+    "autoCoordination": true,
+    "prioritySystem": "mikrotik-critical",
+    "workflowTemplates": [
+      "mikrotik-integration",
+      "payment-plugin-development",
+      "voucher-system-enhancement",
+      "whatsapp-notification-system",
+      "database-migration-optimization"
+    ]
+  },
+  "agents": {
+    "total": 108,
+    "specializedForMikrotik": 19,
+    "coreAgents": [
+      "@nodejs-expert",
+      "@database-admin",
+      "@api-architect",
+      "@network-engineer",
+      "@payment-systems-expert",
+      "@messaging-specialist",
+      "@plugin-developer",
+      "@devops-engineer"
+    ],
+    "domainExperts": [
+      "@mikrotik-specialist",
+      "@billing-systems-expert",
+      "@voucher-management-expert",
+      "@pppoe-user-specialist",
+      "@whatsapp-integration-expert"
+    ],
+    "bridgeAgents": [
+      "@task-executor",
+      "@task-checker",
+      "@task-orchestrator",
+      "@workflow-coordinator"
+    ]
+  },
+  "mcpServers": {
+    "active": 8,
+    "servers": [
+      "playwright",
+      "github",
+      "context7",
+      "prisma",
+      "filesystem",
+      "browser-tools",
+      "web-search-prime",
+      "database-optimizer"
+    ]
+  },
+  "workflows": {
+    "mikrotikIntegration": {
+      "priority": "critical",
+      "agents": ["@network-engineer", "@api-architect", "@nodejs-expert"],
+      "estimatedDuration": "2-4 hours",
+      "dependencies": ["database-connection", "mikrotik-credentials"]
+    },
+    "paymentPluginDevelopment": {
+      "priority": "high",
+      "agents": ["@payment-systems-expert", "@plugin-developer", "@api-architect"],
+      "estimatedDuration": "4-6 hours",
+      "dependencies": ["payment-gateway-docs", "plugin-interface"]
+    },
+    "voucherSystemEnhancement": {
+      "priority": "medium",
+      "agents": ["@nodejs-expert", "@database-admin", "@frontend-optimization-expert"],
+      "estimatedDuration": "2-3 hours",
+      "dependencies": ["mikrotik-profiles", "pricing-configuration"]
+    }
+  },
+  "qualityGates": {
+    "codeReview": {
+      "required": true,
+      "specialistReview": true,
+      "securityReview": true
+    },
+    "testing": {
+      "unitTests": "required",
+      "integrationTests": "required",
+      "e2eTests": "required",
+      "mikrotikSimulation": "recommended"
+    },
+    "deployment": {
+      "stagingValidation": "required",
+      "productionReadiness": "required",
+      "rollbackPlan": "required"
+    }
+  },
+  "monitoring": {
+    "mikrotikConnection": true,
+    "databasePerformance": true,
+    "whatsappSessions": true,
+    "paymentGateways": true,
+    "systemHealth": true
+  }
+}

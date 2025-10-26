@@ -1,4 +1,4 @@
-const Query = require('../../lib/query');
+const QueryHelper = require('../lib/QueryHelper');
 // Database pool will be passed as parameter
 const EventEmitter = require('events');
 
@@ -9,11 +9,8 @@ const EventEmitter = require('events');
 class DataRetentionService extends EventEmitter {
     constructor(dbPool = null, options = {}) {
         super();
-        if (dbPool) {
-            // Check if it's SQLite (has query/get/run methods) or PostgreSQL (has query/connect methods)
-            // Always use Query class for both SQLite and PostgreSQL
-            this.query = new Query(dbPool);
-        }
+        // Always use QueryHelper for database operations
+        this.query = QueryHelper;
         this.retentionPolicies = {
             logs: 30,           // 30 days for system logs
             whatsapp: 15,       // 15 days for WhatsApp messages
@@ -133,11 +130,10 @@ class DataRetentionService extends EventEmitter {
             // Clean up activity logs
             let activityLogsCount = 0;
             try {
-                const activityLogsResult = await this.query.query(`
-                    DELETE FROM activity_logs
-                    WHERE created_at < $1
-                    RETURNING id
-                `, [cutoffDateStr]);
+                const activityLogsResult = await this.query(
+                    'DELETE FROM activity_logs WHERE created_at < ? RETURNING id',
+                    [cutoffDateStr]
+                );
                 activityLogsCount = activityLogsResult.rowCount || 0;
             } catch (error) {
                 if (error.code === 'SQLITE_ERROR' || error.code === '42P01') {
@@ -168,11 +164,10 @@ class DataRetentionService extends EventEmitter {
             // Clean up WhatsApp messages (simplified - only keep essential table)
             let messagesCount = 0;
             try {
-                const messagesResult = await this.query.query(`
-                    DELETE FROM whatsapp_messages
-                    WHERE created_at < $1
-                    RETURNING id
-                `, [cutoffDateStr]);
+                const messagesResult = await QueryHelper.raw(
+                    'DELETE FROM whatsapp_messages WHERE created_at < ? RETURNING id',
+                    [cutoffDateStr]
+                );
                 messagesCount = messagesResult.rowCount || 0;
             } catch (error) {
                 if (error.code === 'SQLITE_ERROR' || error.code === '42P01') {
@@ -185,12 +180,10 @@ class DataRetentionService extends EventEmitter {
             // Clean up old WhatsApp sessions
             let sessionsCount = 0;
             try {
-                const sessionsResult = await this.query.query(`
-                    DELETE FROM whatsapp_sessions
-                    WHERE last_activity < $1
-                    AND status != 'connected'
-                    RETURNING id
-                `, [cutoffDateStr]);
+                const sessionsResult = await this.query(
+                    'DELETE FROM whatsapp_sessions WHERE last_activity < ? AND status != ? RETURNING id',
+                    [cutoffDateStr, 'connected']
+                );
                 sessionsCount = sessionsResult.rowCount || 0;
             } catch (error) {
                 if (error.code === 'SQLITE_ERROR' || error.code === '42P01') {
@@ -221,12 +214,10 @@ class DataRetentionService extends EventEmitter {
             // Clean up old notifications from queue (use send_after column instead of sent_at)
             let sentCount = 0;
             try {
-                const sentResult = await this.query.query(`
-                    DELETE FROM notification_queue
-                    WHERE status = 'sent'
-                    AND send_after < $1
-                    RETURNING id
-                `, [notificationCutoffDate]);
+                const sentResult = await this.query(
+                    'DELETE FROM notification_queue WHERE status = ? AND send_after < ? RETURNING id',
+                    ['sent', notificationCutoffDate]
+                );
                 sentCount = sentResult.rowCount || 0;
             } catch (error) {
                 if (error.code === 'SQLITE_ERROR' || error.code === '42P01') {
@@ -239,12 +230,10 @@ class DataRetentionService extends EventEmitter {
             // Clean up failed notifications
             let failedCount = 0;
             try {
-                const failedResult = await this.query.query(`
-                    DELETE FROM notification_queue
-                    WHERE status = 'failed'
-                    AND created_at < $1
-                    RETURNING id
-                `, [notificationCutoffDate]);
+                const failedResult = await this.query(
+                    'DELETE FROM notification_queue WHERE status = ? AND created_at < ? RETURNING id',
+                    ['failed', notificationCutoffDate]
+                );
                 failedCount = failedResult.rowCount || 0;
             } catch (error) {
                 if (error.code === 'SQLITE_ERROR' || error.code === '42P01') {
@@ -312,11 +301,10 @@ class DataRetentionService extends EventEmitter {
             // Clean up application error logs (use created_at instead of timestamp)
             let errorLogsCount = 0;
             try {
-                const errorLogsResult = await this.query.query(`
-                    DELETE FROM error_logs
-                    WHERE created_at < $1
-                    RETURNING id
-                `, [errorCutoffDate]);
+                const errorLogsResult = await this.query(
+                    'DELETE FROM error_logs WHERE created_at < ? RETURNING id',
+                    [errorCutoffDate]
+                );
                 errorLogsCount = errorLogsResult.rowCount || 0;
             } catch (error) {
                 if (error.code === 'SQLITE_ERROR' || error.code === '42P01') {
@@ -388,11 +376,11 @@ class DataRetentionService extends EventEmitter {
             // Check if it's PostgreSQL or SQLite
             if (process.env.DB_TYPE === 'postgresql') {
                 // PostgreSQL - run VACUUM ANALYZE
-                await this.query.query('VACUUM ANALYZE');
+                await QueryHelper.raw('VACUUM ANALYZE');
             } else {
                 // SQLite - run VACUUM and ANALYZE separately
-                await this.query.query('VACUUM');
-                await this.query.query('ANALYZE');
+                await QueryHelper.raw('VACUUM');
+                await QueryHelper.raw('ANALYZE');
             }
 
             console.log('Database optimization completed');
@@ -420,7 +408,7 @@ class DataRetentionService extends EventEmitter {
 
             for (const table of tables) {
                 try {
-                    const count = await this.query.getOne(`
+                    const count = await QueryHelper.getOne(`
                         SELECT COUNT(*) as count FROM ${table}
                     `);
                     stats[table] = count.count || 0;
@@ -436,7 +424,7 @@ class DataRetentionService extends EventEmitter {
             // Try to get database file size
             try {
                 // Check if we have access to the database file
-                if (this.query.db && typeof this.query.db === 'object') {
+                if (QueryHelper.db && typeof QueryHelper.db === 'object') {
                     // SQLite - get file size
                     const dbPath = path.join(__dirname, '../../data/billing.db');
                     if (fs.existsSync(dbPath)) {
@@ -446,7 +434,7 @@ class DataRetentionService extends EventEmitter {
                     }
                 } else {
                     // PostgreSQL - use pg_database_size
-                    const dbSize = await this.query.getOne(`
+                    const dbSize = await QueryHelper.getOne(`
                         SELECT pg_database_size(current_database()) as size
                     `);
                     stats.databaseSize = dbSize.size || 0;

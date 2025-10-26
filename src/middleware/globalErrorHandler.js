@@ -26,18 +26,43 @@ class GlobalErrorHandler {
      * Handle general errors
      */
     static async errorHandler(error, request, reply) {
-        // Log the full error for debugging
-        console.error('🔥 Global Error Handler:', {
-            error: error.message,
-            stack: error.stack,
-            url: request.url,
-            method: request.method,
-            headers: request.headers,
-            body: request.body,
-            query: request.query,
-            params: request.params,
+        // Enhanced logging with DEBUG mode support
+        const isDebugMode = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development';
+
+        const errorContext = {
+            error: {
+                message: error.message,
+                name: error.name,
+                code: error.code,
+                statusCode: error.statusCode || error.status
+            },
+            request: {
+                method: request.method,
+                url: request.url,
+                headers: request.headers,
+                body: request.body,
+                query: request.query,
+                params: request.params,
+                id: request.id
+            },
             timestamp: new Date().toISOString()
-        });
+        };
+
+        // Log with full context in debug mode, minimal in production
+        if (isDebugMode) {
+            console.error('🔥 DEBUG - Global Error Handler:', {
+                ...errorContext,
+                stack: error.stack,
+                originalError: error
+            });
+        } else {
+            console.error('🔥 Error:', {
+                message: error.message,
+                url: request.url,
+                method: request.method,
+                statusCode: error.statusCode || 500
+            });
+        }
 
         // Default error response
         let statusCode = 500;
@@ -139,28 +164,38 @@ class GlobalErrorHandler {
             data: null
         };
 
-        // Add additional details in development mode
-        if (process.env.NODE_ENV !== 'production') {
+        // Enhanced debug information based on DEBUG mode
+        if (isDebugMode) {
+            // Full debug information in DEBUG mode
             errorResponse.error.details = details || error.message;
             errorResponse.error.stack = error.stack;
             errorResponse.debug = {
                 headers: request.headers,
                 body: request.body,
                 query: request.query,
-                params: request.params
+                params: request.params,
+                database_url: process.env.DATABASE_URL ? '***CONFIGURED***' : 'NOT_SET',
+                node_env: process.env.NODE_ENV,
+                debug_mode: process.env.DEBUG === 'true'
             };
 
             if (field) {
                 errorResponse.error.field = field;
             }
         } else {
-            // In production, only add safe details
-            if (details && !details.includes('password') && !details.includes('secret')) {
+            // Limited information in production
+            if (details && !details.includes('password') && !details.includes('secret') && !details.includes('token')) {
                 errorResponse.error.details = details;
             }
             if (field) {
                 errorResponse.error.field = field;
             }
+
+            // Add basic debug info for troubleshooting
+            errorResponse.debug_info = {
+                timestamp: errorContext.timestamp,
+                request_id: request.id
+            };
         }
 
         // Add request ID if available

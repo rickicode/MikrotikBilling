@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const AuthMiddleware = require('../middleware/auth');
+const { ApiErrorHandler } = require('../middleware/apiErrorHandler');
 
 async function customerRoutes(fastify, options) {
   const auth = new AuthMiddleware(fastify);
@@ -119,7 +120,7 @@ async function customerRoutes(fastify, options) {
       // Create customer
       const result = await db.query(
           'INSERT INTO customers (name, phone, email, is_active, balance, debt, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-          [name, phone, email, is_active, 0, 0, address || null]
+          [name, phone, email, is_active, 0, 0, request.body.address || null]
         );
 
       // Log activity
@@ -265,7 +266,7 @@ async function customerRoutes(fastify, options) {
       // Get payment history
       const payments = await db.query(`
         SELECT p.*,
-               (SELECT service_type FROM subscriptions WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 1) as service_type,
+               (SELECT type FROM subscriptions WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 1) as type,
                (SELECT billing_cycle FROM subscriptions WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 1) as billing_cycle
         FROM payments p
         WHERE p.customer_id = $1
@@ -334,8 +335,8 @@ async function customerRoutes(fastify, options) {
       return reply.view('customers/service-create', {
         admin: request.admin,
         customer,
-        profiles: profiles || [],
-        pppProfiles: pppProfiles || []
+        profiles: profiles.rows || [],
+        pppProfiles: pppProfiles.rows || []
       });
     } catch (error) {
             fastify.log.error('Internal Server Error:', error);
@@ -689,7 +690,7 @@ async function customerRoutes(fastify, options) {
       }
 
       const payments = await db.query(`
-        SELECT p.*, s.service_type, s.billing_cycle
+        SELECT p.*, s.type, s.billing_cycle
         FROM payments p
         LEFT JOIN subscriptions s ON p.subscription_id = s.id
         WHERE p.customer_id = $1
@@ -841,359 +842,313 @@ async function customerRoutes(fastify, options) {
 
   // API Routes for customer management
   // Check duplicate customer API endpoint
-  fastify.get('/api/customers/check-duplicate', {}, async (request, reply) => {
-    try {
-      const { phone, email } = request.query;
+  fastify.get('/api/customers/check-duplicate', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const { phone, email } = request.query;
 
-      if (!phone && !email) {
-        return reply.code(400).send({
-          success: false,
-          message: 'Masukkan nomor HP atau email untuk mengecek duplikat'
-        });
-      }
-
-      let duplicate = false;
-      let field = '';
-      let customer = null;
-
-      if (phone) {
-        const existingPhoneResult = await db.query(
-          'SELECT id, name FROM customers WHERE phone = $1',
-          [phone]
-        );
-        const existingPhone = existingPhoneResult.rows && existingPhoneResult.rows.length > 0 ? existingPhoneResult.rows[0] : null;
-        if (existingPhone) {
-          duplicate = true;
-          field = 'nomor HP';
-          customer = existingPhone;
-        }
-      }
-
-      if (!duplicate && email) {
-        const existingEmailResult = await db.query(
-          'SELECT id, name FROM customers WHERE email = $1',
-          [email]
-        );
-        const existingEmail = existingEmailResult.rows && existingEmailResult.rows.length > 0 ? existingEmailResult.rows[0] : null;
-        if (existingEmail) {
-          duplicate = true;
-          field = 'email';
-          customer = existingEmail;
-        }
-      }
-
-      return reply.send({
-        duplicate,
-        field,
-        customer
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      throw error;
+    if (!phone && !email) {
+      return ApiErrorHandler.validationError(reply, 'Masukkan nomor HP atau email untuk mengecek duplikat');
     }
-  });
+
+    let duplicate = false;
+    let field = '';
+    let customer = null;
+
+    if (phone) {
+      const existingPhoneResult = await db.query(
+        'SELECT id, name FROM customers WHERE phone = $1',
+        [phone]
+      );
+      const existingPhone = existingPhoneResult.rows && existingPhoneResult.rows.length > 0 ? existingPhoneResult.rows[0] : null;
+      if (existingPhone) {
+        duplicate = true;
+        field = 'nomor HP';
+        customer = existingPhone;
+      }
+    }
+
+    if (!duplicate && email) {
+      const existingEmailResult = await db.query(
+        'SELECT id, name FROM customers WHERE email = $1',
+        [email]
+      );
+      const existingEmail = existingEmailResult.rows && existingEmailResult.rows.length > 0 ? existingEmailResult.rows[0] : null;
+      if (existingEmail) {
+        duplicate = true;
+        field = 'email';
+        customer = existingEmail;
+      }
+    }
+
+    return reply.send({
+      duplicate,
+      field,
+      customer
+    });
+  }));
 
   // Create customer via API
-  fastify.post('/api/customers', {}, async (request, reply) => {
+  fastify.post('/api/customers', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
     console.log('DEBUG: Received customer creation request:', request.body);
     const { name, phone, email, is_active = true, balance = 0, debt = 0, address } = request.body;
 
-    try {
-      // Validate required fields
-      if (!name || !phone) {
-        console.log('DEBUG: Missing required fields - name:', name, 'phone:', phone);
-        return reply.code(400).send({
-          success: false,
-          message: 'Nama dan nomor HP wajib diisi'
-        });
-      }
-
-      // Validate phone number format - more permissive for international formats
-      if (!/^\+?[\d\s\-\(\)]{6,}$/.test(phone)) {
-        console.log('DEBUG: Invalid phone format:', phone);
-        return reply.code(400).send({
-          success: false,
-          message: 'Format nomor HP tidak valid'
-        });
-      }
-
-      // Check if phone number already exists
-      const existingResult = await db.query(
-        'SELECT id FROM customers WHERE phone = $1',
-        [phone]
-      );
-
-      if (existingResult.rows && existingResult.rows.length > 0) {
-        return reply.code(400).send({
-          success: false,
-          message: 'Nomor HP sudah terdaftar'
-        });
-      }
-
-      // Create customer with all fields
-      const result = await db.query(
-          'INSERT INTO customers (name, phone, email, is_active, balance, debt, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-          [name, phone, email, is_active, balance || 0, debt || 0, address || null]
-        );
-
-      const newCustomerResult = await db.query(
-        'SELECT * FROM customers WHERE id = $1',
-        [result.rows[0].id]
-      );
-      const newCustomer = newCustomerResult.rows && newCustomerResult.rows.length > 0 ? newCustomerResult.rows[0] : null;
-
-      // Log activity
-      await auth.logActivity(
-        request.admin.id,
-        'create_customer',
-        'customer',
-        result.rows[0].id,
-        { name, phone, email, is_active },
-        request
-      );
-
-      return reply.code(201).send({
-        success: true,
-        customer: newCustomer,
-        message: 'Pelanggan berhasil ditambahkan'
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      throw error;
+    // Validate required fields
+    if (!name || !phone) {
+      console.log('DEBUG: Missing required fields - name:', name, 'phone:', phone);
+      return ApiErrorHandler.validationError(reply, 'Nama dan nomor HP wajib diisi');
     }
-  });
+
+    // Validate phone number format - more permissive for international formats
+    if (!/^\+?[\d\s\-\(\)]{6,}$/.test(phone)) {
+      console.log('DEBUG: Invalid phone format:', phone);
+      return ApiErrorHandler.validationError(reply, 'Format nomor HP tidak valid');
+    }
+
+    // Check if phone number already exists
+    const existingResult = await db.query(
+      'SELECT id FROM customers WHERE phone = $1',
+      [phone]
+    );
+
+    if (existingResult.rows && existingResult.rows.length > 0) {
+      return ApiErrorHandler.validationError(reply, 'Nomor HP sudah terdaftar');
+    }
+
+    // Create customer with all fields
+    const result = await db.query(
+        'INSERT INTO customers (name, phone, email, is_active, balance, debt, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [name, phone, email, is_active, balance || 0, debt || 0, address || null]
+      );
+
+    const newCustomerResult = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [result.rows[0].id]
+    );
+    const newCustomer = newCustomerResult.rows && newCustomerResult.rows.length > 0 ? newCustomerResult.rows[0] : null;
+
+    // Log activity
+    await auth.logActivity(
+      request.admin.id,
+      'create_customer',
+      'customer',
+      result.rows[0].id,
+      { name, phone, email, is_active },
+      request
+    );
+
+    return reply.code(201).send({
+      success: true,
+      customer: newCustomer,
+      message: 'Pelanggan berhasil ditambahkan'
+    });
+  }));
 
   // Get customers with pagination and filtering
-  fastify.get('/api/customers', {}, async (request, reply) => {
-    try {
-      const page = parseInt(request.query.page) || 1;
-      const pageSize = parseInt(request.query.page_size) || 10;
-      const offset = (page - 1) * pageSize;
-      const search = request.query.search || '';
-      const status = request.query.status || '';
-      const service = request.query.service || '';
-      const sortBy = request.query.sort_by || 'created_at';
-      const sortOrder = request.query.sort_order || 'desc';
+  fastify.get('/api/customers', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const page = parseInt(request.query.page) || 1;
+    const pageSize = parseInt(request.query.page_size) || 10;
+    const offset = (page - 1) * pageSize;
+    const search = request.query.search || '';
+    const status = request.query.status || '';
+    const service = request.query.service || '';
+    const sortBy = request.query.sort_by || 'created_at';
+    const sortOrder = request.query.sort_order || 'desc';
 
-      let whereClause = 'WHERE 1=1';
-      const params = [];
+    let whereClause = 'WHERE 1=1';
+    const params = [];
 
-      if (search) {
-        whereClause += ' AND (c.name ILIKE $1 OR c.phone ILIKE $1 OR c.email ILIKE $1)';
-        params.push(`%${search}%`);
-      }
-
-      if (status === 'active') {
-        whereClause += ' AND c.is_active = true';
-      } else if (status === 'inactive') {
-        whereClause += ' AND c.is_active = false';
-      } else if (status === 'suspended') {
-        whereClause += " AND c.status = 'suspended'";
-      }
-
-      // Build query based on service filter
-      let serviceJoin = '';
-      if (service) {
-        if (service === 'hotspot') {
-          serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = \'hotspot\'';
-        } else if (service === 'pppoe') {
-          serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = \'pppoe\'';
-        } else if (service === 'both') {
-          serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id';
-          whereClause += ' AND (SELECT COUNT(DISTINCT service_type) FROM subscriptions WHERE customer_id = c.id) = 2';
-        }
-      } else {
-        serviceJoin = 'LEFT JOIN subscriptions s ON c.id = s.customer_id';
-      }
-
-      const customersResult = await db.query(`
-        SELECT c.*,
-               COUNT(DISTINCT s.id) as subscription_count,
-               COALESCE(SUM(p.amount), 0) as total_payments,
-               STRING_AGG(DISTINCT s.service_type, ',') as services
-        FROM customers c
-        ${serviceJoin}
-        LEFT JOIN payments p ON c.id = p.customer_id AND p.status = 'paid'
-        ${whereClause}
-        GROUP BY c.id
-        ORDER BY c.${sortBy} ${sortOrder}
-        LIMIT $1 OFFSET $2
-      `, [...params, pageSize, offset]);
-
-      const customers = customersResult.rows || [];
-
-      const totalQuery = await db.query(`
-        SELECT COUNT(DISTINCT c.id) as count
-        FROM customers c
-        ${serviceJoin}
-        ${whereClause}
-      `, params);
-      const total = parseInt(totalQuery.rows[0].count);
-
-      // Calculate statistics
-      const statistics = {
-        total: total,
-        active: (await db.query('SELECT COUNT(*) as count FROM customers WHERE is_active = true')).rows[0].count,
-        hotspot: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = \'hotspot\'`)).rows[0].count,
-        pppoe: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = \'pppoe\'`)).rows[0].count
-      };
-
-      // Process services for each customer
-      const processedCustomers = customers.map(customer => ({
-        ...customer,
-        services: customer.services ? customer.services.split(',') : []
-      }));
-
-      return reply.send({
-        customers: processedCustomers,
-        pagination: {
-          page: page,
-          page_size: pageSize,
-          total: total,
-          total_pages: Math.ceil(total / pageSize),
-          from: offset + 1,
-          to: Math.min(offset + pageSize, total)
-        },
-        statistics
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      // Let the global error handler handle this
-      throw error;
+    if (search) {
+      whereClause += ' AND (c.name ILIKE $1 OR c.phone ILIKE $1 OR c.email ILIKE $1)';
+      params.push(`%${search}%`);
     }
-  });
+
+    if (status === 'active') {
+      whereClause += ' AND c.is_active = true';
+    } else if (status === 'inactive') {
+      whereClause += ' AND c.is_active = false';
+    } else if (status === 'suspended') {
+      whereClause += " AND c.status = 'suspended'";
+    }
+
+    // Build query based on service filter
+    let serviceJoin = '';
+    if (service) {
+      if (service === 'hotspot') {
+        serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id AND s.type = \'hotspot\'';
+      } else if (service === 'pppoe') {
+        serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id AND s.type = \'pppoe\'';
+      } else if (service === 'both') {
+        serviceJoin = 'INNER JOIN subscriptions s ON c.id = s.customer_id';
+        whereClause += ' AND (SELECT COUNT(DISTINCT type) FROM subscriptions WHERE customer_id = c.id) = 2';
+      }
+    } else {
+      serviceJoin = 'LEFT JOIN subscriptions s ON c.id = s.customer_id';
+    }
+
+    const customersResult = await db.query(`
+      SELECT c.*,
+             COUNT(DISTINCT s.id) as subscription_count,
+             COALESCE(SUM(p.amount), 0) as total_payments,
+             STRING_AGG(DISTINCT s.type::text, ',') as services
+      FROM customers c
+      ${serviceJoin}
+      LEFT JOIN payments p ON c.id = p.customer_id AND p.status = 'paid'
+      ${whereClause}
+      GROUP BY c.id
+      ORDER BY c.${sortBy} ${sortOrder}
+      LIMIT $1 OFFSET $2
+    `, [...params, pageSize, offset]);
+
+    const customers = customersResult.rows || [];
+
+    const totalQuery = await db.query(`
+      SELECT COUNT(DISTINCT c.id) as count
+      FROM customers c
+      ${serviceJoin}
+      ${whereClause}
+    `, params);
+    const total = parseInt(totalQuery.rows[0].count);
+
+    // Calculate statistics
+    const statistics = {
+      total: total,
+      active: (await db.query('SELECT COUNT(*) as count FROM customers WHERE is_active = true')).rows[0].count,
+      hotspot: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.type = \'hotspot\'`)).rows[0].count,
+      pppoe: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.type = \'pppoe\'`)).rows[0].count
+    };
+
+    // Process services for each customer
+    const processedCustomers = customers.map(customer => ({
+      ...customer,
+      services: customer.services ? customer.services.split(',') : []
+    }));
+
+    return reply.send({
+      customers: processedCustomers,
+      pagination: {
+        page: page,
+        page_size: pageSize,
+        total: total,
+        total_pages: Math.ceil(total / pageSize),
+        from: offset + 1,
+        to: Math.min(offset + pageSize, total)
+      },
+      statistics
+    });
+  }));
 
   // Get customer statistics
-  fastify.get('/api/customers/statistics', {}, async (request, reply) => {
-    try {
-      const statistics = {
-        total: (await db.query('SELECT COUNT(*) as count FROM customers')).rows[0].count,
-        active: (await db.query('SELECT COUNT(*) as count FROM customers WHERE is_active = true')).rows[0].count,
-        inactive: (await db.query('SELECT COUNT(*) as count FROM customers WHERE is_active = false')).rows[0].count,
-        suspended: (await db.query('SELECT COUNT(*) as count FROM customers WHERE status = \'suspended\'')).rows[0].count,
-        hotspot: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = \'hotspot\'`)).rows[0].count,
-        pppoe: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.service_type = \'pppoe\'`)).rows[0].count,
-        total_revenue: 0, // TODO: Fix this query
-        total_debt: (await db.query('SELECT COALESCE(SUM(debt), 0) as total FROM customers')).rows[0].total,
-        total_credit: (await db.query('SELECT COALESCE(SUM(balance), 0) as total FROM customers')).rows[0].total
-      };
+  fastify.get('/api/customers/statistics', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const statistics = {
+      total: (await db.query('SELECT COUNT(*) as count FROM customers')).rows[0].count,
+      active: (await db.query('SELECT COUNT(*) as count FROM customers WHERE is_active = true')).rows[0].count,
+      inactive: (await db.query('SELECT COUNT(*) as count FROM customers WHERE is_active = false')).rows[0].count,
+      suspended: (await db.query('SELECT COUNT(*) as count FROM customers WHERE status = \'suspended\'')).rows[0].count,
+      hotspot: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.type = \'hotspot\'`)).rows[0].count,
+      pppoe: (await db.query(`SELECT COUNT(DISTINCT c.id) as count FROM customers c INNER JOIN subscriptions s ON c.id = s.customer_id AND s.type = \'pppoe\'`)).rows[0].count,
+      total_revenue: 0, // TODO: Fix this query
+      total_debt: (await db.query('SELECT COALESCE(SUM(debt), 0) as total FROM customers')).rows[0].total,
+      total_credit: (await db.query('SELECT COALESCE(SUM(balance), 0) as total FROM customers')).rows[0].total
+    };
 
-      return reply.send(statistics);
-    } catch (error) {
-      fastify.log.error(error);
-      // Let the global error handler handle this
-      throw error;
-    }
-  });
+    return reply.send(statistics);
+  }));
 
   // Get single customer by ID
-  fastify.get('/api/customers/:id', {}, async (request, reply) => {
-    try {
-      const customerResult = await db.query(
-        'SELECT * FROM customers WHERE id = $1',
-        [request.params.id]
-      );
-      const customer = customerResult.rows && customerResult.rows.length > 0 ? customerResult.rows[0] : null;
+  fastify.get('/api/customers/:id', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const customerResult = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [request.params.id]
+    );
+    const customer = customerResult.rows && customerResult.rows.length > 0 ? customerResult.rows[0] : null;
 
-      if (!customer) {
-        return reply.code(404).send({ error: 'Customer not found' });
-      }
-
-      // Get subscriptions
-      const subscriptions = await db.query(`
-        SELECT s.*,
-               (SELECT COUNT(*) FROM payments WHERE customer_id = $1 AND status = 'paid') as payment_count,
-               (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE customer_id = $1 AND status = 'paid') as total_paid
-        FROM subscriptions s
-        WHERE s.customer_id = $1
-        ORDER BY s.created_at DESC
-      `, [request.params.id]);
-
-      // Get payment history
-      const payments = await db.query(`
-        SELECT p.*
-        FROM payments p
-        WHERE p.customer_id = $1
-        ORDER BY p.created_at DESC
-        LIMIT 20
-      `, [request.params.id]);
-
-      // Activities table doesn't exist in current schema
-      const activities = [];
-
-      return reply.send({
-        ...customer,
-        subscriptions,
-        payments,
-        activities,
-        services: subscriptions.map(s => s.service_type)
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      // Let the global error handler handle this
-      throw error;
+    if (!customer) {
+      return ApiErrorHandler.notFoundError(reply, 'Customer not found');
     }
-  });
+
+    // Get subscriptions
+    const subscriptions = await db.query(`
+      SELECT s.*,
+             (SELECT COUNT(*) FROM payments WHERE customer_id = $1 AND status = 'paid') as payment_count,
+             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE customer_id = $1 AND status = 'paid') as total_paid
+      FROM subscriptions s
+      WHERE s.customer_id = $1
+      ORDER BY s.created_at DESC
+    `, [request.params.id]);
+
+    // Get payment history
+    const payments = await db.query(`
+      SELECT p.*
+      FROM payments p
+      WHERE p.customer_id = $1
+      ORDER BY p.created_at DESC
+      LIMIT 20
+    `, [request.params.id]);
+
+    // Activities table doesn't exist in current schema
+    const activities = [];
+
+    return reply.send({
+      ...customer,
+      subscriptions,
+      payments,
+      activities,
+      services: subscriptions.map(s => s.type)
+    });
+  }));
 
   // Export customers
-  fastify.get('/api/customers/export', {}, async (request, reply) => {
-    try {
-      const search = request.query.search || '';
-      const status = request.query.status || '';
-      const service = request.query.service || '';
+  fastify.get('/api/customers/export', {}, ApiErrorHandler.asyncHandler(async (request, reply) => {
+    const search = request.query.search || '';
+    const status = request.query.status || '';
+    const service = request.query.service || '';
 
-      let whereClause = 'WHERE 1=1';
-      const params = [];
+    let whereClause = 'WHERE 1=1';
+    const params = [];
 
-      if (search) {
-        whereClause += ' AND (name ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1)';
-        params.push(`%${search}%`);
-      }
-
-      if (status) {
-        whereClause += ` AND is_active = ${status === 'active' ? 1 : 0}`;
-      }
-
-      if (service) {
-        whereClause += ` AND id IN (SELECT customer_id FROM subscriptions WHERE service_type = '${service}')`;
-      }
-
-      const customersResult = await db.query(`
-        SELECT
-          id, name, phone, email, is_active,
-          balance, debt, created_at, updated_at
-        FROM customers
-        ${whereClause}
-        ORDER BY created_at DESC
-      `, params);
-
-      const customers = customersResult.rows || [];
-
-      // Generate CSV
-      const headers = ['ID', 'Nama', 'Nomor HP', 'Email', 'Status', 'Saldo', 'Hutang', 'Terdaftar'];
-      const csvContent = [
-        headers.join(','),
-        ...customers.map(c => [
-          c.id,
-          `"${c.name || ''}"`,
-          c.phone || '',
-          `"${c.email || ''}"`,
-          c.is_active ? 'Aktif' : c.status === 'suspended' ? 'Ditangguhkan' : 'Tidak Aktif',
-          c.balance || 0,
-          c.debt || 0,
-          c.created_at
-        ].join(','))
-      ].join('\n');
-
-      reply.header('Content-Type', 'text/csv');
-      reply.header('Content-Disposition', 'attachment; filename="customers.csv"');
-      return reply.send(csvContent);
-    } catch (error) {
-      fastify.log.error(error);
-      // Let the global error handler handle this
-      throw error;
+    if (search) {
+      whereClause += ' AND (name ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1)';
+      params.push(`%${search}%`);
     }
-  });
+
+    if (status) {
+      whereClause += ` AND is_active = ${status === 'active' ? 1 : 0}`;
+    }
+
+    if (service) {
+      whereClause += ` AND id IN (SELECT customer_id FROM subscriptions WHERE type = '${service}')`;
+    }
+
+    const customersResult = await db.query(`
+      SELECT
+        id, name, phone, email, is_active,
+        balance, debt, created_at, updated_at
+      FROM customers
+      ${whereClause}
+      ORDER BY created_at DESC
+    `, params);
+
+    const customers = customersResult.rows || [];
+
+    // Generate CSV
+    const headers = ['ID', 'Nama', 'Nomor HP', 'Email', 'Status', 'Saldo', 'Hutang', 'Terdaftar'];
+    const csvContent = [
+      headers.join(','),
+      ...customers.map(c => [
+        c.id,
+        `"${c.name || ''}"`,
+        c.phone || '',
+        `"${c.email || ''}"`,
+        c.is_active ? 'Aktif' : c.status === 'suspended' ? 'Ditangguhkan' : 'Tidak Aktif',
+        c.balance || 0,
+        c.debt || 0,
+        c.created_at
+      ].join(','))
+    ].join('\n');
+
+    reply.header('Content-Type', 'text/csv');
+    reply.header('Content-Disposition', 'attachment; filename="customers.csv"');
+    return reply.send(csvContent);
+  }));
 }
 
 module.exports = customerRoutes;

@@ -1,0 +1,70 @@
+{
+  "projectInfo": {
+    "name": "Mikrotik Billing System",
+    "domain": "telecommunications-billing",
+    "version": "2.0.0",
+    "lastUpdated": "2025-10-23T20:30:00Z"
+  },
+  "technicalStack": {
+    "backend": {
+      "framework": "Fastify",
+      "language": "Node.js",
+      "version": ">=18.0.0"
+    },
+    "database": {
+      "primary": "PostgreSQL",
+      "hosting": "Supabase",
+      "orm": "Knex.js"
+    },
+    "frontend": {
+      "framework": "Bootstrap 5",
+      "templating": "EJS",
+      "enhancements": "HTMX"
+    },
+    "integrations": {
+      "mikrotik": "RouterOS API",
+      "whatsapp": "WhatsApp Web JS",
+      "payments": "Plugin-based System"
+    }
+  },
+  "domainSpecifics": {
+    "mikrotik": {
+      "userTypes": ["hotspot", "pppoe"],
+      "profileManagement": "web-only",
+      "commentPatterns": {
+        "voucher": "VOUCHER_SYSTEM|price_sell|first_login_timestamp|valid_until_timestamp",
+        "subscription": "Complete metadata with customer assignment"
+      },
+      "syncRequirements": "real-time-polling"
+    },
+    "billing": {
+      "voucherSystem": "one-time",
+      "subscriptionSystem": "customer-assigned",
+      "paymentMethods": ["duitku", "manual", "bank-transfer"],
+      "pluginArchitecture": "hot-swappable"
+    },
+    "whatsapp": {
+      "sessions": "multi-session",
+      "rateLimit": "1 message/second",
+      "templateSystem": "advanced-wysiwyg"
+    }
+  },
+  "developmentStandards": {
+    "commitFormat": "type(scope): description - @agent1 @agent2",
+    "codeReview": "specialist-required",
+    "testing": "comprehensive-coverage",
+    "documentation": "real-time-updates"
+  },
+  "performanceRequirements": {
+    "concurrentUsers": 1000,
+    "responseTime": "<200ms",
+    "mikrotikApiCalls": "<100/minute",
+    "whatsappMessages": "1/second/session"
+  },
+  "securityRequirements": {
+    "authentication": "JWT with 30-day sessions",
+    "roleBasedAccess": ["Super Admin", "Admin", "Operator"],
+    "apiSecurity": "Rate limiting, CSRF protection, Helmet",
+    "dataProtection": "Encrypted backup storage"
+  }
+}

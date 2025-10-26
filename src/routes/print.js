@@ -14,257 +14,481 @@ module.exports = async function(fastify, opts) {
         return formatted.replace(/,00$/, '');
     };
 
-    // Get voucher by IDs for printing
-    fastify.get('/vouchers/:ids', async (request, reply) => {
+    // Get voucher by IDs for printing - Enhanced error handling
+    fastify.get('/vouchers/:ids', {
+        config: {
+            // Increase timeout for print operations
+            timeout: 30000
+        }
+    }, async (request, reply) => {
+        let responseSent = false;
+
         try {
             const { ids } = request.params;
-            const { auto_print } = request.query;
+            const { auto_print, format } = request.query;
 
-            // Get template type from settings
-            const templateResult = await db.query(`SELECT value FROM settings WHERE key = $1`, ['print_template_type']);
-            const template = templateResult ? templateResult.value : 'a4'; // Default to A4
+            // Validate input parameters
+            if (!ids || ids.trim() === '') {
+                if (!responseSent) {
+                    responseSent = true;
+                    return reply.code(400).type('application/json').send({
+                        success: false,
+                        error: {
+                            code: 'INVALID_PARAMETERS',
+                            message: 'Voucher IDs are required',
+                            details: 'Please provide valid voucher IDs'
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                return;
+            }
 
-            // Parse voucher IDs
-            const voucherIds = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            // Initialize database connection check
+            try {
+                await db.query('SELECT 1');
+            } catch (dbError) {
+                fastify.log.error('Database connection failed:', dbError);
+                if (!responseSent) {
+                    responseSent = true;
+                    return reply.code(503).type('application/json').send({
+                        success: false,
+                        error: {
+                            code: 'DATABASE_UNAVAILABLE',
+                            message: 'Database connection failed',
+                            details: process.env.DEBUG === 'true' ? dbError.message : 'Service temporarily unavailable'
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                return;
+            }
+
+            // Get template type from settings or query parameter
+            let template = 'a4'; // Default to A4
+            if (format && ['a4', 'thermal'].includes(format)) {
+                template = format;
+            } else {
+                try {
+                    const templateResult = await db.query(`SELECT value FROM settings WHERE key = $1`, ['print_template_type']);
+                    if (templateResult.rows && templateResult.rows.length > 0) {
+                        template = templateResult.rows[0].value;
+                    }
+                } catch (settingsError) {
+                    fastify.log.warn('Error getting template type from settings:', settingsError.message);
+                    // Continue with default template
+                }
+            }
+
+            // Parse and validate voucher IDs
+            const voucherIds = ids.split(',').map(id => {
+                const trimmed = id.trim();
+                const parsed = parseInt(trimmed);
+                return isNaN(parsed) ? null : parsed;
+            }).filter(id => id !== null);
 
             if (voucherIds.length === 0) {
-                return reply.code(400).view('error', {
-                    message: 'Invalid voucher IDs',
-                    error: 'No valid voucher IDs provided'
-                });
+                if (!responseSent) {
+                    responseSent = true;
+                    return reply.code(400).type('application/json').send({
+                        success: false,
+                        error: {
+                            code: 'INVALID_VOUCHER_IDS',
+                            message: 'No valid voucher IDs provided',
+                            details: 'The provided IDs are not valid numbers'
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                return;
             }
 
-            // Get vouchers from database
-            const placeholders = voucherIds.map((_, index) => `$${index + 1}`).join(',');
-            const vouchers = await db.query(`
-                SELECT v.*, p.name as profile_name, p.bandwidth_up, p.bandwidth_down, p.type,
-                       vd.name as vendor_name
-                FROM vouchers v
-                LEFT JOIN profiles p ON v.profile_id = p.id
-                LEFT JOIN vendors vd ON v.vendor_id = vd.id
-                WHERE v.id IN (${placeholders})
-                ORDER BY v.id
-            `, voucherIds);
+            // Check if vouchers table exists and has required columns
+            try {
+                const tableCheck = await db.query(`
+                    SELECT column_name, data_type
+                    FROM information_schema.columns
+                    WHERE table_name = 'vouchers'
+                    AND column_name IN ('id', 'code', 'price_sell', 'duration_hours', 'created_at', 'profile_id', 'vendor_id')
+                `);
+
+                if (tableCheck.rows.length < 7) {
+                    const missingColumns = ['id', 'code', 'price_sell', 'duration_hours', 'created_at', 'profile_id', 'vendor_id']
+                        .filter(col => !tableCheck.rows.some(row => row.column_name === col));
+
+                    if (!responseSent) {
+                        responseSent = true;
+                        return reply.code(500).type('application/json').send({
+                            success: false,
+                            error: {
+                                code: 'DATABASE_SCHEMA_ERROR',
+                                message: 'Database schema is incomplete',
+                                details: `Missing columns in vouchers table: ${missingColumns.join(', ')}`
+                            },
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                    return;
+                }
+            } catch (schemaError) {
+                fastify.log.error('Schema check failed:', schemaError);
+                if (!responseSent) {
+                    responseSent = true;
+                    return reply.code(500).type('application/json').send({
+                        success: false,
+                        error: {
+                            code: 'DATABASE_SCHEMA_ERROR',
+                            message: 'Unable to verify database schema',
+                            details: process.env.DEBUG === 'true' ? schemaError.message : 'Database schema verification failed'
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                return;
+            }
+
+            // Get vouchers from database with proper error handling
+            let vouchers = [];
+            try {
+                const placeholders = voucherIds.map((_, index) => `$${index + 1}`).join(',');
+                const vouchersResult = await db.query(`
+                    SELECT v.id, v.code, v.price_sell, v.duration_hours, v.created_at, v.profile_id, v.vendor_id,
+                           p.name as profile_name,
+                           vd.name as vendor_name
+                    FROM vouchers v
+                    LEFT JOIN profiles p ON v.profile_id = p.id
+                    LEFT JOIN vendors vd ON v.vendor_id = vd.id
+                    WHERE v.id IN (${placeholders})
+                    ORDER BY v.id
+                `, voucherIds);
+
+                vouchers = vouchersResult.rows || [];
+            } catch (queryError) {
+                fastify.log.error('Failed to fetch vouchers:', queryError);
+                if (!responseSent) {
+                    responseSent = true;
+                    return reply.code(500).type('application/json').send({
+                        success: false,
+                        error: {
+                            code: 'QUERY_ERROR',
+                            message: 'Failed to fetch vouchers from database',
+                            details: process.env.DEBUG === 'true' ? queryError.message : 'Database query failed'
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                return;
+            }
 
             if (vouchers.length === 0) {
-                return reply.code(404).view('error', {
-                    message: 'Vouchers not found',
-                    error: 'No vouchers found with the provided IDs'
-                });
-            }
-
-            // Calculate total revenue
-            const totalRevenue = vouchers.reduce((sum, voucher) => sum + (voucher.price_sell || 0), 0);
-
-            // Read template file
-            const fs = require('fs');
-            const path = require('path');
-            const templateFileName = `template_${template}.html`;
-            const templateFilePath = path.join(__dirname, '../../data', templateFileName);
-
-            let templateContent = '';
-            try {
-                templateContent = fs.readFileSync(templateFilePath, 'utf8');
-            } catch (error) {
-                // If template file doesn't exist, use default built-in template
-                templateContent = getDefaultTemplate(template);
-            }
-
-            // Generate all vouchers HTML by creating multiple voucher divs
-            let allVouchersHTML = '';
-            vouchers.forEach((voucher, index) => {
-                let voucherHTML = templateContent;
-
-                // Replace template variables with actual voucher data
-                voucherHTML = voucherHTML.replace(/{KodeVoucher}/g, voucher.voucher_code || '');
-                voucherHTML = voucherHTML.replace(/{NamaPerusahaan}/g, (reply.locals.settings && reply.locals.settings.company_name) || 'WiFi Hotspot');
-                voucherHTML = voucherHTML.replace(/{NamaVendor}/g, voucher.vendor_name || 'Tanpa Vendor');
-                voucherHTML = voucherHTML.replace(/{DurasiHari}/g, `${Math.floor(voucher.duration_hours / 24)} Hari`);
-                voucherHTML = voucherHTML.replace(/{TanggalExpired}/g, new Date(voucher.created_at).toLocaleDateString('id-ID'));
-                voucherHTML = voucherHTML.replace(/{HargaJual}/g, formatCurrency(voucher.price_sell).replace('Rp', '').trim());
-                voucherHTML = voucherHTML.replace(/\[1\]/g, `[${index + 1}]`);
-
-                // Extract just the voucher div from the template
-                const voucherMatch = voucherHTML.match(/<div class="voucher">[\s\S]*?<\/div>/);
-                if (voucherMatch) {
-                    allVouchersHTML += voucherMatch[0];
+                if (!responseSent) {
+                    responseSent = true;
+                    return reply.code(404).type('application/json').send({
+                        success: false,
+                        error: {
+                            code: 'VOUCHERS_NOT_FOUND',
+                            message: 'No vouchers found with the provided IDs',
+                            details: `Checked ${voucherIds.length} voucher IDs, none were found`
+                        },
+                        timestamp: new Date().toISOString()
+                    });
                 }
-            });
-
-            // Build final HTML with proper structure
-            let finalHTML = templateContent;
-            const containerMatch = finalHTML.match(/(<div class="voucher-container">)[\s\S]*?(<\/div>)/);
-            if (containerMatch) {
-                finalHTML = finalHTML.replace(containerMatch[0], `${containerMatch[1]}${allVouchersHTML}${containerMatch[2]}`);
+                return;
             }
 
             // Get template name from settings
-            const templateNameResult = await db.query(`SELECT value FROM settings WHERE key = $1`, ['template_name']);
-            const templateName = templateNameResult ? templateNameResult.value : 'Default';
+            let templateName = 'Default';
+            try {
+                const templateNameResult = await db.query(`SELECT value FROM settings WHERE key = $1`, ['template_name']);
+                if (templateNameResult.rows && templateNameResult.rows.length > 0) {
+                    templateName = templateNameResult.rows[0].value;
+                }
+            } catch (templateNameError) {
+                fastify.log.warn('Error getting template name from settings:', templateNameError.message);
+                // Continue with default template name
+            }
 
-            // Build complete HTML document with embedded CSS
-            const cssStyles = `
-                body {
-                    font-family: Courier New, monospace;
-                    margin: 5px;
-                    background: #ffffff;
-                    font-size: 10px;
-                }
-                .voucher-container {
-                    display: grid;
-                    grid-template-columns: repeat(10, 1fr);
-                    gap: 4px;
-                    max-width: 210mm;
-                    margin: 0 auto;
-                }
-                .voucher {
-                    width: 145px;
-                    border: 1px solid #000;
-                    page-break-inside: avoid;
-                    background: #ffffff;
-                }
-                .voucher table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 11px;
-                }
-                .voucher td {
-                    padding: 2px;
-                    border: none;
-                }
-                .rotate {
-                    font-weight: bold;
-                    border-right: 1px solid black;
-                    background-color: #ffea8f !important;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                    width: 20px;
-                    height: 80px;
-                }
-                .rotate span {
-                    writing-mode: vertical-lr;
-                    text-orientation: mixed;
-                    transform: rotate(180deg);
-                    display: block;
-                    text-align: center;
-                    font-size: 10px;
-                    line-height: 1.2;
-                    padding: 5px 2px;
-                }
-                .company-header {
-                    font-weight: bold;
-                    font-size: 12px;
-                    padding-left: 5px;
-                    background: #FBA1B7 !important;
-                    color: white !important;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                    text-align: center;
-                }
-                .company-name {
-                    text-align: left;
-                }
-                .voucher-number {
-                    text-align: right;
-                    font-size: 9px;
-                }
-                .voucher-code {
-                    width: 100%;
-                    font-weight: 600;
-                    font-size: 18px;
-                    text-align: center;
-                }
-                .duration, .validity {
-                    font-size: 11px;
-                    padding-right: 5px;
-                    text-align: end;
-                    background: #FFECAF !important;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-                @media print {
-                    body { margin: 2px; }
-                    .voucher-container { gap: 2px; }
-                }
-            `;
+            // Generate HTML content
+            let allVouchersHTML = '';
+            vouchers.forEach((voucher, index) => {
+                const safeVoucher = {
+                    code: voucher.code || 'N/A',
+                    vendor_name: voucher.vendor_name || 'Tanpa Vendor',
+                    duration_hours: voucher.duration_hours || 0,
+                    created_at: voucher.created_at || new Date(),
+                    price_sell: voucher.price_sell || 0
+                };
 
-            const thermalCssStyles = `
-                body {
-                    font-family: Courier New, monospace;
-                    margin: 5px;
-                    padding: 5px;
-                    width: 80mm;
-                    background: white;
-                }
-                .voucher-container {
-                    width: 100%;
-                }
-                .voucher {
-                    border-bottom: 1px dashed #000;
-                    padding: 10px 0;
-                    margin-bottom: 10px;
-                    text-align: center;
-                    page-break-inside: avoid;
-                }
-                .header {
-                    font-size: 12px;
-                    font-weight: bold;
-                    margin-bottom: 8px;
-                }
-                .code {
-                    font-family: Courier New, monospace;
-                    font-size: 16px;
-                    font-weight: bold;
-                    background: #000 !important;
-                    color: #fff !important;
-                    padding: 5px;
-                    margin: 8px 0;
-                    letter-spacing: 2px;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-                .info {
-                    font-size: 10px;
-                    margin: 3px 0;
-                }
-                .price {
-                    font-size: 12px;
-                    font-weight: bold;
-                    margin-top: 5px;
-                }
-                @media print {
-                    body { margin: 2px; }
-                    .voucher { margin-bottom: 5px; }
-                }
-            `;
-
-            const completeHTML = `<!DOCTYPE html>
-<html>
-<head>
-    <title>WiFi Voucher - ${template.toUpperCase()}</title>
-    <style>
-        ${template === 'a4' ? cssStyles : thermalCssStyles}
-    </style>
-</head>
-<body>
-    ${finalHTML}
-</body>
-</html>`;
-
-            // Return the processed template HTML
-            reply.header('Content-Type', 'text/html');
-            return completeHTML;
-
-        } catch (error) {
-            fastify.log.error('Error printing vouchers:', error);
-            reply.code(500).view('error', {
-                message: 'Internal Server Error',
-                error: error.message
+                const voucherHTML = generateVoucherHTML(safeVoucher, index + 1, template, reply.locals.settings);
+                allVouchersHTML += voucherHTML;
             });
+
+            // Build complete HTML document
+            const completeHTML = generateCompleteHTML(allVouchersHTML, template, templateName);
+
+            // Send successful response
+            if (!responseSent) {
+                responseSent = true;
+                reply.header('Content-Type', 'text/html');
+                reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                return reply.send(completeHTML);
+            }
+
+        } catch (unexpectedError) {
+            fastify.log.error('Unexpected error in print route:', {
+                error: unexpectedError.message,
+                stack: unexpectedError.stack,
+                params: request.params,
+                query: request.query,
+                responseSent: responseSent
+            });
+
+            if (!responseSent) {
+                responseSent = true;
+                return reply.code(500).type('application/json').send({
+                    success: false,
+                    error: {
+                        code: 'UNEXPECTED_ERROR',
+                        message: 'An unexpected error occurred while processing your request',
+                        details: process.env.DEBUG === 'true' ? unexpectedError.message : 'Internal server error',
+                        stack: process.env.DEBUG === 'true' ? unexpectedError.stack : undefined
+                    },
+                    timestamp: new Date().toISOString()
+                });
+            }
         }
     });
 
-    // Helper function to get default template HTML
+    // Helper function to generate individual voucher HTML
+    function generateVoucherHTML(voucher, index, template, settings = {}) {
+        const companyName = (settings && settings.company_name) || 'WiFi Hotspot';
+        const durationDays = Math.floor(voucher.duration_hours / 24);
+        const formattedPrice = formatCurrency(voucher.price_sell).replace('Rp', '').trim();
+
+        // Hanya tampilkan expiry untuk voucher yang sudah digunakan
+        const isUsed = voucher.used_at !== null && voucher.used_at !== undefined;
+        const expiryDate = isUsed ? new Date(voucher.expires_at).toLocaleDateString('id-ID') : null;
+
+        // Sistem VALID: periode aktif setelah voucher digunakan (1 hari setelah first login)
+        const validPeriod = "Valid 1 Hari";
+
+        if (template === 'a4') {
+            // Hitung durasi dalam jam (sesuai template)
+            const durationHours = voucher.duration_hours || 0;
+            const durationText = durationHours >= 24
+                ? `Durasi: ${Math.floor(durationHours / 24)} hari`
+                : `Durasi: ${durationHours} jam`;
+
+            return `
+                <div class="voucher">
+                    <table class="voucher" style="width: 145;">
+                        <tbody>
+                            <tr>
+                                <td class="rotate" style="font-weight: bold; border-right: 1px solid black; background-color:#ffea8f; -webkit-print-color-adjust: exact;" rowspan="6">
+                                    <span style="padding-bottom: 5px; font-size: 18px; font-weight: bold;">Rp ${formattedPrice}</span>
+                                </td>
+                                <td style="font-weight: bold;font-size: 12px;padding-left: 5px;background: #FBA1B7;color: white;text-align: center;" colspan="2">
+                                    <span>${companyName}</span>
+                                    <span style="text-align: right;font-size: 9px;">[${index}]</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width: 100%; font-weight: 600; font-size: 18px; text-align: center;">${voucher.code}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-size: 11px;padding-right: 5px;text-align: end;background: #FFECAF;"> ${durationText}  </td>
+                            </tr>
+                            <tr>
+                                <td style="font-size: 11px;padding-right: 5px;text-align: end;background: #FFECAF;"> Valid: 1 hari  </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else if (template === 'thermal') {
+            // Untuk voucher thermal
+            const expiryInfo = isUsed
+                ? `<div class="info">Berlaku sampai: ${expiryDate}</div>`
+                : '';
+
+            return `
+                <div class="voucher">
+                    <div class="header">${companyName}</div>
+                    <div class="code">${voucher.code}</div>
+                    <div class="info">Durasi: ${durationDays} Hari</div>
+                    ${expiryInfo}
+                    <div class="info">${validPeriod}</div>
+                    <div class="price">Rp ${formattedPrice}</div>
+                </div>
+            `;
+        }
+        return '';
+    }
+
+    // Helper function to generate complete HTML document
+    function generateCompleteHTML(vouchersHTML, template, templateName = 'Default') {
+        const cssStyles = template === 'a4' ? `
+            body {
+                font-family: Courier New, monospace;
+                margin: 5px;
+                background: #ffffff;
+                font-size: 10px;
+            }
+            .voucher-container {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 4px;
+                max-width: 210mm;
+                margin: 0 auto;
+            }
+            .voucher {
+                width: 145px;
+                border: 1px solid #000;
+                page-break-inside: avoid;
+                background: #ffffff;
+            }
+            .voucher table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 11px;
+            }
+            .voucher td {
+                padding: 2px;
+                border: none;
+            }
+            .rotate {
+                font-weight: bold;
+                border-right: 1px solid black;
+                background-color: #ffea8f !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                width: 25px;
+                height: 80px;
+            }
+            .rotate span {
+                writing-mode: vertical-lr;
+                text-orientation: mixed;
+                transform: rotate(180deg);
+                display: block;
+                text-align: center;
+                font-size: 9px;
+                line-height: 1.1;
+                padding: 4px 2px;
+                font-weight: 600;
+            }
+            .company-header {
+                font-weight: bold;
+                font-size: 12px;
+                padding-left: 5px;
+                background: #FBA1B7 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                text-align: center;
+            }
+            .company-name {
+                text-align: left;
+            }
+            .voucher-number {
+                text-align: right;
+                font-size: 9px;
+            }
+            .voucher-code {
+                width: 100%;
+                font-weight: 600;
+                font-size: 18px;
+                text-align: center;
+            }
+            .duration, .validity {
+                font-size: 11px;
+                padding-right: 5px;
+                text-align: end;
+                background: #FFECAF !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            @media print {
+                body { margin: 2px; }
+                .voucher-container { gap: 2px; }
+            }
+            @page {
+                margin: 5mm;
+                size: A4;
+            }
+        ` : `
+            body {
+                font-family: Courier New, monospace;
+                margin: 5px;
+                padding: 5px;
+                width: 80mm;
+                background: white;
+            }
+            .voucher {
+                border-bottom: 1px dashed #000;
+                padding: 10px 0;
+                margin-bottom: 10px;
+                text-align: center;
+                page-break-inside: avoid;
+            }
+            .header {
+                font-size: 12px;
+                font-weight: bold;
+                margin-bottom: 8px;
+            }
+            .code {
+                font-family: Courier New, monospace;
+                font-size: 16px;
+                font-weight: bold;
+                background: #000 !important;
+                color: #fff !important;
+                padding: 5px;
+                margin: 8px 0;
+                letter-spacing: 2px;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .info {
+                font-size: 10px;
+                margin: 3px 0;
+            }
+            .price {
+                font-size: 12px;
+                font-weight: bold;
+                margin-top: 5px;
+            }
+            @media print {
+                body { margin: 2px; }
+                .voucher { margin-bottom: 5px; }
+            }
+            @page {
+                margin: 5mm;
+                size: 80mm auto;
+            }
+        `;
+
+        const containerClass = template === 'a4' ? 'voucher-container' : '';
+        const containerTag = template === 'a4' ? 'div' : 'div';
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>WiFi Voucher - ${template.toUpperCase()}</title>
+    <meta charset="utf-8">
+    <style>
+        ${cssStyles}
+    </style>
+    ${template === 'thermal' ? '<meta name="viewport" content="width=device-width, initial-scale=1.0">' : ''}
+</head>
+<body>
+    <${containerTag} class="${containerClass}">
+        ${vouchersHTML}
+    </${containerTag}>
+    ${template === 'thermal' ? '<script>window.onload = function() { window.print(); };</script>' : ''}
+</body>
+</html>`;
+    }
+
+    // Helper function to get default template HTML (legacy fallback)
     function getDefaultTemplate(templateType) {
         if (templateType === 'a4') {
             return `<!DOCTYPE html>
@@ -455,8 +679,13 @@ module.exports = async function(fastify, opts) {
             });
 
             // Get template name from settings
-            const templateNameResult = await db.query(`SELECT value FROM settings WHERE key = $1`, ['template_name']);
-            const templateName = templateNameResult ? templateNameResult.value : 'Default';
+            let templateName = 'Default';
+            try {
+                const templateNameResult = await db.query(`SELECT value FROM settings WHERE key = $1`, ['template_name']);
+                templateName = templateNameResult.rows && templateNameResult.rows.length > 0 ? templateNameResult.rows[0].value : 'Default';
+            } catch (error) {
+                console.warn('Error getting template name from settings:', error.message);
+            }
 
             // Render with print-only template (no header/footer)
             reply.header('Content-Type', 'text/html');
@@ -473,7 +702,7 @@ module.exports = async function(fastify, opts) {
 
         } catch (error) {
             fastify.log.error('Error printing batch vouchers:', error);
-            reply.code(500).view('error', {
+            return reply.code(500).view('error', {
                 message: 'Internal Server Error',
                 error: error.message
             });
@@ -508,7 +737,7 @@ module.exports = async function(fastify, opts) {
 
         } catch (error) {
             fastify.log.error('Error getting print templates:', error);
-            reply.code(500).send({
+            return reply.code(500).send({
                 success: false,
                 message: 'Failed to get print templates',
                 error: error.message
@@ -556,7 +785,7 @@ module.exports = async function(fastify, opts) {
 
         } catch (error) {
             fastify.log.error('Error previewing print template:', error);
-            reply.code(500).send({
+            return reply.code(500).send({
                 success: false,
                 message: 'Failed to preview template',
                 error: error.message
@@ -592,7 +821,7 @@ module.exports = async function(fastify, opts) {
 
         } catch (error) {
             fastify.log.error('Error loading print management page:', error);
-            reply.code(500).view('error', {
+            return reply.code(500).view('error', {
                 message: 'Internal Server Error',
                 error: error.message
             });

@@ -143,7 +143,7 @@ const PaymentManager = {
                 sort_order: this.sortOrder
             });
 
-            const response = await fetch(`/api/payments?${params}`);
+            const response = await fetch(`/payments/api/payments?${params}`);
             const result = await response.json();
 
             if (result.success) {
@@ -355,7 +355,7 @@ const PaymentManager = {
 
     async loadStatistics() {
         try {
-            const response = await fetch('/api/payments/statistics');
+            const response = await fetch('/payments/api/payments/statistics');
             const result = await response.json();
 
             if (result.success) {
@@ -371,7 +371,7 @@ const PaymentManager = {
 
     async loadTodaySummary() {
         try {
-            const response = await fetch('/api/payments/today-summary');
+            const response = await fetch('/payments/api/payments/today-summary');
             const result = await response.json();
 
             if (result.success) {
@@ -387,7 +387,7 @@ const PaymentManager = {
         if (!confirm('Apakah Anda yakin ingin menyetujui pembayaran ini?')) return;
 
         try {
-            const response = await fetch(`/api/payments/${paymentId}/approve`, {
+            const response = await fetch(`/payments/api/payments/${paymentId}/approve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -395,16 +395,22 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', 'Pembayaran berhasil disetujui');
+                if (window.showToast) {
+                    window.showToast('Pembayaran berhasil disetujui', 'success');
+                }
                 this.loadPayments();
                 this.loadStatistics();
                 this.loadTodaySummary();
             } else {
-                this.showAlert('danger', result.message || 'Gagal menyetujui pembayaran');
+                if (window.showToast) {
+                    window.showToast(result.message || 'Gagal menyetujui pembayaran', 'error');
+                }
             }
         } catch (error) {
             console.error('Error approving payment:', error);
-            this.showAlert('danger', 'Gagal menyetujui pembayaran');
+            if (window.showToast) {
+                window.showToast('Gagal menyetujui pembayaran', 'error');
+            }
         }
     },
 
@@ -412,7 +418,7 @@ const PaymentManager = {
         if (!confirm('Apakah Anda yakin ingin menolak pembayaran ini?')) return;
 
         try {
-            const response = await fetch(`/api/payments/${paymentId}/reject`, {
+            const response = await fetch(`/payments/api/payments/${paymentId}/reject`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -420,22 +426,28 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', 'Pembayaran berhasil ditolak');
+                if (window.showToast) {
+                    window.showToast('Pembayaran berhasil ditolak', 'success');
+                }
                 this.loadPayments();
                 this.loadStatistics();
                 this.loadTodaySummary();
             } else {
-                this.showAlert('danger', result.message || 'Gagal menolak pembayaran');
+                if (window.showToast) {
+                    window.showToast(result.message || 'Gagal menolak pembayaran', 'error');
+                }
             }
         } catch (error) {
             console.error('Error rejecting payment:', error);
-            this.showAlert('danger', 'Gagal menolak pembayaran');
+            if (window.showToast) {
+                window.showToast('Gagal menolak pembayaran', 'error');
+            }
         }
     },
 
     async checkDuitKuStatus(paymentId) {
         try {
-            const response = await fetch(`/api/payments/${paymentId}/check-duitku`, {
+            const response = await fetch(`/payments/api/payments/${paymentId}/check-duitku`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -443,29 +455,37 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('info', `Status DuitKu: ${result.data.status}`);
+                if (window.showToast) {
+                    window.showToast(`Status DuitKu: ${result.data.status}`, 'info');
+                }
                 this.loadPayments();
                 this.loadStatistics();
                 this.loadTodaySummary();
             } else {
-                this.showAlert('danger', result.message || 'Gagal mengecek status DuitKu');
+                if (window.showToast) {
+                    window.showToast(result.message || 'Gagal mengecek status DuitKu', 'error');
+                }
             }
         } catch (error) {
             console.error('Error checking DuitKu status:', error);
-            this.showAlert('danger', 'Gagal mengecek status DuitKu');
+            if (window.showToast) {
+                window.showToast('Gagal mengecek status DuitKu', 'error');
+            }
         }
     },
 
     async bulkApprovePayments() {
         if (this.selectedPayments.size === 0) {
-            this.showAlert('warning', 'Pilih pembayaran yang ingin disetujui');
+            if (window.showToast) {
+                window.showToast('Pilih pembayaran yang ingin disetujui', 'warning');
+            }
             return;
         }
 
         if (!confirm(`Apakah Anda yakin ingin menyetujui ${this.selectedPayments.size} pembayaran?`)) return;
 
         try {
-            const response = await fetch('/api/payments/bulk-approve', {
+            const response = await fetch('/payments/api/payments/bulk-approve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: Array.from(this.selectedPayments) })
@@ -474,30 +494,36 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', `${result.data.processed_count} pembayaran berhasil disetujui`);
+                if (window.showToast) {
+                    window.showToast(`${result.data.processed_count} pembayaran berhasil disetujui`, 'success');
+                }
                 this.clearSelection();
                 this.loadPayments();
                 this.loadStatistics();
                 this.loadTodaySummary();
             } else {
-                this.showAlert('danger', result.message || 'Gagal menyetujui pembayaran');
+                if (window.showToast) {
+                    window.showToast(result.message || 'Gagal menyetujui pembayaran', 'error');
+                }
             }
         } catch (error) {
             console.error('Error bulk approving payments:', error);
-            this.showAlert('danger', 'Gagal menyetujui pembayaran');
+            if (window.showToast) {
+                window.showToast('Gagal menyetujui pembayaran', 'error');
+            }
         }
     },
 
     async bulkRejectPayments() {
         if (this.selectedPayments.size === 0) {
-            this.showAlert('warning', 'Pilih pembayaran yang ingin ditolak');
+            window.showToast('Pilih pembayaran yang ingin ditolak', 'warning');
             return;
         }
 
         if (!confirm(`Apakah Anda yakin ingin menolak ${this.selectedPayments.size} pembayaran?`)) return;
 
         try {
-            const response = await fetch('/api/payments/bulk-reject', {
+            const response = await fetch('/payments/api/payments/bulk-reject', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: Array.from(this.selectedPayments) })
@@ -506,23 +532,23 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', `${result.data.processed_count} pembayaran berhasil ditolak`);
+                window.showToast( `${result.data.processed_count} pembayaran berhasil ditolak`);
                 this.clearSelection();
                 this.loadPayments();
                 this.loadStatistics();
                 this.loadTodaySummary();
             } else {
-                this.showAlert('danger', result.message || 'Gagal menolak pembayaran');
+                window.showToast( result.message || 'Gagal menolak pembayaran');
             }
         } catch (error) {
             console.error('Error bulk rejecting payments:', error);
-            this.showAlert('danger', 'Gagal menolak pembayaran');
+            window.showToast( 'Gagal menolak pembayaran');
         }
     },
 
     async showProcessDuitKuModal() {
         try {
-            const response = await fetch('/api/payments/duitku-pending');
+            const response = await fetch('/payments/api/payments/duitku-pending');
             const result = await response.json();
 
             if (result.success) {
@@ -530,11 +556,11 @@ const PaymentManager = {
                 const modal = new bootstrap.Modal(document.getElementById('processDuitKuModal'));
                 modal.show();
             } else {
-                this.showAlert('danger', result.message || 'Gagal memuat data DuitKu pending');
+                window.showToast( result.message || 'Gagal memuat data DuitKu pending');
             }
         } catch (error) {
             console.error('Error loading DuitKu pending:', error);
-            this.showAlert('danger', 'Gagal memuat data DuitKu pending');
+            window.showToast( 'Gagal memuat data DuitKu pending');
         }
     },
 
@@ -590,12 +616,12 @@ const PaymentManager = {
         const paymentIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.value));
 
         if (paymentIds.length === 0) {
-            this.showAlert('warning', 'Pilih pembayaran yang ingin diproses');
+            window.showToast( 'Pilih pembayaran yang ingin diproses');
             return;
         }
 
         try {
-            const response = await fetch('/api/payments/bulk-check-duitku', {
+            const response = await fetch('/payments/api/payments/bulk-check-duitku', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: paymentIds })
@@ -604,17 +630,17 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', `Berhasil memproses ${result.data.processed_count} pembayaran DuitKu`);
+                window.showToast( `Berhasil memproses ${result.data.processed_count} pembayaran DuitKu`);
                 bootstrap.Modal.getInstance(document.getElementById('processDuitKuModal')).hide();
                 this.loadPayments();
                 this.loadStatistics();
                 this.loadTodaySummary();
             } else {
-                this.showAlert('danger', result.message || 'Gagal memproses pembayaran DuitKu');
+                window.showToast( result.message || 'Gagal memproses pembayaran DuitKu');
             }
         } catch (error) {
             console.error('Error processing DuitKu payments:', error);
-            this.showAlert('danger', 'Gagal memproses pembayaran DuitKu');
+            window.showToast( 'Gagal memproses pembayaran DuitKu');
         }
     },
 
@@ -628,7 +654,7 @@ const PaymentManager = {
         const formData = new FormData(form);
 
         try {
-            const response = await fetch('/api/payments/generate-report', {
+            const response = await fetch('/payments/api/payments/generate-report', {
                 method: 'POST',
                 body: formData
             });
@@ -636,24 +662,24 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', 'Laporan berhasil dibuat');
+                window.showToast( 'Laporan berhasil dibuat');
                 // Download the report
                 if (result.data.file_url) {
                     window.open(result.data.file_url, '_blank');
                 }
                 bootstrap.Modal.getInstance(document.getElementById('reportsModal')).hide();
             } else {
-                this.showAlert('danger', result.message || 'Gagal membuat laporan');
+                window.showToast( result.message || 'Gagal membuat laporan');
             }
         } catch (error) {
             console.error('Error generating report:', error);
-            this.showAlert('danger', 'Gagal membuat laporan');
+            window.showToast( 'Gagal membuat laporan');
         }
     },
 
     async checkOverduePayments() {
         try {
-            const response = await fetch('/api/payments/check-overdue', {
+            const response = await fetch('/payments/api/payments/check-overdue', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -661,14 +687,14 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('info', `Ditemukan ${result.data.overdue_count} pembayaran terlambat`);
+                window.showToast( `Ditemukan ${result.data.overdue_count} pembayaran terlambat`);
                 this.loadPayments();
             } else {
-                this.showAlert('danger', result.message || 'Gagal mengecek pembayaran terlambat');
+                window.showToast( result.message || 'Gagal mengecek pembayaran terlambat');
             }
         } catch (error) {
             console.error('Error checking overdue payments:', error);
-            this.showAlert('danger', 'Gagal mengecek pembayaran terlambat');
+            window.showToast( 'Gagal mengecek pembayaran terlambat');
         }
     },
 
@@ -676,7 +702,7 @@ const PaymentManager = {
         if (!confirm('Apakah Anda yakin ingin merekonsiliasi semua pembayaran?')) return;
 
         try {
-            const response = await fetch('/api/payments/reconcile', {
+            const response = await fetch('/payments/api/payments/reconcile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -684,20 +710,20 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', `Rekonsiliasi berhasil: ${result.data.message}`);
+                window.showToast( `Rekonsiliasi berhasil: ${result.data.message}`);
                 this.updateReconciliationStatus(result.data);
             } else {
-                this.showAlert('danger', result.message || 'Gagal merekonsiliasi pembayaran');
+                window.showToast( result.message || 'Gagal merekonsiliasi pembayaran');
             }
         } catch (error) {
             console.error('Error reconciling payments:', error);
-            this.showAlert('danger', 'Gagal merekonsiliasi pembayaran');
+            window.showToast( 'Gagal merekonsiliasi pembayaran');
         }
     },
 
     async autoReconcile() {
         try {
-            const response = await fetch('/api/payments/auto-reconcile', {
+            const response = await fetch('/payments/api/payments/auto-reconcile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -705,14 +731,14 @@ const PaymentManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.showAlert('success', `Auto-reconcile berhasil: ${result.data.message}`);
+                window.showToast( `Auto-reconcile berhasil: ${result.data.message}`);
                 this.updateReconciliationStatus(result.data);
             } else {
-                this.showAlert('danger', result.message || 'Gagal auto-reconcile');
+                window.showToast( result.message || 'Gagal auto-reconcile');
             }
         } catch (error) {
             console.error('Error auto-reconciling payments:', error);
-            this.showAlert('danger', 'Gagal auto-reconcile');
+            window.showToast( 'Gagal auto-reconcile');
         }
     },
 
@@ -735,21 +761,21 @@ const PaymentManager = {
                 end_date: this.endDate
             });
 
-            window.open(`/api/payments/export?${params}`, '_blank');
+            window.open(`/payments/api/payments/export?${params}`, '_blank');
         } catch (error) {
             console.error('Error exporting payments:', error);
-            this.showAlert('danger', 'Gagal mengekspor pembayaran');
+            window.showToast( 'Gagal mengekspor pembayaran');
         }
     },
 
     async bulkExportPayments() {
         if (this.selectedPayments.size === 0) {
-            this.showAlert('warning', 'Pilih pembayaran yang ingin diekspor');
+            window.showToast( 'Pilih pembayaran yang ingin diekspor');
             return;
         }
 
         try {
-            const response = await fetch('/api/payments/bulk-export', {
+            const response = await fetch('/payments/api/payments/bulk-export', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_ids: Array.from(this.selectedPayments) })
@@ -759,13 +785,13 @@ const PaymentManager = {
 
             if (result.success) {
                 window.open(result.data.file_url, '_blank');
-                this.showAlert('success', 'Export berhasil');
+                window.showToast( 'Export berhasil');
             } else {
-                this.showAlert('danger', result.message || 'Gagal mengekspor pembayaran');
+                window.showToast( result.message || 'Gagal mengekspor pembayaran');
             }
         } catch (error) {
             console.error('Error bulk exporting payments:', error);
-            this.showAlert('danger', 'Gagal mengekspor pembayaran');
+            window.showToast( 'Gagal mengekspor pembayaran');
         }
     },
 
@@ -829,24 +855,7 @@ const PaymentManager = {
         }, 30000);
     },
 
-    showAlert(type, message) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        document.body.appendChild(alertDiv);
-
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.parentNode.removeChild(alertDiv);
-            }
-        }, 5000);
-    },
-
+    
     formatCurrency(amount) {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -857,6 +866,23 @@ const PaymentManager = {
 
     formatDateTime(timestamp) {
         return new Date(timestamp).toLocaleString('id-ID');
+    },
+
+    toggleAdvancedFilters() {
+        const advancedFilters = document.getElementById('advancedFilters');
+        const toggleBtn = document.getElementById('advancedFilterBtn');
+
+        if (!advancedFilters) return;
+
+        const isHidden = advancedFilters.classList.contains('hidden');
+
+        if (isHidden) {
+            advancedFilters.classList.remove('hidden');
+            toggleBtn.innerHTML = '<i class="fas fa-times mr-1"></i>Sembunyikan Filter';
+        } else {
+            advancedFilters.classList.add('hidden');
+            toggleBtn.innerHTML = '<i class="fas fa-filter mr-1"></i>Filter Lanjutan';
+        }
     }
 };
 

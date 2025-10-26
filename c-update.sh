@@ -16,6 +16,19 @@ API_BASE_URL="https://api.z.ai/api/anthropic"
 API_KEY_URL="https://z.ai/manage-apikey/apikey-list"
 API_TIMEOUT_MS=3000000
 
+# Default API Keys
+declare -A API_KEYS=(
+    [1]="95f46d84a34a48b29001581cd8931236.x7CUYWYubskKYwvn"
+    [2]="55cc29474ec341309f46c400dd2e27c1.3HWVT2Mm65IcZPN4"
+    [3]="81a58b3d27eb433d91693f7607ffd288.O7eunCaYfBajIq0c"
+)
+
+declare -A API_KEY_DESCRIPTIONS=(
+    [1]="rickicode@gmail.com (Google)"
+    [2]="rickicode (GitHub)"
+    [3]="rickiuchiha@gmail.com"
+)
+
 # ========================
 #       工具函数
 # ========================
@@ -139,11 +152,87 @@ configure_claude_json(){
 #     API Key 配置
 # ========================
 
+get_current_api_key() {
+    if [ -f "$CONFIG_FILE" ]; then
+        node --eval '
+            const fs = require("fs");
+            const path = require("path");
+            const homeDir = require("os").homedir();
+            const filePath = path.join(homeDir, ".claude", "settings.json");
+            
+            if (fs.existsSync(filePath)) {
+                try {
+                    const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+                    if (content.env && content.env.ANTHROPIC_AUTH_TOKEN) {
+                        console.log(content.env.ANTHROPIC_AUTH_TOKEN);
+                    }
+                } catch (e) {}
+            }
+        ' 2>/dev/null || echo ""
+    else
+        echo ""
+    fi
+}
+
 configure_claude() {
     log_info "Configuring Claude Code..."
-    echo "   You can get your API key from: $API_KEY_URL"
-    read -s -p "🔑 Please enter your ZHIPU API key: " api_key
-    echo
+    
+    # Deteksi API key yang sedang digunakan
+    current_api_key=$(get_current_api_key)
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "   📋 Available API Keys:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Tampilkan setiap API key dengan indikator jika sedang digunakan
+    for i in 1 2 3; do
+        if [ -n "$current_api_key" ] && [ "${API_KEYS[$i]}" = "$current_api_key" ]; then
+            echo "   [${i}] ${API_KEY_DESCRIPTIONS[$i]} ✓ (Currently Active)"
+        else
+            echo "   [${i}] ${API_KEY_DESCRIPTIONS[$i]}"
+        fi
+    done
+    
+    # Cek jika API key saat ini bukan dari default list
+    if [ -n "$current_api_key" ]; then
+        is_default=false
+        for i in 1 2 3; do
+            if [ "${API_KEYS[$i]}" = "$current_api_key" ]; then
+                is_default=true
+                break
+            fi
+        done
+        
+        if [ "$is_default" = false ]; then
+            echo "   [m] Manual input (custom API key) ✓ (Currently Active)"
+        else
+            echo "   [m] Manual input (custom API key)"
+        fi
+    else
+        echo "   [m] Manual input (custom API key)"
+    fi
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    read -p "🔑 Choose your API key (1/2/3/m): " choice
+    
+    case "$choice" in
+        1|2|3)
+            api_key="${API_KEYS[$choice]}"
+            log_success "Selected: ${API_KEY_DESCRIPTIONS[$choice]}"
+            ;;
+        m|M)
+            echo ""
+            echo "   You can get your API key from: $API_KEY_URL"
+            read -s -p "🔑 Please enter your ZHIPU API key: " api_key
+            echo
+            ;;
+        *)
+            log_error "Invalid choice. Please run the script again and select 1, 2, 3, or m."
+            exit 1
+            ;;
+    esac
 
     if [ -z "$api_key" ]; then
         log_error "API key cannot be empty. Please run the script again."

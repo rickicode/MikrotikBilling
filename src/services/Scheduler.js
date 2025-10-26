@@ -4,26 +4,24 @@ const CarryOverService = require('./CarryOverService');
 const PaymentFlowOrchestrator = require('./PaymentFlowOrchestrator');
 const NotificationFlowService = require('./NotificationFlowService');
 const MikrotikSyncService = require('./MikrotikSyncService');
+const QueryHelper = require('../lib/QueryHelper');
 
 module.exports = async function(fastify) {
   console.log('Starting background scheduler...');
-
-  // Get database connection (PostgreSQL pool)
-  const dbPool = fastify.db.getPool();
 
   // Initialize User Monitor Service (replaces profile scripts)
   fastify.userMonitorService = new UserMonitorService(
     fastify.mikrotik,
     fastify.whatsappService,
-    dbPool
+    QueryHelper
   );
 
   // Initialize Carry Over Service
-  fastify.carryOverService = new CarryOverService(dbPool);
+  fastify.carryOverService = new CarryOverService(QueryHelper);
 
   // Initialize Notification Flow Service
   fastify.notificationFlowService = new NotificationFlowService(
-    dbPool,
+    QueryHelper,
     {
       whatsappService: fastify.whatsappService
     }
@@ -36,7 +34,7 @@ module.exports = async function(fastify) {
   });
 
   // Initialize the MikrotikSyncService with database and config
-  await fastify.mikrotikSyncService.initialize(dbPool, {
+  await fastify.mikrotikSyncService.initialize(QueryHelper, {
     host: process.env.MIKROTIK_HOST || '192.168.88.1',
     port: process.env.MIKROTIK_API_PORT || 8728,
     username: process.env.MIKROTIK_USER || 'admin',
@@ -44,7 +42,7 @@ module.exports = async function(fastify) {
   });
 
   // Initialize Payment Flow Orchestrator
-  fastify.paymentFlowOrchestrator = new PaymentFlowOrchestrator(dbPool, {
+  fastify.paymentFlowOrchestrator = new PaymentFlowOrchestrator(QueryHelper, {
     carryOverService: fastify.carryOverService,
     whatsappService: fastify.whatsappService,
     mikrotikClient: fastify.mikrotik,
@@ -271,20 +269,29 @@ module.exports = async function(fastify) {
           console.warn(`⚠️ WhatsApp connection issue: ${connectionStatus.status} - ${connectionStatus.message}`);
 
           // Log to database for monitoring
-          await fastify.db.query(`
-            INSERT INTO system_logs (level, module, message, details)
-            VALUES ($1, $2, $3, $4)
-          `, [
-            'WARN',
-            'whatsapp_connection',
-            `WhatsApp connection status: ${connectionStatus.status}`,
-            JSON.stringify({
-              status: connectionStatus.status,
-              message: connectionStatus.message,
-              qr_code_available: connectionStatus.qrCodeAvailable,
-              session_active: connectionStatus.sessionActive
-            })
-          ]);
+          try {
+            if (QueryHelper && typeof QueryHelper.query === 'function') {
+              await QueryHelper.query(`
+                INSERT INTO system_logs (level, module, message, details)
+                VALUES (?, ?, ?, ?)
+              `, [
+                'WARN',
+                'whatsapp_connection',
+                `WhatsApp connection status: ${connectionStatus.status}`,
+                JSON.stringify({
+                  status: connectionStatus.status,
+                  message: connectionStatus.message,
+                  qr_code_available: connectionStatus.qrCodeAvailable,
+                  session_active: connectionStatus.sessionActive
+                })
+              ]);
+            } else {
+              console.warn('QueryHelper.query not available, skipping database logging');
+            }
+          } catch (logError) {
+            console.error('Failed to log WhatsApp connection status to database:', logError);
+            // Continue execution - logging failure shouldn't stop the monitoring
+          }
         } else {
           console.log(`📱 WhatsApp connection healthy: ${connectionStatus.status}`);
         }

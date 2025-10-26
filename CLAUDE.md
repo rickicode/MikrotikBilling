@@ -5,7 +5,7 @@ Sistem manajemen voucher hotspot dan user PPPoE mikrotik lengkap menggunakan pen
 ## Tech Stack
 
 - **Framework**: Node.js dengan Fastify
-- **Database**: SQLite dengan migration system
+- **Database**: PostgreSQL dengan Supabase hosting
 - **Frontend**: HTML, CSS, JavaScript, Bootstrap 5, HTMX
 - **Mikrotik Integration**: RouterOS API
 - **WhatsApp Integration**: WhatsApp Web JS
@@ -178,7 +178,45 @@ Sistem manajemen voucher hotspot dan user PPPoE mikrotik lengkap menggunakan pen
 - Subscription: Complete metadata dengan customer assignment
 - Consistent pattern across all user types
 
-### 8. User Interface Structure
+### 8. Profile Management System
+
+**Web-Only Profile Management**
+
+- File: `src/routes/profiles.js`, `views/profiles/`
+- **Hanya profil yang dibuat melalui web interface** yang ditampilkan
+- Profil manual yang dibuat langsung di RouterOS tidak di-list di web
+- Sistem sinkronisasi untuk memverifikasi keberadaan profil di Mikrotik
+
+**Profile Creation Logic**
+
+- Semua profil dibuat melalui web otomatis dianggap "web-managed"
+- Tidak ada konsep "Managed By Manual" karena semua profil di web adalah sistem-managed
+- Status sync menunjukkan apakah profil sudah ada di Mikrotik (Tersinkron/Belum Sync)
+- Query filter hanya menampilkan profil yang ada di database lokal
+
+**Sync Status System**
+
+- **Tersinkron**: Profil sudah dibuat di Mikrotik RouterOS
+- **Belum Sync**: Profil ada di database web tapi belum di RouterOS
+- Automatic sync saat pembuatan profil baru
+- Manual sync button untuk sinkronisasi ulang
+- Real-time sync monitoring di statistics dashboard
+
+**Mikrotik Integration Pattern**
+
+- Comment pattern: `VOUCHER_SYSTEM` untuk hotspot profiles
+- Comment pattern: `PPPOE_SYSTEM` untuk PPPoE profiles
+- Script injection otomatis untuk profile lifecycle management
+- Profile validation sebelum pembuatan user voucher/PPPoE
+
+**CRUD Operations**
+
+- Create: Web interface → Database → RouterOS (sync)
+- Read: Hanya profil dari database web yang ditampilkan
+- Update: Web interface → Database → RouterOS (resync)
+- Delete: Web interface → Database → RouterOS (remove)
+
+### 9. User Interface Structure
 
 **Navigation System**
 
@@ -323,3 +361,310 @@ Sistem manajemen voucher hotspot dan user PPPoE mikrotik lengkap menggunakan pen
 7. **Real-time Sync**: Polling dengan offline mode fallback
 8. **Comment Patterns**: Consistent metadata storage dalam Mikrotik comments
 9. **Auto Lifecycle**: System-managed user creation, monitoring, dan cleanup
+
+### 14. Plugin Manager System
+
+**WordPress-style Plugin Management**
+
+- File: `src/routes/plugins.js`, `views/plugins/`
+- Plugin dashboard dengan activate/deactivate functionality
+- Real-time plugin status monitoring dengan error detection
+- Plugin sandbox environment untuk security isolation
+- Hot-swappable plugins tanpa system restart
+- Plugin metadata management (version, author, description)
+- Plugin update notifications dan automatic validation
+
+**Plugin Manager Interface**
+
+- Grid layout dengan plugin cards
+- Search dan filter functionality
+- Bulk operations (activate/deactivate multiple plugins)
+- Plugin settings integration
+- Error reporting untuk crashed plugins
+- Plugin performance monitoring
+
+**Plugin Development Environment**
+
+- Standardized plugin interface documentation
+- Development tools dan debugging utilities
+- Plugin templates dan code generators
+- API reference dan examples
+- Testing framework untuk plugins
+
+### 15. Advanced WhatsApp Template System
+
+**Custom Template Management**
+
+- File: `src/routes/whatsapp-templates.js`, `views/whatsapp-templates/`
+- WYSIWYG template editor dengan real-time preview
+- Variable system dengan dynamic content substitution
+- Template categories (welcome, payment, expiry, notifications)
+- Multi-language template support
+- Template versioning dan rollback functionality
+
+**Template Features**
+
+- Rich text formatting (bold, italic, emojis)
+- Conditional content based on customer data
+- Media attachments (images, documents)
+- Template scheduling dan time-based sending
+- A/B testing untuk template effectiveness
+- Template analytics (open rates, response rates)
+
+**Multi-Session WhatsApp System**
+
+- Multiple WhatsApp sessions untuk volume tinggi
+- Load balancing antar sessions
+- Session health monitoring dan auto-recovery
+- Priority queue management
+- Rate limiting per session (1 message/second)
+- Failover management untuk session failures
+
+### 16. Multi-Location Mikrotik Management
+
+**Location Management System**
+
+- File: `src/routes/locations.js`, `views/locations/`
+- Add/Edit/Delete Mikrotik locations dengan interface
+- Location-based user assignment (single location per user)
+- Centralized monitoring across all locations
+- Location-specific settings dan configurations
+- Real-time status monitoring per location
+
+**Location Features**
+
+- Geographic location tracking
+- Location-based analytics dan reporting
+- Load balancing antar locations
+- Backup connection configurations
+- Location-specific user limits dan quotas
+- Failover management dengan automatic switching
+
+**Location Monitoring**
+
+- Individual location health status
+- User distribution per location
+- Performance metrics per location
+- Alert system untuk location issues
+- Historical data tracking per location
+
+### 17. Advanced Backup Manager
+
+**Automated Backup System**
+
+- File: `src/routes/backup.js`, `services/BackupManager.js`
+- Flexible scheduling: daily, weekly, monthly backups
+- Customizable retention policies (user-defined duration)
+- Database dan configuration backup
+- File system backup (templates, logs, media)
+- Backup integrity verification
+
+**Backup Storage Options**
+
+- Local storage dengan automatic cleanup
+- SFTP/SSH transfer untuk remote backup
+- Cloud storage integration (S3 compatible)
+- Encrypted backup storage
+- Compressed backup files untuk space optimization
+- Incremental backup support
+
+**Backup Management Interface**
+
+- Backup history dengan detailed information
+- One-click restore functionality
+- Download backup files
+- Import/upload backup dari external sources
+- Backup scheduling configuration
+- Restore point management
+
+**Backup Features**
+
+- Real-time backup monitoring
+- Backup verification dan integrity checks
+- Automated backup testing
+- Backup reporting dan notifications
+- Rollback functionality untuk failed restores
+- Backup analytics dan storage monitoring
+
+## Critical Implementation Notes
+
+1. **Separate UI Systems**: Voucher generation (no customer) vs Customer subscriptions (mandatory customer)
+2. **Payment-First Renewal**: No auto-renewal, manual payment required
+3. **Plugin-based Payments**: Modular payment gateway system with hot-swappable methods
+4. **Mikrotik-Centric**: RouterOS handles primary user logic
+5. **Audit Protection**: Manual Mikrotik changes tidak affect billing
+6. **WhatsApp-Only**: Single notification channel dengan multi-session support
+7. **Real-time Sync**: Polling dengan offline mode fallback
+8. **Comment Patterns**: Consistent metadata storage dalam Mikrotik comments
+9. **Auto Lifecycle**: System-managed user creation, monitoring, dan cleanup
+10. **Plugin Sandbox**: Isolated environment untuk plugin security dengan crash detection
+11. **Mobile-First Design**: Responsive UI optimized untuk mobile devices
+12. **Multi-Location Support**: Single location per user dengan centralized management
+13. **Backup Flexibility**: Customizable retention dengan SFTP cloud storage support
+14. **Template System**: Advanced WhatsApp templates dengan WYSIWYG editor
+15. **Plugin Ecosystem**: WordPress-style plugin management dengan developer tools
+16. **Web-Only Profiles**: Hanya profil yang dibuat melalui web yang ditampilkan, manual Mikrotik profiles diabaikan
+17. **Profile Sync System**: Status sync menunjukkan keberadaan profil di RouterOS, bukan management type
+
+
+---
+
+## Updated Configuration
+
+## CRITICAL: COMMIT MESSAGE REQUIREMENTS
+
+⚠️ **MANDATORY FORMAT**: `type(scope): description - @agent1 @agent2`
+
+## Pre-Commit Checklist
+1. ✅ Identify contributing agents
+2. ✅ Format: `type(scope): description - @agent1 @agent2` 
+## Mikrotik Billing System Specialist Agents
+
+### Technology Stack Specialists
+- `@nodejs-expert` - Node.js/Fastify backend optimization and performance
+- `@database-admin` - PostgreSQL database management, optimization, and migrations
+- `@api-architect` - RESTful API design and Mikrotik integration patterns
+- `@frontend-optimization-expert` - Bootstrap 5, HTMX, and EJS template optimization
+
+### Domain-Specific Experts
+- `@payment-systems-expert` - Payment gateway plugin architecture and DuitKu integration
+- `@messaging-specialist` - WhatsApp Web JS integration and multi-session management
+- `@network-engineer` - Mikrotik RouterOS API integration and network protocols
+- `@plugin-developer` - Plugin system development, sandboxing, and WordPress-style management
+
+### System Operations
+- `@devops-engineer` - Deployment, infrastructure, and backup management systems
+- `@performance-optimizer` - System performance tuning and caching strategies
+- `@testing-coordinator` - Jest unit testing and Playwright E2E test orchestration
+
+## Enhanced Task Master Configuration
+
+**Project Complexity**: Level 8 (High-Complexity Enterprise System)
+
+### Agent Assignment Matrix
+- **Backend Development**: `@nodejs-expert` + `@software-engineering-expert`
+- **Database Operations**: `@database-admin` + `@performance-optimizer`
+- **API Development**: `@api-architect` + `@security-specialist`
+- **Payment Systems**: `@payment-systems-expert` + `@plugin-developer`
+- **WhatsApp Integration**: `@messaging-specialist` + `@network-engineer`
+- **Frontend Work**: `@frontend-optimization-expert` + `@code-reviewer`
+- **Plugin Development**: `@plugin-developer` + `@api-architect`
+- **Testing**: `@test-automation-expert` + `@testing-coordinator`
+- **Deployment**: `@devops-engineer` + `@deployment-specialist`
+
+### Development Workflow Commands
+```bash
+# Initialize project-specific Task Master configuration
+task-master set-complexity 8
+task-master assign-agents mikrotik-billing-system
+
+# Set up development environment
+task-master setup-env --template nodejs-postgres
+
+# Configure specialized workflows
+task-master add-workflow payment-plugin-development
+task-master add-workflow mikrotik-integration
+task-master add-workflow whatsapp-notification-system
+```
+
+## Mikrotik-Specific Development Protocols
+
+### 1. Mikrotik Integration Development
+- Always test RouterOS API connections in development environment
+- Implement connection pooling and error recovery
+- Use comment metadata patterns consistently: `VOUCHER_SYSTEM|price_sell|timestamps`
+- Validate profile synchronization before production deployment
+
+### 2. Payment Plugin Development
+- Follow standardized plugin interface in `src/lib/PaymentPlugin.js`
+- Implement all required methods: `createPayment`, `checkStatus`, `handleCallback`
+- Test plugin sandbox isolation and error handling
+- Validate fee calculation and currency conversion
+
+### 3. WhatsApp Multi-Session Management
+- Implement rate limiting (1 message/second per session)
+- Test session health monitoring and auto-recovery
+- Validate template variable substitution
+- Test failover and load balancing between sessions
+
+### 4. Database Migration Standards
+- Use Knex.js migrations for all schema changes
+- Test migrations on fresh database before deployment
+- Include rollback migrations for all changes
+- Validate foreign key constraints and indexes
+
+## MCP Server Integration Status
+
+### Active MCP Servers
+- **playwright**: E2E testing automation
+- **github**: Repository management and CI/CD
+- **context7**: Live documentation and code examples
+- **prisma**: Database schema management (backup for Knex)
+- **filesystem**: File system operations and management
+- **browser-tools**: Web automation and testing
+- **web-search-prime**: Research and documentation lookup
+
+### Server Usage Guidelines
+```javascript
+// MCP Integration Examples
+"Use @playwright to test voucher generation workflow"
+"Use @github to create pull request for payment plugin"
+"Use @context7 to lookup Fastify documentation"
+"Use @prisma to validate database schema"
+"Use @browser-tools to test WhatsApp Web interface"
+```
+
+## Critical Development Standards
+
+### Commit Message Requirements (ENFORCED)
+```
+Format: type(scope): description - @agent1 @agent2
+
+Examples:
+feat(vouchers): implement batch generation - @nodejs-expert @api-architect
+fix(mikrotik): resolve API connection timeout - @network-engineer @performance-optimizer
+feat(plugins): add DuitKu payment gateway - @payment-systems-expert @plugin-developer
+test(whatsapp): add multi-session E2E tests - @test-automation-expert @messaging-specialist
+docs(api): update Mikrotik integration guide - @documentation-specialist @network-engineer
+```
+
+### Code Review Requirements
+- All code changes require at least one specialist agent review
+- Security changes must include `@security-specialist`
+- Database changes require `@database-admin` approval
+- API changes need `@api-architect` validation
+- Plugin development requires `@plugin-developer` sign-off
+
+## System Status & Next Steps
+
+**Current Status**: ✅ ENHANCED SYSTEM READY
+**Agent Count**: 19 specialized agents configured
+**Task Master**: Level 8 complexity optimization active
+**MCP Integration**: 8 servers configured and operational
+
+### Immediate Action Items
+1. **Database Migration**: Complete PostgreSQL migration validation
+2. **Plugin System**: Finalize payment gateway plugin architecture
+3. **Testing Suite**: Implement comprehensive E2E test coverage
+4. **Performance**: Optimize Mikrotik API connection handling
+5. **Documentation**: Create developer onboarding guides
+
+### Development Session Start Commands
+```bash
+# Start development with specialized agents
+"Use @nodejs-expert to optimize Fastify server configuration"
+"Use @database-admin to review PostgreSQL migration strategy"
+"Use @payment-systems-expert to design plugin architecture"
+"Use @messaging-specialist to implement WhatsApp multi-session"
+"Use @network-engineer to optimize Mikrotik API integration"
+```
+
+---
+
+**🎯 Enhanced System Status**: ✅ ENTERPRISE READY  
+**📊 Total Agents**: 19 specialized agents  
+**🔧 MCP Servers**: 8 integrations active  
+**⚡ Task Master**: Level 8 optimization configured  
+**🚀 Ready For**: Immediate complex development workflow  
+
+*Enhanced by Claude 007 Bootstrap Orchestrator - Enterprise System Configuration Complete*

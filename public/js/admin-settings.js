@@ -26,12 +26,8 @@
     }
 
     bindEvents() {
-        // Save buttons
+        // Save button - now saves all settings
         document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
-            this.saveCurrentTab();
-        });
-
-        document.getElementById('saveAllSettingsBtn')?.addEventListener('click', () => {
             this.saveAllSettings();
         });
 
@@ -107,22 +103,14 @@
             this.saveNotificationSettings();
         });
 
-        document.getElementById('paymentSettingsForm')?.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.savePaymentSettings();
-        });
-
+  
         document.getElementById('systemSettingsForm')?.addEventListener('submit', (e) => {
             e.preventDefault();
             this.saveSystemSettings();
         });
 
   
-        // Database type change handler
-        document.getElementById('databaseType')?.addEventListener('change', (e) => {
-            this.toggleDatabaseFields(e.target.value);
-        });
-
+    
         // WhatsApp provider change handler
         document.getElementById('whatsappProvider')?.addEventListener('change', (e) => {
             this.toggleWhatsAppFields(e.target.value);
@@ -160,6 +148,7 @@
             const result = await response.json();
 
             if (result.success) {
+                console.log('Settings loaded:', result.data);
                 this.currentSettings = result.data;
                 this.populateForms();
                 this.updateSaveButtonState();
@@ -173,78 +162,88 @@
     }
 
     populateForms() {
+        // Helper function to get setting value (handle API response structure)
+        const getSetting = (key, defaultValue = '') => {
+            if (this.currentSettings[key] && typeof this.currentSettings[key] === 'object') {
+                return this.currentSettings[key].value || defaultValue;
+            }
+            return this.currentSettings[key] || defaultValue;
+        };
+
+        const getSettingChecked = (key, defaultValue = false) => {
+            if (this.currentSettings[key] && typeof this.currentSettings[key] === 'object') {
+                return this.currentSettings[key].value === 'true';
+            }
+            return this.currentSettings[key] === 'true';
+        };
+
+        // Helper function to safely set element value
+        const safeSetValue = (elementId, value) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.value = value;
+            } else {
+                console.warn(`Element with ID '${elementId}' not found`);
+            }
+        };
+
+        // Helper function to safely set element checked
+        const safeSetChecked = (elementId, checked) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.checked = checked;
+            } else {
+                console.warn(`Element with ID '${elementId}' not found`);
+            }
+        };
+
         // General Settings
-        document.getElementById('companyName').value = this.currentSettings.company_name || 'Mikrotik Billing System';
-        document.getElementById('companyAddress').value = this.currentSettings.company_address || '';
-        document.getElementById('companyPhone').value = this.currentSettings.company_phone || '';
-        document.getElementById('companyEmail').value = this.currentSettings.company_email || '';
-        document.getElementById('currency').value = this.currentSettings.currency || 'IDR';
-        document.getElementById('language').value = this.currentSettings.language || 'id';
+        safeSetValue('companyName', getSetting('company_name', 'Mikrotik Billing System'));
+        safeSetValue('companyAddress', getSetting('company_address'));
+        safeSetValue('companyPhone', getSetting('company_phone'));
+        safeSetValue('companyEmail', getSetting('company_email'));
+        safeSetValue('currency', getSetting('currency', 'IDR'));
+        safeSetValue('language', getSetting('language', 'id'));
 
         // Mikrotik Settings
-        document.getElementById('mikrotikHost').value = this.currentSettings.mikrotik_host || '';
-        document.getElementById('mikrotikPort').value = this.currentSettings.mikrotik_port || 8728;
-        document.getElementById('mikrotikUsername').value = this.currentSettings.mikrotik_username || '';
-        document.getElementById('mikrotikPassword').value = this.currentSettings.mikrotik_password || '';
-        document.getElementById('hotspotCommentMarker').value = this.currentSettings.hotspot_comment_marker || 'VOUCHER_SYSTEM';
-        document.getElementById('pppoeCommentMarker').value = this.currentSettings.pppoe_comment_marker || 'PPPOE_SYSTEM';
-        document.getElementById('useSSL').checked = this.currentSettings.mikrotik_use_ssl === 'true';
+        safeSetValue('mikrotikHost', getSetting('mikrotik_host'));
+        safeSetValue('mikrotikPort', getSetting('mikrotik_port', 8728));
+        safeSetValue('mikrotikUsername', getSetting('mikrotik_username'));
+        safeSetValue('mikrotikPassword', getSetting('mikrotik_password'));
+        safeSetValue('hotspotCommentMarker', getSetting('hotspot_comment_marker', 'VOUCHER_SYSTEM'));
+        safeSetValue('pppoeCommentMarker', getSetting('pppoe_comment_marker', 'PPPOE_SYSTEM'));
+        safeSetChecked('useSSL', getSettingChecked('mikrotik_use_ssl'));
 
-        // Database Settings
-        document.getElementById('databaseType').value = this.currentSettings.database_type || 'sqlite';
-        document.getElementById('backupInterval').value = this.currentSettings.backup_interval || 60;
-        document.getElementById('autoBackup').checked = this.currentSettings.auto_backup === 'true';
-        document.getElementById('optimizeOnStartup').checked = this.currentSettings.optimize_on_startup === 'true';
+        // Database Settings (removed databaseType as it doesn't exist)
+        safeSetValue('backupInterval', getSetting('backup_interval', 60));
+        safeSetChecked('autoBackup', getSettingChecked('auto_backup'));
+        safeSetChecked('optimizeOnStartup', getSettingChecked('optimize_on_startup'));
 
         // Notification Settings
-        document.getElementById('whatsappProvider').value = this.currentSettings.whatsapp_provider || '';
-        document.getElementById('whatsappApiKey').value = this.currentSettings.whatsapp_api_key || '';
-        document.getElementById('notifyVoucherCreated').checked = this.currentSettings.notify_voucher_created === 'true';
-        document.getElementById('notifyExpiryWarning').checked = this.currentSettings.notify_expiry_warning === 'true';
-        document.getElementById('notifyExpired').checked = this.currentSettings.notify_expired === 'true';
-
-        // Payment Settings
-        document.getElementById('duitkuMerchantCode').value = this.currentSettings.duitku_merchant_code || '';
-        document.getElementById('duitkuApiKey').value = this.currentSettings.duitku_api_key || '';
-        document.getElementById('duitkuEnvironment').value = this.currentSettings.duitku_environment || 'sandbox';
-        document.getElementById('duitkuCallbackUrl').value = this.currentSettings.duitku_callback_url || '';
-        document.getElementById('enableDuitku').checked = this.currentSettings.enable_duitku === 'true';
+        safeSetValue('whatsappProvider', getSetting('whatsapp_provider'));
+        safeSetValue('whatsappApiKey', getSetting('whatsapp_api_key'));
+        safeSetChecked('notifyVoucherCreated', getSettingChecked('notify_voucher_created'));
+        safeSetChecked('notifyExpiryWarning', getSettingChecked('notify_expiry_warning'));
+        safeSetChecked('notifyExpired', getSettingChecked('notify_expired'));
 
         // System Settings
-        document.getElementById('sessionTimeout').value = this.currentSettings.session_timeout || 30;
-        document.getElementById('logLevel').value = this.currentSettings.log_level || 'info';
-        document.getElementById('cleanupSchedule').value = this.currentSettings.cleanup_schedule || 24;
-        document.getElementById('maxLogDays').value = this.currentSettings.max_log_days || 30;
-        document.getElementById('enableRegistration').checked = this.currentSettings.enable_registration === 'true';
-        document.getElementById('enableDemo').checked = this.currentSettings.enable_demo === 'true';
-        document.getElementById('enableMaintenance').checked = this.currentSettings.enable_maintenance === 'true';
+        safeSetValue('sessionTimeout', getSetting('session_timeout', 30));
+        safeSetValue('logLevel', getSetting('log_level', 'info'));
+        safeSetValue('cleanupSchedule', getSetting('cleanup_schedule', 24));
+        safeSetValue('maxLogDays', getSetting('max_log_days', 30));
+        safeSetChecked('enableRegistration', getSettingChecked('enable_registration'));
+        safeSetChecked('enableDemo', getSettingChecked('enable_demo'));
+        safeSetChecked('enableMaintenance', getSettingChecked('enable_maintenance'));
 
         // Template Settings
-        document.getElementById('printTemplateType').value = this.currentSettings.print_template_type || 'a4';
-        document.getElementById('templateName').value = this.currentSettings.template_name || 'Default';
+        safeSetValue('printTemplateType', getSetting('print_template_type', 'a4'));
+        safeSetValue('templateName', getSetting('template_name', 'Default'));
+
+        // Initialize field visibility
+        this.toggleWhatsAppFields(getSetting('whatsapp_provider'));
+    }
 
   
-        // Initialize field visibility
-        this.toggleDatabaseFields(this.currentSettings.database_type || 'sqlite');
-        this.toggleWhatsAppFields(this.currentSettings.whatsapp_provider || '');
-    }
-
-    toggleDatabaseFields(type) {
-        const dbFields = document.querySelectorAll('#databaseSettingsForm input, #databaseSettingsForm select');
-        dbFields.forEach(field => {
-            if (field.id === 'databaseType') return;
-
-            if (type === 'sqlite') {
-                field.disabled = false;
-            } else {
-                // Disable some fields for PostgreSQL/Supabase
-                if (['autoBackup', 'optimizeOnStartup'].includes(field.id)) {
-                    field.disabled = true;
-                }
-            }
-        });
-    }
-
     toggleWhatsAppFields(provider) {
         const apiKeyField = document.getElementById('whatsappApiKey');
         const triggersField = document.getElementById('notifyVoucherCreated')?.parentElement.parentElement;
@@ -268,10 +267,19 @@
     }
 
     async saveAllSettings() {
+        const saveBtn = document.getElementById('saveSettingsBtn');
+        const originalText = saveBtn.innerHTML;
+        const originalClasses = saveBtn.className;
+
+        // 1. ANIMASI LANGSUNG: Ubah tombol menjadi loading state SEGERA
+        saveBtn.disabled = true;
+        saveBtn.className = 'btn btn-secondary disabled cursor-not-allowed transition-all duration-200';
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+
         const formData = {};
 
         // Collect all form data with proper field mapping
-        const forms = document.querySelectorAll('#settingsTabContent form');
+        const forms = document.querySelectorAll('#general-panel form, #mikrotik-panel form, #database-panel form, #notification-panel form, #system-panel form');
         forms.forEach(form => {
             const inputs = form.querySelectorAll('input, select');
             inputs.forEach(input => {
@@ -315,42 +323,94 @@
             const result = await response.json();
 
             if (result.success) {
+                // 2. SUCCESS ANIMASI: Tampilkan success state di tombol
+                saveBtn.className = 'btn btn-success disabled transition-all duration-300';
+                saveBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Berhasil Disimpan!';
+
                 this.showToast('Semua pengaturan berhasil disimpan', 'success');
                 this.clearChangedForms();
 
                 // Update current settings
                 this.currentSettings = result.data;
+
+                // Kembalikan tombol ke state normal setelah 2 detik
+                setTimeout(() => {
+                    saveBtn.className = originalClasses;
+                    saveBtn.innerHTML = originalText;
+                    this.updateSaveButtonState();
+                }, 2000);
+
             } else {
+                // 3. ERROR ANIMASI: Tampilkan error state di tombol
+                saveBtn.className = 'btn btn-danger disabled transition-all duration-300';
+                saveBtn.innerHTML = '<i class="fas fa-times mr-2"></i>Gagal Menyimpan!';
+
                 this.showToast(result.message || 'Gagal menyimpan pengaturan', 'error');
+
+                // Kembalikan tombol ke state normal setelah 2 detik
+                setTimeout(() => {
+                    saveBtn.className = originalClasses;
+                    saveBtn.innerHTML = originalText;
+                    this.updateSaveButtonState();
+                }, 2000);
             }
         } catch (error) {
             console.error('Error saving settings:', error);
+
+            // 4. CONNECTION ERROR ANIMASI: Tampilkan error state di tombol
+            saveBtn.className = 'btn btn-warning disabled transition-all duration-300';
+            saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Koneksi Error!';
+
             this.showToast('Kesalahan koneksi', 'error');
+
+            // Kembalikan tombol ke state normal setelah 2 detik
+            setTimeout(() => {
+                saveBtn.className = originalClasses;
+                saveBtn.innerHTML = originalText;
+                this.updateSaveButtonState();
+            }, 2000);
         }
     }
 
     async saveGeneralSettings() {
+        // Helper function to safely get element value
+        const safeGetValue = (elementId, defaultValue = '') => {
+            const element = document.getElementById(elementId);
+            return element ? element.value : defaultValue;
+        };
+
         const data = {
-            company_name: document.getElementById('companyName').value,
-            company_address: document.getElementById('companyAddress').value,
-            company_phone: document.getElementById('companyPhone').value,
-            company_email: document.getElementById('companyEmail').value,
-            currency: document.getElementById('currency').value,
-            language: document.getElementById('language').value
+            company_name: safeGetValue('companyName'),
+            company_address: safeGetValue('companyAddress'),
+            company_phone: safeGetValue('companyPhone'),
+            company_email: safeGetValue('companyEmail'),
+            currency: safeGetValue('currency', 'IDR'),
+            language: safeGetValue('language', 'id')
         };
 
         await this.saveSettingsSection('general', data);
     }
 
     async saveMikrotikSettings() {
+        // Helper function to safely get element value/checked
+        const safeGetValue = (elementId, defaultValue = '') => {
+            const element = document.getElementById(elementId);
+            return element ? element.value : defaultValue;
+        };
+
+        const safeGetChecked = (elementId, defaultValue = false) => {
+            const element = document.getElementById(elementId);
+            return element ? element.checked : defaultValue;
+        };
+
         const data = {
-            mikrotik_host: document.getElementById('mikrotikHost').value,
-            mikrotik_port: document.getElementById('mikrotikPort').value,
-            mikrotik_username: document.getElementById('mikrotikUsername').value,
-            mikrotik_password: document.getElementById('mikrotikPassword').value,
-            hotspot_comment_marker: document.getElementById('hotspotCommentMarker').value,
-            pppoe_comment_marker: document.getElementById('pppoeCommentMarker').value,
-            mikrotik_use_ssl: document.getElementById('useSSL').checked
+            mikrotik_host: safeGetValue('mikrotikHost'),
+            mikrotik_port: safeGetValue('mikrotikPort', '8728'),
+            mikrotik_username: safeGetValue('mikrotikUsername'),
+            mikrotik_password: safeGetValue('mikrotikPassword'),
+            hotspot_comment_marker: safeGetValue('hotspotCommentMarker', 'VOUCHER_SYSTEM'),
+            pppoe_comment_marker: safeGetValue('pppoeCommentMarker', 'PPPOE_SYSTEM'),
+            mikrotik_use_ssl: safeGetChecked('useSSL')
         };
 
         // Save settings
@@ -410,101 +470,167 @@
     }
 
     async saveDatabaseSettings() {
+        // Helper function to safely get element value/checked
+        const safeGetValue = (elementId, defaultValue = '') => {
+            const element = document.getElementById(elementId);
+            return element ? element.value : defaultValue;
+        };
+
+        const safeGetChecked = (elementId, defaultValue = false) => {
+            const element = document.getElementById(elementId);
+            return element ? element.checked : defaultValue;
+        };
+
         const data = {
-            database_type: document.getElementById('databaseType').value,
-            backup_interval: document.getElementById('backupInterval').value,
-            auto_backup: document.getElementById('autoBackup').checked,
-            optimize_on_startup: document.getElementById('optimizeOnStartup').checked
+            // Removed database_type as it doesn't exist in the form
+            backup_interval: safeGetValue('backupInterval', '60'),
+            auto_backup: safeGetChecked('autoBackup'),
+            optimize_on_startup: safeGetChecked('optimizeOnStartup')
         };
 
         await this.saveSettingsSection('database', data);
     }
 
     async saveNotificationSettings() {
+        // Helper function to safely get element value/checked
+        const safeGetValue = (elementId, defaultValue = '') => {
+            const element = document.getElementById(elementId);
+            return element ? element.value : defaultValue;
+        };
+
+        const safeGetChecked = (elementId, defaultValue = false) => {
+            const element = document.getElementById(elementId);
+            return element ? element.checked : defaultValue;
+        };
+
         const data = {
-            whatsapp_provider: document.getElementById('whatsappProvider').value,
-            whatsapp_api_key: document.getElementById('whatsappApiKey').value,
-            notify_voucher_created: document.getElementById('notifyVoucherCreated').checked,
-            notify_expiry_warning: document.getElementById('notifyExpiryWarning').checked,
-            notify_expired: document.getElementById('notifyExpired').checked
+            whatsapp_provider: safeGetValue('whatsappProvider'),
+            whatsapp_api_key: safeGetValue('whatsappApiKey'),
+            notify_voucher_created: safeGetChecked('notifyVoucherCreated'),
+            notify_expiry_warning: safeGetChecked('notifyExpiryWarning'),
+            notify_expired: safeGetChecked('notifyExpired')
         };
 
         await this.saveSettingsSection('notification', data);
     }
 
-    async savePaymentSettings() {
-        const data = {
-            duitku_merchant_code: document.getElementById('duitkuMerchantCode').value,
-            duitku_api_key: document.getElementById('duitkuApiKey').value,
-            duitku_environment: document.getElementById('duitkuEnvironment').value,
-            duitku_callback_url: document.getElementById('duitkuCallbackUrl').value,
-            enable_duitku: document.getElementById('enableDuitku').checked
+  
+    async saveSystemSettings() {
+        // Helper function to safely get element value/checked
+        const safeGetValue = (elementId, defaultValue = '') => {
+            const element = document.getElementById(elementId);
+            return element ? element.value : defaultValue;
         };
 
-        await this.saveSettingsSection('payment', data);
-    }
+        const safeGetChecked = (elementId, defaultValue = false) => {
+            const element = document.getElementById(elementId);
+            return element ? element.checked : defaultValue;
+        };
 
-    async saveSystemSettings() {
         const data = {
-            session_timeout: document.getElementById('sessionTimeout').value,
-            log_level: document.getElementById('logLevel').value,
-            cleanup_schedule: document.getElementById('cleanupSchedule').value,
-            max_log_days: document.getElementById('maxLogDays').value,
-            enable_registration: document.getElementById('enableRegistration').checked,
-            enable_demo: document.getElementById('enableDemo').checked,
-            enable_maintenance: document.getElementById('enableMaintenance').checked,
-            print_template_type: document.getElementById('printTemplateType').value,
-            template_name: document.getElementById('templateName').value
+            session_timeout: safeGetValue('sessionTimeout', '30'),
+            log_level: safeGetValue('logLevel', 'info'),
+            cleanup_schedule: safeGetValue('cleanupSchedule', '24'),
+            max_log_days: safeGetValue('maxLogDays', '30'),
+            enable_registration: safeGetChecked('enableRegistration'),
+            enable_demo: safeGetChecked('enableDemo'),
+            enable_maintenance: safeGetChecked('enableMaintenance'),
+            print_template_type: safeGetValue('printTemplateType', 'a4'),
+            template_name: safeGetValue('templateName', 'Default')
         };
 
         await this.saveSettingsSection('system', data);
     }
 
+    // Update Mikrotik status di header setelah test koneksi berhasil
+    updateMikrotikStatusAfterTest(details) {
+        try {
+            console.log('🔄 Updating Mikrotik header status after test connection...');
+
+            // 🔥 FIX: Update header status indicator menggunakan ID yang benar (mikrotikStatus)
+            const headerStatus = document.getElementById('mikrotikStatus');
+            if (headerStatus) {
+                console.log('✅ Found header status element (mikrotikStatus):', headerStatus);
+                if (details.connected) {
+                    headerStatus.textContent = 'Connected';
+                    headerStatus.className = 'text-green-400';
+                    console.log('✅ Updated header status to Connected');
+                } else {
+                    headerStatus.textContent = 'Disconnected';
+                    headerStatus.className = 'text-red-400';
+                    console.log('❌ Updated header status to Disconnected');
+                }
+            } else {
+                console.warn('⚠️ Header status element (mikrotikStatus) not found');
+            }
+
+  
+            // Update global Mikrotik status in header (fallback selector)
+            const globalStatus = document.querySelector('[data-mikrotik-status]');
+            if (globalStatus) {
+                console.log('✅ Found global status element:', globalStatus);
+                globalStatus.setAttribute('data-mikrotik-status', details.connected ? 'connected' : 'disconnected');
+                globalStatus.textContent = details.connected ? 'Connected' : 'Disconnected';
+                console.log('✅ Updated global status to:', details.connected ? 'Connected' : 'Disconnected');
+            }
+
+            // Force trigger update untuk status monitoring system
+            if (window.mikrotikStatusManager && window.mikrotikStatusManager.updateStatus) {
+                window.mikrotikStatusManager.updateStatus();
+                console.log('✅ Triggered global Mikrotik status manager update');
+            }
+
+            // 🔥 BONUS: Trigger immediate refresh dari footer check function
+            if (typeof checkMikrotikConnection === 'function') {
+                setTimeout(() => {
+                    checkMikrotikConnection();
+                    console.log('✅ Triggered immediate Mikrotik connection check');
+                }, 500);
+            }
+
+            // 🔥 BONUS 2: Force server-side connection status update
+            setTimeout(async () => {
+                try {
+                    const response = await fetch('/api/public/system/connection');
+                    const data = await response.json();
+                    const statusElement = document.getElementById('mikrotikStatus');
+
+                    if (statusElement) {
+                        if (data.connected) {
+                            statusElement.textContent = 'Connected';
+                            statusElement.className = 'text-green-400';
+                        } else {
+                            statusElement.textContent = 'Disconnected';
+                            statusElement.className = 'text-red-400';
+                        }
+                        console.log('✅ Server-side status updated:', data.connected ? 'Connected' : 'Disconnected');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to update server-side status:', error);
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('❌ Error updating Mikrotik status after test:', error);
+        }
+    }
+
     // Update Mikrotik connection status in UI
     updateMikrotikStatusUI(details) {
         try {
-            // Update header status indicator
-            const statusIndicator = document.querySelector('.mikrotik-status-indicator');
-            if (statusIndicator) {
+            // 🔥 FIX: Update header status indicator menggunakan ID yang benar (mikrotikStatus)
+            const statusElement = document.getElementById('mikrotikStatus');
+            if (statusElement) {
                 if (details.connected) {
-                    statusIndicator.className = 'mikrotik-status-indicator status-connected';
-                    statusIndicator.textContent = 'Connected';
+                    statusElement.textContent = 'Connected';
+                    statusElement.className = 'text-green-400';
                 } else {
-                    statusIndicator.className = 'mikrotik-status-indicator status-disconnected';
-                    statusIndicator.textContent = 'Disconnected';
+                    statusElement.textContent = 'Disconnected';
+                    statusElement.className = 'text-red-400';
                 }
             }
 
-            // Update connection details in Mikrotik tab
-            const connectionInfo = document.getElementById('connectionInfo');
-            if (connectionInfo) {
-                connectionInfo.innerHTML = `
-                    <div class="alert ${details.connected ? 'alert-success' : 'alert-danger'}" role="alert">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Status:</strong> 
-                                <span class="badge ${details.connected ? 'bg-success' : 'bg-danger'}">
-                                    ${details.connected ? 'Connected' : 'Disconnected'}
-                                </span>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="small">
-                            <strong>Host:</strong> ${details.host}<br>
-                            <strong>Port:</strong> ${details.port}<br>
-                            <strong>Username:</strong> ${details.username}
-                            ${details.routeros ? `<br><strong>RouterOS:</strong> ${details.routeros.name}` : ''}
-                            ${details.note ? `<br><em>${details.note}</em>` : ''}
-                        </div>
-                    </div>
-                `;
-
-                // Auto-hide after 5 seconds
-                setTimeout(() => {
-                    connectionInfo.style.opacity = '0.7';
-                }, 5000);
-            }
-
+    
             // Update global Mikrotik status in header (if exists)
             const globalStatus = document.querySelector('[data-mikrotik-status]');
             if (globalStatus) {
@@ -561,7 +687,19 @@
 
                 // Special handling for Mikrotik settings
                 if (section === 'mikrotik') {
-                    // Update connection status
+                    // 🔥 AUTOMATIC TEST: Test koneksi Mikrotik dengan pengaturan baru
+                    console.log('🔄 Testing Mikrotik connection with new settings...');
+                    const testResult = await this.testMikrotikConnectionWithCurrentSettings();
+
+                    if (testResult.success) {
+                        console.log('✅ Mikrotik connection test successful after settings save');
+                        this.showToast('Pengaturan Mikrotik disimpan dan koneksi berhasil diverifikasi', 'success');
+                    } else {
+                        console.log('❌ Mikrotik connection test failed after settings save');
+                        this.showToast('Pengaturan disimpan tapi koneksi ke Mikrotik gagal', 'warning');
+                    }
+
+                    // Update connection status regardless of test result
                     await this.updateConnectionStatus();
                 }
             } else {
@@ -574,16 +712,161 @@
     }
 
     async testMikrotikConnection() {
+        // Helper function to safely get element value/checked
+        const safeGetValue = (elementId, defaultValue = '') => {
+            const element = document.getElementById(elementId);
+            return element ? element.value : defaultValue;
+        };
+
+        const safeGetChecked = (elementId, defaultValue = false) => {
+            const element = document.getElementById(elementId);
+            return element ? element.checked : defaultValue;
+        };
+
         // Get current form values (not saved settings)
         const settings = {
-            host: document.getElementById('mikrotikHost').value,
-            port: document.getElementById('mikrotikPort').value,
-            username: document.getElementById('mikrotikUsername').value,
-            password: document.getElementById('mikrotikPassword').value,
-            use_ssl: document.getElementById('useSSL').checked
+            host: safeGetValue('mikrotikHost'),
+            port: safeGetValue('mikrotikPort', '8728'),
+            username: safeGetValue('mikrotikUsername'),
+            password: safeGetValue('mikrotikPassword'),
+            use_ssl: safeGetChecked('useSSL')
         };
 
         await this.testMikrotikConnectionWithSettings(settings, true);
+    }
+
+    // 🔥 NEW: Force update Mikrotik status dari server (manual trigger)
+    async forceUpdateMikrotikStatus() {
+        try {
+            console.log('🔄 Force updating Mikrotik status from server...');
+
+            const response = await fetch('/api/public/system/connection', {
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+            const statusElement = document.getElementById('mikrotikStatus');
+
+            if (statusElement) {
+                if (data.connected) {
+                    statusElement.textContent = 'Connected';
+                    statusElement.className = 'text-green-400';
+                    console.log('✅ Status updated to Connected');
+                } else {
+                    statusElement.textContent = 'Disconnected';
+                    statusElement.className = 'text-red-400';
+                    console.log('❌ Status updated to Disconnected');
+                }
+            }
+
+            return data.connected;
+        } catch (error) {
+            console.error('❌ Error force updating Mikrotik status:', error);
+            return false;
+        }
+    }
+
+    // Helper function to get authentication token
+    getToken() {
+        // Try to get token from localStorage
+        const token = localStorage.getItem('authToken');
+        if (token) return token;
+
+        // Try to get token from sessionStorage
+        const sessionToken = sessionStorage.getItem('authToken');
+        if (sessionToken) return sessionToken;
+
+        // Try to get token from cookie
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'authToken') return value;
+        }
+
+        return null;
+    }
+
+    // 🔥 NEW: Test koneksi dengan pengaturan yang sudah disimpan (current settings)
+    async testMikrotikConnectionWithCurrentSettings() {
+        try {
+            // Helper function to get setting value safely
+            const getSetting = (key, defaultValue = '') => {
+                if (this.currentSettings[key] && typeof this.currentSettings[key] === 'object') {
+                    return this.currentSettings[key].value || defaultValue;
+                }
+                return this.currentSettings[key] || defaultValue;
+            };
+
+            const getSettingChecked = (key, defaultValue = false) => {
+                if (this.currentSettings[key] && typeof this.currentSettings[key] === 'object') {
+                    return this.currentSettings[key].value === 'true';
+                }
+                return this.currentSettings[key] === 'true';
+            };
+
+            // Get settings from current settings (already saved)
+            const settings = {
+                host: getSetting('mikrotik_host'),
+                port: getSetting('mikrotik_port', '8728'),
+                username: getSetting('mikrotik_username'),
+                password: getSetting('mikrotik_password'),
+                use_ssl: getSettingChecked('mikrotik_use_ssl')
+            };
+
+            console.log('🔍 Testing Mikrotik connection with current settings:', {
+                host: settings.host,
+                port: settings.port,
+                username: settings.username,
+                hasPassword: !!settings.password,
+                useSSL: settings.use_ssl
+            });
+
+            // Silent test (no modal)
+            const result = await this.testMikrotikConnectionWithSettings(settings, false);
+
+            // 🔥 NEW: Refresh main Mikrotik client connection if test successful
+            if (result.success && result.info) {
+                console.log('✅ Refreshing main Mikrotik client connection after successful test...');
+                try {
+                    const refreshResponse = await fetch('/admin/system/refresh-mikrotik-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.getToken()}`
+                        }
+                    });
+
+                    if (refreshResponse.ok) {
+                        const refreshData = await refreshResponse.json();
+                        console.log('✅ Main Mikrotik client refreshed successfully:', refreshData.message);
+                    } else {
+                        console.warn('⚠️ Warning: Failed to refresh main Mikrotik client');
+                    }
+                } catch (refreshError) {
+                    console.warn('⚠️ Warning: Could not refresh main Mikrotik client:', refreshError);
+                }
+
+                // Update status di header
+                console.log('✅ Updating Mikrotik status in header after automatic test...');
+                this.updateMikrotikStatusAfterTest({
+                    connected: true,
+                    host: settings.host,
+                    port: settings.port,
+                    username: settings.username,
+                    routeros: {
+                        name: result.info.version || 'Unknown',
+                        identity: result.info.identity || 'Unknown'
+                    },
+                    note: 'Automatic connection test successful'
+                });
+            }
+
+            return result;
+
+        } catch (error) {
+            console.error('❌ Error testing Mikrotik connection with current settings:', error);
+            return { success: false, error: error.message };
+        }
     }
 
     async testMikrotikConnectionWithSettings(settings, showModals = false) {
@@ -599,10 +882,8 @@
             // Show loading state
             resultDiv.innerHTML = `
                 <div class="text-center">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Testing...</span>
-                    </div>
-                    <p class="mt-2">Menguji koneksi ke Mikrotik...</p>
+                    <div class="inline-flex items-center justify-center w-12 h-12 border-4 border-slate-600 border-t-blue-500 rounded-full animate-spin mb-4" role="status" aria-label="Loading"></div>
+                    <p class="text-slate-300">Menguji koneksi ke Mikrotik...</p>
                 </div>
             `;
 
@@ -619,26 +900,81 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    const info = result.info || {};
                     resultDiv.innerHTML = `
                         <div class="text-center">
                             <div class="text-success mb-3">
-                                <i class="bi bi-check-circle-fill" style="font-size: 3rem;"></i>
+                                <i class="fas fa-check-circle" style="font-size: 3rem;"></i>
                             </div>
-                            <h5 class="text-success">Koneksi Berhasil!</h5>
-                            <p class="mb-0">Terhubung ke Mikrotik ${result.info?.version || ''}</p>
-                            <p class="mb-0">${result.info?.platform || ''} - ${result.info?.board_name || ''}</p>
-                            <small class="text-muted">${result.message || 'Connection successful'}</small>
+                            <h5 class="text-success mb-3">Koneksi Berhasil!</h5>
+                            <div class="text-start bg-slate-700/50 rounded-lg p-3 mb-3">
+                                <div class="row text-sm">
+                                    <div class="col-6 mb-2">
+                                        <strong class="text-slate-400">Identity:</strong>
+                                        <div class="text-white">${info.identity || 'Unknown'}</div>
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        <strong class="text-slate-400">RouterOS:</strong>
+                                        <div class="text-white">${info.version || 'Unknown'}</div>
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        <strong class="text-slate-400">Platform:</strong>
+                                        <div class="text-white">${info.platform || 'Unknown'}</div>
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        <strong class="text-slate-400">Board:</strong>
+                                        <div class="text-white">${info.board || 'Unknown'}</div>
+                                    </div>
+                                    ${info.routerboard ? `
+                                    <div class="col-6 mb-2">
+                                        <strong class="text-slate-400">Model:</strong>
+                                        <div class="text-white">${info.routerboard}</div>
+                                    </div>
+                                    ` : ''}
+                                    ${info.cpu ? `
+                                    <div class="col-6 mb-2">
+                                        <strong class="text-slate-400">CPU:</strong>
+                                        <div class="text-white">${info.cpu}</div>
+                                    </div>
+                                    ` : ''}
+                                    ${info.memory ? `
+                                    <div class="col-12 mb-2">
+                                        <strong class="text-slate-400">Memory:</strong>
+                                        <div class="text-white">${info.memory}</div>
+                                    </div>
+                                    ` : ''}
+                                    ${info.uptime ? `
+                                    <div class="col-12">
+                                        <strong class="text-slate-400">Uptime:</strong>
+                                        <div class="text-white">${info.uptime}</div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <small class="text-slate-400">${result.message || 'Connection successful'}</small>
                         </div>
                     `;
+
+                    // 🔥 UPDATE: Update Mikrotik status di header setelah test koneksi berhasil
+                    console.log('🔄 Updating Mikrotik status in header after successful test...');
+                    this.updateMikrotikStatusAfterTest({
+                        connected: true,
+                        host: settings.host,
+                        port: settings.port,
+                        username: settings.username,
+                        routeros: { name: info.version },
+                        note: 'Connection test successful'
+                    });
+
                     return true;
                 } else {
                     resultDiv.innerHTML = `
                         <div class="text-center">
-                            <div class="text-danger mb-3">
-                                <i class="bi bi-x-circle-fill" style="font-size: 3rem;"></i>
+                            <div class="text-red-400 mb-3">
+                                <i class="fas fa-times-circle" style="font-size: 3rem;"></i>
                             </div>
-                            <h5 class="text-danger">Koneksi Gagal!</h5>
-                            <p class="mb-0">${result.error || result.message || 'Tidak dapat terhubung ke Mikrotik'}</p>
+                            <h5 class="text-red-400">Koneksi Gagal!</h5>
+                            <p class="mb-0 text-slate-300">${result.error || result.message || 'Tidak dapat terhubung ke Mikrotik'}</p>
                         </div>
                     `;
                     return false;
@@ -778,10 +1114,9 @@
 
     updateSaveButtonState() {
         const saveBtn = document.getElementById('saveSettingsBtn');
-        const saveAllBtn = document.getElementById('saveAllSettingsBtn');
 
         console.log('updateSaveButtonState called');
-        console.log('Save buttons found:', !!saveBtn, !!saveAllBtn);
+        console.log('Save button found:', !!saveBtn);
 
         const hasChanges = this.hasUnsavedChanges();
         console.log('Has unsaved changes:', hasChanges);
@@ -789,24 +1124,14 @@
         if (hasChanges) {
             if (saveBtn) {
                 saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i class="bi bi-save"></i> Simpan*';
+                saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Simpan Semua Pengaturan*';
                 console.log('Save button enabled');
-            }
-            if (saveAllBtn) {
-                saveAllBtn.disabled = false;
-                saveAllBtn.innerHTML = '<i class="bi bi-check"></i> Simpan Semua*';
-                console.log('Save all button enabled');
             }
         } else {
             if (saveBtn) {
                 saveBtn.disabled = true;
-                saveBtn.innerHTML = '<i class="bi bi-save"></i> Simpan';
+                saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Simpan Semua Pengaturan';
                 console.log('Save button disabled');
-            }
-            if (saveAllBtn) {
-                saveAllBtn.disabled = true;
-                saveAllBtn.innerHTML = '<i class="bi bi-check"></i> Simpan Semua';
-                console.log('Save all button disabled');
             }
         }
     }
@@ -861,7 +1186,7 @@
     handleInitialTab() {
         // Check URL hash for initial tab
         const hash = window.location.hash.substring(1);
-        const validTabs = ['general', 'mikrotik', 'database', 'notification', 'payment', 'system'];
+        const validTabs = ['general', 'mikrotik', 'database', 'notification', 'system'];
 
         if (hash && validTabs.includes(hash)) {
             this.switchTab(hash);
@@ -886,7 +1211,9 @@
     }
 
     updatePageTitle() {
-        const companyName = this.currentSettings.company_name || 'Mikrotik Billing System';
+        const companyName = this.currentSettings.company_name && typeof this.currentSettings.company_name === 'object'
+            ? this.currentSettings.company_name.value
+            : this.currentSettings.company_name || 'Mikrotik Billing System';
 
         // Update page title
         document.title = `Pengaturan Sistem - ${companyName}`;

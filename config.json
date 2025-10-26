@@ -1,0 +1,6 @@
+{
+  "agents": {
+    "globalPath": "~/.local/share/claude-agents/agents",
+    "fallbackToLocal": true
+  }
+}

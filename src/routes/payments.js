@@ -1,15 +1,127 @@
-const DatabaseManager = require('../database/DatabaseManager');
+const { db } = require('../database/DatabaseManager');
 const auth = require('../middleware/auth');
 const CarryOverService = require('../services/CarryOverService');
+const PaymentPluginManager = require('../services/PaymentPluginManager');
+const WhatsAppService = require('../services/WhatsAppService');
+const { ApiErrorHandler } = require('../middleware/apiErrorHandler');
 
 const paymentRoutes = (fastify, options, done) => {
-    // Initialize CarryOverService
-    const carryOverService = new CarryOverService();
+    // Initialize services
+    const carryOverService = new CarryOverService(fastify.db?.getPool?.() || null);
+    const paymentPluginManager = new PaymentPluginManager(db);
+    const whatsappService = new WhatsAppService();
+
+    // Initialize WhatsApp service if database pool is available
+    try {
+        if (fastify.db && fastify.db.getPool) {
+            whatsappService.initialize(fastify.db.getPool());
+        }
+    } catch (error) {
+        fastify.log.warn('Failed to initialize WhatsApp service:', error.message);
+    }
+
+    // WhatsApp notification functions
+    async function sendPaymentNotification(customer, payment, type = 'confirmation') {
+        try {
+            if (!customer || !customer.nomor_hp) {
+                fastify.log.warn('No phone number available for WhatsApp notification');
+                return false;
+            }
+
+            const phoneNumber = customer.nomor_hp.replace(/^0/, '+62');
+            let message = '';
+
+            switch (type) {
+                case 'confirmation':
+                    message = `*🎉 PEMBAYARAN BERHASIL*\n\n` +
+                        `Kode: ${payment.transaction_id}\n` +
+                        `Jumlah: Rp ${Number(payment.amount).toLocaleString('id-ID')}\n` +
+                        `Metode: ${payment.method}\n` +
+                        `Tanggal: ${new Date().toLocaleString('id-ID')}\n\n` +
+                        `Terima kasih atas pembayaran Anda! 🙏\n` +
+                        `HIJINETWORK Mikrotik Billing`;
+                    break;
+
+                case 'pending':
+                    message = `*⏳ MENUNGGU PEMBAYARAN*\n\n` +
+                        `Kode: ${payment.transaction_id}\n` +
+                        `Jumlah: Rp ${Number(payment.amount).toLocaleString('id-ID')}\n` +
+                        `Metode: ${payment.method}\n\n` +
+                        `Silakan selesaikan pembayaran Anda.\n` +
+                        `HIJINETWORK Mikrotik Billing`;
+                    break;
+
+                case 'reminder':
+                    message = `*🔔 PENGINGAT PEMBAYARAN*\n\n` +
+                        `Halo ${customer.nama},\n\n` +
+                        `Pembayaran Anda masih menunggu:\n` +
+                        `Kode: ${payment.transaction_id}\n` +
+                        `Jumlah: Rp ${Number(payment.amount).toLocaleString('id-ID')}\n` +
+                        `Metode: ${payment.method}\n\n` +
+                        `Silakan selesaikan pembayaran segera.\n` +
+                        `HIJINETWORK Mikrotik Billing`;
+                    break;
+            }
+
+            const result = await whatsappService.sendMessageWithSession(phoneNumber, message, {
+                priority: 'normal'
+            });
+
+            if (result.success) {
+                fastify.log.info(`WhatsApp notification sent to ${customer.nama}: ${type}`);
+                return true;
+            } else {
+                fastify.log.warn(`Failed to send WhatsApp notification: ${result.message}`);
+                return false;
+            }
+
+        } catch (error) {
+            fastify.log.error('Error sending WhatsApp notification:', error);
+            return false;
+        }
+    }
+
+    async function sendPaymentLinkNotification(customer, paymentLink) {
+        try {
+            if (!customer || !customer.nomor_hp) {
+                fastify.log.warn('No phone number available for WhatsApp payment link notification');
+                return false;
+            }
+
+            const phoneNumber = customer.nomor_hp.replace(/^0/, '+62');
+
+            const message = `*💳 LINK PEMBAYARAN*\n\n` +
+                `Halo ${customer.nama},\n\n` +
+                `Berikut link pembayaran untuk Anda:\n` +
+                `Kode: ${paymentLink.invoice_number}\n` +
+                `Jumlah: Rp ${Number(paymentLink.amount).toLocaleString('id-ID')}\n` +
+                `Berlaku hingga: ${new Date(paymentLink.expiry_date).toLocaleString('id-ID')}\n\n` +
+                `Link: ${paymentLink.payment_url}\n\n` +
+                `Klik link untuk melakukan pembayaran.\n` +
+                `HIJINETWORK Mikrotik Billing`;
+
+            const result = await whatsappService.sendMessageWithSession(phoneNumber, message, {
+                priority: 'normal'
+            });
+
+            if (result.success) {
+                fastify.log.info(`WhatsApp payment link sent to ${customer.nama}`);
+                return true;
+            } else {
+                fastify.log.warn(`Failed to send WhatsApp payment link: ${result.message}`);
+                return false;
+            }
+
+        } catch (error) {
+            fastify.log.error('Error sending WhatsApp payment link:', error);
+            return false;
+        }
+    }
 
     // Payment Management Page
     fastify.get('/', { preHandler: auth.verifyToken }, async (request, reply) => {
         try {
-            const db = DatabaseManager.getInstance();
+            // Use the singleton db instance directly
 
             // Get basic statistics for the page
             const stats = {
@@ -33,8 +145,8 @@ const paymentRoutes = (fastify, options, done) => {
                         END), 0) as monthly_revenue
                     FROM payments
                 `);
-                if (statsResult && statsResult.length > 0) {
-                    Object.assign(stats, statsResult[0]);
+                if (statsResult && statsResult.rows && statsResult.rows.length > 0) {
+                    Object.assign(stats, statsResult.rows[0]);
                 }
             } catch (error) {
                 fastify.log.error('Error getting payment stats:', error);
@@ -54,27 +166,352 @@ const paymentRoutes = (fastify, options, done) => {
                     FROM payments
                     WHERE DATE(created_at) = CURRENT_DATE
                 `);
-                if (todayResult && todayResult.length > 0) {
-                    Object.assign(todaySummary, todayResult[0]);
+                if (todayResult && todayResult.rows && todayResult.rows.length > 0) {
+                    Object.assign(todaySummary, todayResult.rows[0]);
                 }
             } catch (error) {
                 fastify.log.error('Error getting today summary:', error);
             }
 
             return reply.view('payments/index', {
+                admin: request.admin,
                 stats,
                 todaySummary
             });
         } catch (error) {
+            console.error('DETAILED ERROR loading payments page:', error);
+            console.error('ERROR STACK:', error.stack);
             fastify.log.error('Error loading payments page:', error);
-            reply.code(500).view('error', { error: 'Internal Server Error', detail: error.message });
+            return reply.code(500).view('error', { error: 'Internal Server Error', detail: error.message });
+        }
+    });
+
+    // Create Payment Page
+    fastify.get('/create', { preHandler: auth.verifyToken }, async (request, reply) => {
+        try {
+            // Get available payment methods from plugins
+            const activePlugins = paymentPluginManager.getActivePlugins();
+            const paymentMethods = [];
+
+            // Add built-in methods
+            paymentMethods.push(
+                { code: 'cash', name: 'Cash', description: 'Tunai langsung' },
+                { code: 'transfer', name: 'Transfer Bank', description: 'Transfer manual ke rekening' }
+            );
+
+            // Add plugin methods
+            for (const plugin of activePlugins) {
+                const methods = plugin.instance.getSupportedMethods?.() || [];
+                for (const method of methods) {
+                    paymentMethods.push({
+                        code: method,
+                        name: plugin.instance.name,
+                        description: `${plugin.instance.name} - ${method}`,
+                        plugin: plugin.name
+                    });
+                }
+            }
+
+            // Get customers for selection
+            const customers = await db.query(`
+                SELECT id, nama, nomor_hp, email
+                FROM customers
+                ORDER BY nama ASC
+                LIMIT 100
+            `);
+
+            // Get active subscriptions
+            const subscriptions = await db.query(`
+                SELECT s.*, c.name as customer_name, p.name as profile_name
+                FROM subscriptions s
+                JOIN customers c ON s.customer_id = c.id
+                JOIN profiles p ON s.profile_id = p.id
+                WHERE s.status IN ('active', 'expired')
+                ORDER BY s.expiry_date ASC
+                LIMIT 50
+            `);
+
+            return reply.view('payments/create', {
+                admin: request.admin,
+                paymentMethods,
+                customers,
+                subscriptions
+            });
+        } catch (error) {
+            fastify.log.error('Error loading create payment page:', error);
+            return reply.code(500).view('error', { error: 'Internal Server Error', detail: error.message });
+        }
+    });
+
+    // Create Payment API
+    fastify.post('/api/create', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+        const {
+            customer_id,
+            subscription_id,
+            amount,
+            method,
+            payment_method_code,
+            bank_code,
+            description,
+            customer_email,
+            customer_phone,
+            payment_details = {}
+        } = request.body;
+
+        try {
+            // Validate required fields
+            if (!amount || amount <= 0) {
+                return reply.code(400).send({
+                    success: false,
+                    message: 'Amount is required and must be greater than 0'
+                });
+            }
+
+            if (!method) {
+                return reply.code(400).send({
+                    success: false,
+                    message: 'Payment method is required'
+                });
+            }
+
+            // Get customer information
+            let customer = null;
+            if (customer_id) {
+                customer = await db.getOne('customers', { id: customer_id });
+                if (!customer) {
+                    return reply.code(404).send({
+                        success: false,
+                        message: 'Customer not found'
+                    });
+                }
+            }
+
+            // Generate payment reference
+            const paymentReference = 'PAY' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase();
+
+            let paymentResult = null;
+
+            // Handle payment creation based on method
+            if (method === 'plugin' && payment_method_code) {
+                // Use payment plugin
+                const paymentData = {
+                    method: payment_method_code,
+                    amount: parseFloat(amount),
+                    customer_id: customer_id,
+                    customer_name: customer?.nama || 'Guest',
+                    customer_email: customer_email || customer?.email || '',
+                    customer_phone: customer_phone || customer?.nomor_hp || '',
+                    description: description || `Payment ${paymentReference}`,
+                    bank_code: bank_code,
+                    ...payment_details
+                };
+
+                try {
+                    // Initialize plugin manager if not already initialized
+                    if (paymentPluginManager.plugins.size === 0) {
+                        await paymentPluginManager.initialize();
+                    }
+
+                    paymentResult = await paymentPluginManager.createPayment(paymentData);
+                } catch (pluginError) {
+                    fastify.log.error('Payment plugin error:', pluginError);
+                    return reply.code(400).send({
+                        success: false,
+                        message: `Payment processing failed: ${pluginError.message}`
+                    });
+                }
+            } else {
+                // Handle manual/cash payments
+                paymentResult = {
+                    success: true,
+                    reference: paymentReference,
+                    payment_type: method,
+                    status: method === 'cash' ? 'SUCCESS' : 'PENDING',
+                    amount: parseFloat(amount),
+                    currency: 'IDR',
+                    fee: 0,
+                    total_amount: parseFloat(amount),
+                    instructions: {
+                        type: method,
+                        steps: method === 'cash'
+                            ? ['1. Receive cash payment', '2. Record in system', '3. Provide receipt']
+                            : ['1. Wait for transfer confirmation', '2. Verify in bank account', '3. Record payment']
+                    }
+                };
+            }
+
+            if (!paymentResult.success) {
+                return reply.code(400).send({
+                    success: false,
+                    message: paymentResult.message || 'Payment creation failed'
+                });
+            }
+
+            // Create payment record in database
+            const paymentRecord = {
+                customer_id: customer_id || null,
+                subscription_id: subscription_id || null,
+                amount: parseFloat(amount),
+                method: method === 'plugin' ? payment_method_code : method,
+                status: paymentResult.status.toLowerCase() === 'success' ? 'paid' : 'pending',
+                transaction_id: paymentResult.reference,
+                notes: description || `Payment ${paymentReference}`,
+                created_at: new Date(),
+                updated_at: new Date()
+            };
+
+            // Add plugin-specific data
+            if (method === 'plugin' && paymentResult.metadata) {
+                paymentRecord.plugin_data = JSON.stringify(paymentResult.metadata);
+            }
+
+            const insertedPayment = await db.insert('payments', paymentRecord);
+
+            // Handle subscription extension if applicable
+            if (subscription_id && paymentResult.status === 'SUCCESS') {
+                const subscription = await db.getOne('subscriptions', { id: subscription_id });
+                if (subscription) {
+                    const daysExtension = Math.floor((parseFloat(amount) / subscription.price_sell) * 30);
+                    const now = new Date();
+                    const currentExpiry = new Date(subscription.expiry_date);
+                    const newExpiryDate = currentExpiry > now
+                        ? new Date(currentExpiry.getTime() + daysExtension * 24 * 60 * 60 * 1000)
+                        : new Date(now.getTime() + daysExtension * 24 * 60 * 60 * 1000);
+
+                    await db.update('subscriptions',
+                        {
+                            expiry_date: newExpiryDate.toISOString().split('T')[0],
+                            status: 'active',
+                            updated_at: new Date()
+                        },
+                        { id: subscription_id }
+                    );
+                }
+            }
+
+            // Send WhatsApp notification if customer has phone number
+            if (customer && customer.nomor_hp) {
+                try {
+                    const notificationType = paymentResult.status === 'SUCCESS' ? 'confirmation' : 'pending';
+                    await sendPaymentNotification(customer, {
+                        ...paymentRecord,
+                        transaction_id: paymentResult.reference,
+                        amount: parseFloat(amount),
+                        method: paymentRecord.method
+                    }, notificationType);
+                } catch (whatsappError) {
+                    fastify.log.error('WhatsApp notification failed:', whatsappError);
+                    // Don't fail the payment creation if WhatsApp fails
+                }
+            }
+
+            // Log system event
+            await db.insert('system_logs', {
+                level: 'INFO',
+                module: 'payments',
+                message: `Payment created: ${paymentResult.reference}`,
+                user_id: request.user?.id || null,
+                ip_address: request.ip,
+                created_at: new Date()
+            });
+
+            return reply.send({
+                success: true,
+                data: {
+                    payment: {
+                        id: insertedPayment.id,
+                        ...paymentRecord,
+                        customer_name: customer?.nama || 'Guest',
+                        customer_phone: customer?.nomor_hp || ''
+                    },
+                    payment_result: paymentResult
+                },
+                message: 'Payment created successfully'
+            });
+
+        } catch (error) {
+            fastify.log.error('Error creating payment:', error);
+            return reply.code(500).send({
+                success: false,
+                message: 'Failed to create payment',
+                error: error.message
+            });
+        }
+    }));
+
+    // Payment Webhook Handler
+    fastify.post('/webhook/:plugin', async (request, reply) => {
+        try {
+            const { plugin } = request.params;
+            const callbackData = request.body;
+
+            fastify.log.info(`Received webhook from ${plugin}`, callbackData);
+
+            // Initialize plugin manager if not already initialized
+            if (paymentPluginManager.plugins.size === 0) {
+                await paymentPluginManager.initialize();
+            }
+
+            // Process callback through plugin manager
+            const result = await paymentPluginManager.handleCallback({
+                ...callbackData,
+                plugin: plugin
+            });
+
+            if (result.success) {
+                // Update payment record in database
+                if (result.reference) {
+                    await db.update('payments',
+                        {
+                            status: result.status.toLowerCase() === 'success' ? 'paid' : 'failed',
+                            updated_at: new Date(),
+                            notes: `Webhook processed: ${JSON.stringify(result.metadata || {})}`
+                        },
+                        { transaction_id: result.reference }
+                    );
+                }
+
+                // Send WhatsApp notification if payment is successful
+                if (result.status === 'SUCCESS') {
+                    try {
+                        // Get payment details to find customer
+                        const paymentRecord = await db.getOne('payments', {
+                            transaction_id: result.reference
+                        });
+
+                        if (paymentRecord && paymentRecord.customer_id) {
+                            const customer = await db.getOne('customers', {
+                                id: paymentRecord.customer_id
+                            });
+
+                            if (customer && customer.nomor_hp) {
+                                await sendPaymentNotification(customer, {
+                                    ...paymentRecord,
+                                    transaction_id: result.reference,
+                                    amount: paymentRecord.amount,
+                                    method: paymentRecord.method
+                                }, 'confirmation');
+                            }
+                        }
+                    } catch (whatsappError) {
+                        fastify.log.error('WhatsApp notification failed in webhook:', whatsappError);
+                        // Don't fail the webhook processing if WhatsApp fails
+                    }
+                }
+
+                return reply.code(200).send({ success: true, message: 'Webhook processed successfully' });
+            } else {
+                return reply.code(400).send({ success: false, message: 'Webhook processing failed' });
+            }
+
+        } catch (error) {
+            fastify.log.error('Error processing webhook:', error);
+            return reply.code(500).send({ success: false, message: 'Webhook processing error' });
         }
     });
 
     // Get payments with pagination and filtering
-    fastify.get('/api/payments', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
+    fastify.get('/api/payments', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 page = 1,
                 limit = 20,
@@ -97,10 +534,10 @@ const paymentRoutes = (fastify, options, done) => {
             if (search) {
                 whereConditions.push(`
                     (p.id ILIKE $${paramIndex} OR
-                     c.nama ILIKE $${paramIndex + 1} OR
-                     c.nomor_hp ILIKE $${paramIndex + 2} OR
+                     c.name ILIKE $${paramIndex + 1} OR
+                     c.phone ILIKE $${paramIndex + 2} OR
                      pr.name ILIKE $${paramIndex + 3} OR
-                     p.description ILIKE $${paramIndex + 4})
+                     p.notes ILIKE $${paramIndex + 4})
                 `);
                 const searchPattern = `%${search}%`;
                 queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
@@ -143,14 +580,14 @@ const paymentRoutes = (fastify, options, done) => {
                 ${whereClause}
             `;
             const countResult = await db.query(countQuery, queryParams);
-            const total = countResult[0]?.total || 0;
+            const total = countResult.rows?.[0]?.total || 0;
 
             // Get payments
             const paymentsQuery = `
                 SELECT
                     p.*,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone,
+                    c.name as customer_name,
+                    c.phone as customer_phone,
                     s.profile_id,
                     pr.name as subscription_name,
                     CASE
@@ -179,24 +616,14 @@ const paymentRoutes = (fastify, options, done) => {
             return reply.send({
                 success: true,
                 data: {
-                    payments: paymentsResult,
+                    payments: paymentsResult.rows || [],
                     pagination
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error getting payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get payment statistics
-    fastify.get('/api/payments/statistics', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
+    fastify.get('/api/payments/statistics', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const statsQuery = `
                 SELECT
                     COUNT(*) as total_count,
@@ -214,26 +641,16 @@ const paymentRoutes = (fastify, options, done) => {
                 FROM payments
             `;
             const result = await db.query(statsQuery);
-            const stats = result[0] || {};
+            const stats = result.rows?.[0] || {};
 
             return reply.send({
                 success: true,
                 data: stats
             });
-        } catch (error) {
-            fastify.log.error('Error getting payment statistics:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get payment statistics',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get today's summary
-    fastify.get('/api/payments/today-summary', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
+    fastify.get('/api/payments/today-summary', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const query = `
                 SELECT
                     COUNT(*) as count,
@@ -244,27 +661,17 @@ const paymentRoutes = (fastify, options, done) => {
                 WHERE DATE(created_at) = CURRENT_DATE
             `;
             const result = await db.query(query);
-            const summary = result[0] || {};
+            const summary = result.rows?.[0] || {};
 
             return reply.send({
                 success: true,
                 data: summary
             });
-        } catch (error) {
-            fastify.log.error('Error getting today summary:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get today summary',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Approve payment
-    fastify.post('/api/payments/:id/approve', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { id } = request.params;
+    fastify.post('/api/payments/:id/approve', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { id } = request.params;
 
             // Get payment details
             const payment = await db.getOne('payments', { id });
@@ -345,8 +752,8 @@ const paymentRoutes = (fastify, options, done) => {
                     // Sync with Mikrotik
                     try {
                         await fastify.mikrotik.extendSubscription(subscription.username, daysExtension);
-                    } catch (error) {
-                        fastify.log.error('Error extending subscription in Mikrotik:', error);
+                    } catch (mikrotikError) {
+                        fastify.log.error('Error extending subscription in Mikrotik:', mikrotikError);
                     }
                 }
             } else if (payment.customer_id && payment.amount > 0) {
@@ -384,21 +791,11 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 message: 'Payment approved successfully'
             });
-        } catch (error) {
-            fastify.log.error('Error approving payment:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to approve payment',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Reject payment
-    fastify.post('/api/payments/:id/reject', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { id } = request.params;
+    fastify.post('/api/payments/:id/reject', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { id } = request.params;
 
             // Get payment details
             const payment = await db.getOne('payments', { id });
@@ -442,21 +839,11 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 message: 'Payment rejected successfully'
             });
-        } catch (error) {
-            fastify.log.error('Error rejecting payment:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to reject payment',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Check DuitKu payment status
-    fastify.post('/api/payments/:id/check-duitku', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { id } = request.params;
+    fastify.post('/api/payments/:id/check-duitku', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { id } = request.params;
 
             // Get payment details
             const payment = await db.getOne('payments', {
@@ -472,7 +859,7 @@ const paymentRoutes = (fastify, options, done) => {
                 });
             }
 
-            if (!payment.duitku_reference) {
+            if (!payment.transaction_id) {
                 return reply.code(400).send({
                     success: false,
                     message: 'No DuitKu reference found',
@@ -511,25 +898,15 @@ const paymentRoutes = (fastify, options, done) => {
                     status: newStatus
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error checking DuitKu status:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to check DuitKu status',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get DuitKu pending payments
-    fastify.get('/api/payments/duitku-pending', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const query = `
+    fastify.get('/api/payments/duitku-pending', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const query = `
                 SELECT
                     p.*,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone
+                    c.name as customer_name,
+                    c.phone as customer_phone
                 FROM payments p
                 LEFT JOIN customers c ON p.customer_id = c.id
                 WHERE p.method = 'duitku'
@@ -543,21 +920,11 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: result
             });
-        } catch (error) {
-            fastify.log.error('Error getting DuitKu pending payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get DuitKu pending payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Bulk approve payments
-    fastify.post('/api/payments/bulk-approve', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { payment_ids } = request.body;
+    fastify.post('/api/payments/bulk-approve', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { payment_ids } = request.body;
 
             if (!Array.isArray(payment_ids) || payment_ids.length === 0) {
                 return reply.code(400).send({
@@ -616,7 +983,7 @@ const paymentRoutes = (fastify, options, done) => {
                         processedCount++;
                     }
                 } catch (error) {
-                    fastify.log.error(`Error approving payment ${paymentId}:`, error);
+                    fastify.log.error('Error processing payment:', error);
                 }
             }
 
@@ -637,21 +1004,11 @@ const paymentRoutes = (fastify, options, done) => {
                     total_requested: payment_ids.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error bulk approving payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to bulk approve payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Bulk reject payments
-    fastify.post('/api/payments/bulk-reject', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { payment_ids } = request.body;
+    fastify.post('/api/payments/bulk-reject', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { payment_ids } = request.body;
 
             if (!Array.isArray(payment_ids) || payment_ids.length === 0) {
                 return reply.code(400).send({
@@ -691,21 +1048,11 @@ const paymentRoutes = (fastify, options, done) => {
                     total_requested: payment_ids.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error bulk rejecting payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to bulk reject payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Bulk check DuitKu status
-    fastify.post('/api/payments/bulk-check-duitku', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const { payment_ids } = request.body;
+    fastify.post('/api/payments/bulk-check-duitku', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const { payment_ids } = request.body;
 
             if (!Array.isArray(payment_ids) || payment_ids.length === 0) {
                 return reply.code(400).send({
@@ -743,7 +1090,7 @@ const paymentRoutes = (fastify, options, done) => {
                         processedCount++;
                     }
                 } catch (error) {
-                    fastify.log.error(`Error checking DuitKu payment ${paymentId}:`, error);
+                    fastify.log.error('Error processing payment:', error);
                 }
             }
 
@@ -754,21 +1101,11 @@ const paymentRoutes = (fastify, options, done) => {
                     total_requested: payment_ids.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error bulk checking DuitKu payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to bulk check DuitKu payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Export payments
-    fastify.get('/api/payments/export', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            const {
+    fastify.get('/api/payments/export', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        const {
                 search = '',
                 status = '',
                 method = '',
@@ -785,10 +1122,10 @@ const paymentRoutes = (fastify, options, done) => {
             if (search) {
                 whereConditions.push(`
                     (p.id ILIKE $${paramIndex} OR
-                     c.nama ILIKE $${paramIndex + 1} OR
-                     c.nomor_hp ILIKE $${paramIndex + 2} OR
+                     c.name ILIKE $${paramIndex + 1} OR
+                     c.phone ILIKE $${paramIndex + 2} OR
                      pr.name ILIKE $${paramIndex + 3} OR
-                     p.description ILIKE $${paramIndex + 4})
+                     p.notes ILIKE $${paramIndex + 4})
                 `);
                 const searchPattern = `%${search}%`;
                 queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
@@ -828,11 +1165,11 @@ const paymentRoutes = (fastify, options, done) => {
                     p.amount,
                     p.method,
                     p.status,
-                    p.duitku_reference,
-                    p.description,
+                    p.transaction_id as duitku_reference,
+                    p.notes as description,
                     p.created_at,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone,
+                    c.name as customer_name,
+                    c.phone as customer_phone,
                     pr.name as subscription_name
                 FROM payments p
                 LEFT JOIN customers c ON p.customer_id = c.id
@@ -877,19 +1214,10 @@ const paymentRoutes = (fastify, options, done) => {
                     data: result
                 });
             }
-        } catch (error) {
-            fastify.log.error('Error exporting payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to export payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Generate payment report
-    fastify.post('/api/payments/generate-report', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/payments/generate-report', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 report_type = 'summary',
                 period = 'month',
@@ -949,8 +1277,7 @@ const paymentRoutes = (fastify, options, done) => {
             }
 
             // Log report generation
-            const db = DatabaseManager.getInstance();
-            await db.insert('system_logs', {
+                        await db.insert('system_logs', {
                 level: 'INFO',
                 module: 'payments',
                 message: `Generated ${report_type} report`,
@@ -969,26 +1296,16 @@ const paymentRoutes = (fastify, options, done) => {
                     generated_at: new Date().toISOString()
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error generating payment report:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to generate payment report',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Check overdue payments
-    fastify.post('/api/payments/check-overdue', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            // Find subscriptions that are expired but don't have recent payments
+    fastify.post('/api/payments/check-overdue', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        // Find subscriptions that are expired but don't have recent payments
             const query = `
                 SELECT
                     s.*,
-                    c.nama as customer_name,
-                    c.nomor_hp as customer_phone,
+                    c.name as customer_name,
+                    c.phone as customer_phone,
                     pr.name as profile_name,
                     p.created_at as last_payment_date
                 FROM subscriptions s
@@ -1020,21 +1337,11 @@ const paymentRoutes = (fastify, options, done) => {
                     overdue_subscriptions: overdueSubscriptions
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error checking overdue payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to check overdue payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Reconcile payments
-    fastify.post('/api/payments/reconcile', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            // Find payments that should be reconciled
+    fastify.post('/api/payments/reconcile', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        // Find payments that should be reconciled
             const reconcileQuery = `
                 SELECT COUNT(*) as total,
                        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid,
@@ -1044,7 +1351,7 @@ const paymentRoutes = (fastify, options, done) => {
                 WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
             `;
             const result = await db.query(reconcileQuery);
-            const stats = result[0] || {};
+            const stats = result.rows?.[0] || {};
 
             const status = stats.pending > 0 ? 'Action Required' : 'Up to date';
             const message = stats.pending > 0
@@ -1067,21 +1374,11 @@ const paymentRoutes = (fastify, options, done) => {
                     stats
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error reconciling payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to reconcile payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Auto-reconcile payments
-    fastify.post('/api/payments/auto-reconcile', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
-            const db = DatabaseManager.getInstance();
-            let reconciledCount = 0;
+    fastify.post('/api/payments/auto-reconcile', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
+                        let reconciledCount = 0;
 
             // Auto-approve successful DuitKu payments
             const duitKuResult = await db.query(`
@@ -1125,19 +1422,10 @@ const paymentRoutes = (fastify, options, done) => {
                     reconciled_count: reconciledCount
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error auto-reconciling payments:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to auto-reconcile payments',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get customer carry over balances
-    fastify.get('/api/carry-over/:customerId', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.get('/api/carry-over/:customerId', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const { customerId } = request.params;
 
             const balances = await carryOverService.getAvailableBalances(parseInt(customerId));
@@ -1151,19 +1439,10 @@ const paymentRoutes = (fastify, options, done) => {
                     count: balances.length
                 }
             });
-        } catch (error) {
-            fastify.log.error('Error getting carry over balances:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get carry over balances',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Apply carry over to invoice/subscription
-    fastify.post('/api/carry-over/apply', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/carry-over/apply', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 customerId,
                 invoiceAmount,
@@ -1182,19 +1461,10 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: result
             });
-        } catch (error) {
-            fastify.log.error('Error applying carry over:', error);
-            return reply.code(500).send({
-                success: false,
-                message: error.message || 'Failed to apply carry over',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Get carry over statistics
-    fastify.get('/api/carry-over/statistics', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.get('/api/carry-over/statistics', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const { customerId } = request.query;
 
             const stats = await carryOverService.getStatistics(
@@ -1205,19 +1475,10 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: stats
             });
-        } catch (error) {
-            fastify.log.error('Error getting carry over statistics:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to get carry over statistics',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Transfer carry over between subscriptions
-    fastify.post('/api/carry-over/transfer', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/carry-over/transfer', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const {
                 fromSubscriptionId,
                 toSubscriptionId,
@@ -1234,19 +1495,10 @@ const paymentRoutes = (fastify, options, done) => {
                 success: true,
                 data: result
             });
-        } catch (error) {
-            fastify.log.error('Error transferring carry over:', error);
-            return reply.code(500).send({
-                success: false,
-                message: error.message || 'Failed to transfer carry over',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     // Clean up expired carry over balances (admin only)
-    fastify.post('/api/carry-over/cleanup', { preHandler: auth.verifyTokenAPI }, async (request, reply) => {
-        try {
+    fastify.post('/api/carry-over/cleanup', { preHandler: auth.verifyTokenAPI }, ApiErrorHandler.asyncHandler(async (request, reply) => {
             const cleanedCount = await carryOverService.cleanupExpiredBalances();
 
             return reply.send({
@@ -1254,15 +1506,7 @@ const paymentRoutes = (fastify, options, done) => {
                 message: `Cleaned up ${cleanedCount} expired carry over balances`,
                 cleanedCount
             });
-        } catch (error) {
-            fastify.log.error('Error cleaning up carry over balances:', error);
-            return reply.code(500).send({
-                success: false,
-                message: 'Failed to cleanup carry over balances',
-                error: error.message
-            });
-        }
-    });
+        }));
 
     done();
 };

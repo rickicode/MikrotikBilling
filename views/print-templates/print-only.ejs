@@ -200,7 +200,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td class="voucher-code" colspan="2"><%= voucher.voucher_code %></td>
+                                <td class="voucher-code" colspan="2"><%= voucher.code %></td>
                             </tr>
                             <tr>
                                 <td class="duration" colspan="2">Durasi: <%= Math.floor(voucher.duration_hours / 24) %> Hari</td>
@@ -219,7 +219,7 @@
             <% vouchers.forEach((voucher, index) => { %>
                 <div class="voucher">
                     <div class="header"><%= settings.company_name || 'WiFi Hotspot' %></div>
-                    <div class="code"><%= voucher.voucher_code %></div>
+                    <div class="code"><%= voucher.code %></div>
                     <div class="info">Profile: <%= voucher.profile_name %></div>
                     <div class="info">Duration: <%= Math.floor(voucher.duration_hours / 24) %> Hari</div>
                     <div class="info">Created: <%= new Date(voucher.created_at).toLocaleDateString('id-ID') %></div>

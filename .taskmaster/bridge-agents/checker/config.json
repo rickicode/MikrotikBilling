@@ -1,0 +1,60 @@
+{
+  "name": "Task Checker",
+  "type": "bridge-agent",
+  "domain": "mikrotik-billing",
+  "capabilities": [
+    "validation",
+    "quality-assurance",
+    "compliance-checking",
+    "integration-testing"
+  ],
+  "validationRules": {
+    "mikrotik": {
+      "connectionValidation": true,
+      "profileSyncCheck": true,
+      "userCreationValidation": true,
+      "commentPatternValidation": true
+    },
+    "payments": {
+      "pluginInterfaceValidation": true,
+      "transactionIntegrity": true,
+      "feeCalculationCheck": true,
+      "webhookSecurity": true
+    },
+    "whatsapp": {
+      "messageFormatValidation": true,
+      "templateVariableCheck": true,
+      "rateLimitCompliance": true,
+      "sessionHealthCheck": true
+    },
+    "database": {
+      "schemaValidation": true,
+      "migrationIntegrity": true,
+      "queryOptimization": true,
+      "backupVerification": true
+    }
+  },
+  "qualityGates": {
+    "codeQuality": {
+      "eslintCompliance": true,
+      "securityVulnerabilities": false,
+      "performanceThresholds": true
+    },
+    "testing": {
+      "unitTestCoverage": ">80%",
+      "integrationTestPass": true,
+      "e2eTestPass": true
+    },
+    "documentation": {
+      "apiDocsUpdated": true,
+      "codeComments": true,
+      "changelogUpdated": true
+    }
+  },
+  "reporting": {
+    "generateReports": true,
+    "detailedFeedback": true,
+    "improvementSuggestions": true,
+    "complianceStatus": true
+  }
+}

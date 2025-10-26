@@ -1,5 +1,6 @@
 const WhatsAppSessionManager = require('./WhatsAppSessionManager');
-const Query = require('../../lib/query');
+const { db } = require('../database/DatabaseManager');
+const QueryHelper = require('../lib/QueryHelper');
 const EventEmitter = require('events');
 
 class WhatsAppService extends EventEmitter {
@@ -31,7 +32,7 @@ class WhatsAppService extends EventEmitter {
             if (dbPool) {
                 // PostgreSQL pool
                 console.log('🐘 WhatsApp Service using PostgreSQL');
-                this.query = new Query(dbPool);
+                this.query = QueryHelper;
                 this.sessionManager.query = this.query;
             }
 
@@ -58,15 +59,12 @@ class WhatsAppService extends EventEmitter {
      */
     async loadTemplates() {
         try {
-            const templates = await this.query.getMany(`
-                SELECT * FROM whatsapp_templates
-                WHERE is_active = true
-            `);
+            const templates = await db.findMany('whatsapp_templates', { is_active: true });
 
             for (const template of templates) {
                 this.templates.set(template.name, {
                     ...template,
-                    variables: JSON.parse(template.variables || '{}')
+                    variables: template.variables || []
                 });
             }
 
@@ -196,7 +194,7 @@ class WhatsAppService extends EventEmitter {
      */
     async getSessionQR(sessionId) {
         try {
-            const session = await this.query.getOne(`
+            const session = await QueryHelper.getOne(`
                 SELECT session_id, session_name, status, qr_code, phone_number
                 FROM whatsapp_sessions
                 WHERE session_id = $1
@@ -218,9 +216,9 @@ class WhatsAppService extends EventEmitter {
      */
     async getSessions() {
         try {
-            const sessions = await this.query.getMany(`
-                SELECT session_id, session_name, status, priority, is_active,
-                       is_default, phone_number, last_activity, created_at
+            const sessions = await QueryHelper.getMany(`
+                SELECT session_id, session_name, status, priority,
+                       phone_number, last_activity, created_at
                 FROM whatsapp_sessions
                 ORDER BY priority DESC, session_name
             `);
@@ -295,7 +293,7 @@ class WhatsAppService extends EventEmitter {
      */
     async logNotification(phoneNumber, templateName, variables, result) {
         try {
-            await this.query.insert(`
+            await QueryHelper.insert(`
                 INSERT INTO notification_queue (
                     session_id, phone_number, template_name, variables,
                     status, message_id, created_at
@@ -320,7 +318,7 @@ class WhatsAppService extends EventEmitter {
      */
     async getStatistics(startDate, endDate) {
         try {
-            const stats = await this.query.getOne(`
+            const stats = await QueryHelper.getOne(`
                 SELECT
                     COUNT(*) as total_sent,
                     COUNT(CASE WHEN status = 'sent' THEN 1 END) as successful,
@@ -330,7 +328,7 @@ class WhatsAppService extends EventEmitter {
                 WHERE created_at BETWEEN $1 AND $2
             `, [startDate, endDate]);
 
-            const templateStats = await this.query.getMany(`
+            const templateStats = await QueryHelper.getMany(`
                 SELECT template_name, COUNT(*) as sent_count
                 FROM notification_queue
                 WHERE created_at BETWEEN $1 AND $2
@@ -383,12 +381,12 @@ class WhatsAppService extends EventEmitter {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-            await this.query.query(`
+            await QueryHelper.query(`
                 DELETE FROM whatsapp_messages
                 WHERE created_at < $1
             `, [cutoffDate]);
 
-            await this.query.query(`
+            await QueryHelper.query(`
                 DELETE FROM notification_queue
                 WHERE created_at < $1
             `, [cutoffDate]);
@@ -407,7 +405,7 @@ class WhatsAppService extends EventEmitter {
             const stats = this.sessionManager.getStatistics();
 
             for (const [sessionId, sessionData] of this.sessionManager.sessions) {
-                await this.query.query(`
+                await QueryHelper.query(`
                     UPDATE whatsapp_sessions
                     SET last_activity = $1, updated_at = NOW()
                     WHERE session_id = $2
@@ -546,24 +544,23 @@ class WhatsAppService extends EventEmitter {
             // If no sessionId provided, try to get or create a default session
             if (!sessionId) {
                 const sessions = await this.getSessions();
-                let defaultSession = sessions.find(s => s.is_default);
+                // Since is_default column doesn't exist, use the first session or highest priority
+                let defaultSession = sessions.length > 0 ? sessions[0] : null;
 
                 if (!defaultSession) {
-                    if (sessions.length === 0) {
-                        // Create a new session if none exist
-                        const result = await this.createSession('Default Session', {
-                            isDefault: true,
-                            priority: 100
-                        });
-                        sessionId = result.sessionId;
-                    } else {
-                        // Use the first session as default
-                        defaultSession = sessions[0];
-                        sessionId = defaultSession.session_id;
-                    }
+                    // Create a new session if none exist
+                    const result = await this.createSession('Default Session', {
+                        isDefault: true,
+                        priority: 100
+                    });
+                    sessionId = result.sessionId;
                 } else {
+                    // Use the first session as default
+                    defaultSession = sessions[0];
                     sessionId = defaultSession.session_id;
                 }
+            } else {
+                sessionId = defaultSession.session_id;
             }
 
             // Connect the session to generate QR code
@@ -642,20 +639,19 @@ class WhatsAppService extends EventEmitter {
     async getDefaultSession() {
         try {
             const sessions = await this.getSessions();
-            let defaultSession = sessions.find(s => s.is_default);
+            // Since is_default column doesn't exist, use the first session or highest priority
+            let defaultSession = sessions.length > 0 ? sessions[0] : null;
 
             if (!defaultSession) {
-                if (sessions.length === 0) {
-                    // Create default session
-                    const result = await this.createSession('Default Session', {
-                        isDefault: true,
-                        priority: 100
-                    });
-                    return result.sessionId;
-                } else {
-                    // Use first session as default
-                    return sessions[0].session_id;
-                }
+                // Create default session
+                const result = await this.createSession('Default Session', {
+                    isDefault: true,
+                    priority: 100
+                });
+                return result.sessionId;
+            } else {
+                // Use first session as default
+                return sessions[0].session_id;
             }
 
             return defaultSession.session_id;

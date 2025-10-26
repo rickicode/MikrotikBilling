@@ -1,8 +1,32 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+
+// Enhanced logger configuration based on DEBUG mode
+const loggerConfig = {
+  level: process.env.DEBUG === 'true' ? 'debug' : (process.env.LOG_LEVEL || 'info'),
+  serializers: {
+    req: (req) => ({
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      hostname: req.hostname,
+      remoteAddress: req.ip,
+      remotePort: req.socket.remotePort
+    })
+  }
+};
+
 const fastify = require('fastify')({
-  logger: true
+  logger: loggerConfig,
+  // Performance optimizations
+  trustProxy: true,
+  requestIdHeader: 'x-request-id',
+  bodyLimit: 10485760, // 10MB
+  // Connection optimization
+  keepAliveTimeout: 65000,
+  // Disable unwanted features for performance
+  disableRequestLogging: process.env.NODE_ENV === 'production'
 });
 // Load validation schemas
 const commonSchemas = JSON.parse(fs.readFileSync('./schemas/common.json', 'utf8'));
@@ -18,16 +42,19 @@ Object.entries(whatsappSchemas).forEach(([name, schema]) => {
 });
 
 
-// Register plugins
+// Enhanced compression with performance optimizations
 fastify.register(require('@fastify/compress'), {
   global: true,
   threshold: 1024,
   encodings: ['gzip', 'deflate', 'br'],
   zlib: {
-    level: 6,
-    strategy: 1 // Z_DEFAULT_STRATEGY
+    level: process.env.NODE_ENV === 'production' ? 6 : 1, // Lower compression in dev for speed
+    strategy: 1, // Z_DEFAULT_STRATEGY
+    chunkSize: 32 * 1024 // 32KB chunks
   }
 });
+
+// Performance monitoring hook will be added later
 
 fastify.register(require('@fastify/static'), {
   root: path.join(__dirname, 'public'),
@@ -209,6 +236,10 @@ fastify.addHook('preHandler', async (request, reply) => {
 console.log('🐘 Using PostgreSQL database with Knex.js');
 const { db } = require('./src/database/DatabaseManager');
 
+// Also expose the direct PostgreSQL pool for legacy compatibility
+const pgPool = require('./config/database');
+fastify.decorate('pgPool', pgPool);
+
 // Mikrotik client
 const MikrotikClient = require('./src/services/MikrotikClient');
 const mikrotik = new MikrotikClient(db);
@@ -224,6 +255,9 @@ const PerformanceOptimizer = require('./src/services/PerformanceOptimizer');
 
 // Data retention service
 const DataRetentionService = require('./src/services/DataRetentionService');
+
+// Connection recovery service
+const ConnectionRecoveryService = require('./src/services/ConnectionRecoveryService');
 
 // Initialize database and load config
 async function initializeServices() {
@@ -245,13 +279,47 @@ async function initializeServices() {
   }
 
   // Set up message handlers for WhatsApp service
-  const WhatsAppMessage = require('./src/models/WhatsAppMessage');
-  const whatsappMessageModel = new WhatsAppMessage();
+  let whatsappMessageModel = null;
+  try {
+    const WhatsAppMessage = require('./src/models/WhatsAppMessage');
+    whatsappMessageModel = new WhatsAppMessage();
+  } catch (error) {
+    // Silent fallback - models are optional, system will use raw database queries
+    if (process.env.NODE_ENV === 'development') {
+      // Only log in debug mode for development
+      if (process.env.DEBUG_MODE === 'true') {
+        console.debug('WhatsApp models optional - using raw database queries:', error.message);
+      }
+    } else {
+      // Log warning in production but don't fail
+      console.warn('WhatsApp models initialization failed - using raw database queries:', error.message);
+    }
+  }
 
   // Handle message storage
   whatsappService.on('store_message', async (messageData) => {
     try {
-      await whatsappMessageModel.create(messageData);
+      if (whatsappMessageModel) {
+        await whatsappMessageModel.create(messageData);
+      } else {
+        // Fallback to raw database query
+        await db.query(`
+          INSERT INTO whatsapp_messages (
+            message_id, from_number, to_number, message_type,
+            content, status, timestamp, related_id, related_type
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [
+          messageData.message_id,
+          messageData.from_number,
+          messageData.to_number,
+          messageData.message_type,
+          messageData.content,
+          messageData.status,
+          messageData.timestamp,
+          messageData.related_id,
+          messageData.related_type
+        ]);
+      }
     } catch (error) {
       console.error('Error storing message:', error);
     }
@@ -260,7 +328,16 @@ async function initializeServices() {
   // Handle message status updates
   whatsappService.on('update_message_status', async (data) => {
     try {
-      await whatsappMessageModel.updateStatus(data.messageId, data.status, data.errorMessage);
+      if (whatsappMessageModel) {
+        await whatsappMessageModel.updateStatus(data.messageId, data.status, data.errorMessage);
+      } else {
+        // Fallback to raw database query
+        await db.query(`
+          UPDATE whatsapp_messages
+          SET status = $1, error_message = $2, updated_at = CURRENT_TIMESTAMP
+          WHERE message_id = $3
+        `, [data.status, data.errorMessage, data.messageId]);
+      }
     } catch (error) {
       console.error('Error updating message status:', error);
     }
@@ -269,7 +346,16 @@ async function initializeServices() {
   // Handle message ID updates
   whatsappService.on('update_message_id', async (data) => {
     try {
-      await whatsappMessageModel.updateMessageId(data.tempId, data.actualId);
+      if (whatsappMessageModel) {
+        await whatsappMessageModel.updateMessageId(data.tempId, data.actualId);
+      } else {
+        // Fallback to raw database query
+        await db.query(`
+          UPDATE whatsapp_messages
+          SET message_id = $1
+          WHERE message_id = $2
+        `, [data.actualId, data.tempId]);
+      }
     } catch (error) {
       console.error('Error updating message ID:', error);
     }
@@ -299,6 +385,12 @@ async function initializeServices() {
     console.error('❌ Failed to initialize Data Retention Service:', error);
   }
   global.DataRetentionService = dataRetentionService;
+
+  // Connection Recovery Service DISABLED to prevent connection competition
+  // Multiple services were trying to connect simultaneously, causing timeouts
+  // Using single connection management through MikrotikClient only
+  console.log('🔌 Connection Recovery Service disabled - using single connection management');
+  global.ConnectionRecoveryService = null;
 
   // Make services available globally
   fastify.decorate('db', db);
@@ -353,26 +445,76 @@ const GlobalErrorHandler = require('./src/middleware/globalErrorHandler');
 
 console.log('HIJINETWORK: 🛡️ Global detailed error handler initialized');
 
-// Test routes untuk global error handler (tanpa authentication)
-fastify.get('/test-error', async (request, reply) => {
-  throw new Error('Test error - Global error handler verification');
+// Health check endpoint
+fastify.get('/health', async (request, reply) => {
+  try {
+    const healthStatus = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV,
+      debug_mode: process.env.DEBUG === 'true',
+      services: {
+        database: 'unknown',
+        mikrotik: 'unknown'
+      }
+    };
+
+    // Check database connection
+    try {
+      await db.query('SELECT 1');
+      healthStatus.services.database = 'connected';
+    } catch (dbError) {
+      healthStatus.services.database = 'error';
+      healthStatus.status = 'degraded';
+    }
+
+    // Check Mikrotik connection (if available)
+    try {
+      if (global.mikrotik) {
+        healthStatus.services.mikrotik = 'connected';
+      } else {
+        healthStatus.services.mikrotik = 'not_initialized';
+      }
+    } catch (mikrotikError) {
+      healthStatus.services.mikrotik = 'error';
+      healthStatus.status = 'degraded';
+    }
+
+    const statusCode = healthStatus.status === 'healthy' ? 200 : 503;
+    return reply.code(statusCode).send(healthStatus);
+
+  } catch (error) {
+    return reply.code(500).send({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: process.env.DEBUG === 'true' ? error.message : 'Health check failed'
+    });
+  }
 });
 
-fastify.get('/test-validation-error', async (request, reply) => {
-  throw GlobalErrorHandler.validationError('This is a test validation error', 'email', 'Email format is invalid');
-});
+// Test routes for global error handler (development only)
+if (process.env.NODE_ENV !== 'production') {
+  fastify.get('/test-error', async (request, reply) => {
+    throw new Error('Test error - Global error handler verification');
+  });
 
-fastify.get('/test-not-found', async (request, reply) => {
-  throw GlobalErrorHandler.notFoundError('Test Resource');
-});
+  fastify.get('/test-validation-error', async (request, reply) => {
+    throw GlobalErrorHandler.validationError('This is a test validation error', 'email', 'Email format is invalid');
+  });
 
-fastify.get('/test-unauthorized', async (request, reply) => {
-  throw GlobalErrorHandler.unauthorizedError('You are not authorized to access this resource');
-});
+  fastify.get('/test-not-found', async (request, reply) => {
+    throw GlobalErrorHandler.notFoundError('Test Resource');
+  });
 
-fastify.get('/test-db-error', async (request, reply) => {
-  return fastify.db.query('SELECT * FROM non_existent_table_for_testing');
-});
+  fastify.get('/test-unauthorized', async (request, reply) => {
+    throw GlobalErrorHandler.unauthorizedError('You are not authorized to access this resource');
+  });
+
+  fastify.get('/test-db-error', async (request, reply) => {
+    return db.query('SELECT * FROM non_existent_table_for_testing');
+  });
+}
 
 // Register auth routes for login/logout
 fastify.register(require('./src/routes/auth'));
@@ -404,6 +546,9 @@ fastify.register(require('./src/routes/performance'), { prefix: '/performance' }
 
 // Register plugin management routes
 fastify.register(require('./src/routes/plugins'), { prefix: '/plugins' });
+
+// Register network monitoring routes
+fastify.register(require('./src/routes/network-monitor'), { prefix: '/network-monitor' });
 
 // Register additional new routes if they exist
 try {
@@ -461,8 +606,81 @@ fastify.addHook('onResponse', async (request, reply) => {
   global.performanceMonitor.trackConnection('close');
 });
 
-// Error handler - Global detailed error handler
-fastify.setErrorHandler(GlobalErrorHandler.errorHandler);
+// Enhanced Error handler with better debug support
+fastify.setErrorHandler(async (error, request, reply) => {
+  // Log error with full context
+  fastify.log.error({
+    error: {
+      message: error.message,
+      stack: error.stack,
+        message: error.message,
+        code: error.code,
+      code: error.code,
+      statusCode: error.statusCode
+    },
+    request: {
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body: request.body,
+      query: request.query,
+      params: request.params,
+      id: request.id
+    },
+    timestamp: new Date().toISOString()
+  });
+
+  // Check if it's an API route
+  const isApiRoute = request.url.startsWith('/api/') ||
+                    request.url.startsWith('/customers/api/') ||
+                    request.url.startsWith('/vouchers/api/') ||
+                    request.url.startsWith('/pppoe/api/') ||
+                    request.headers.accept === 'application/json' ||
+                    request.headers['content-type'] === 'application/json';
+
+  if (isApiRoute) {
+    // For API routes, return JSON error response
+    return GlobalErrorHandler.errorHandler(error, request, reply);
+  } else {
+    // For web routes, render the error page with full debug information
+    const statusCode = error.statusCode || error.status || 500;
+    reply.code(statusCode);
+
+    // Enhance error object with additional debug information for DEBUG mode
+    const enhancedError = {
+      ...error,
+      status: statusCode,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      debugMode: process.env.DEBUG === 'true',
+      timestamp: new Date().toISOString(),
+      requestId: request.id,
+      url: request.url,
+      method: request.method,
+      userAgent: request.headers['user-agent'],
+      admin: request.admin || null
+    };
+
+    // Add additional debug context in DEBUG mode
+    if (process.env.DEBUG === 'true') {
+      enhancedError.nodeEnv = process.env.NODE_ENV;
+      enhancedError.debugInfo = {
+        headers: request.headers,
+        body: request.body,
+        query: request.query,
+        params: request.params,
+        stack: error.stack,
+        message: error.message,
+        code: error.code,
+        originalError: error
+      };
+    }
+
+        // Pass error data as 'error' variable to match EJS template expectations
+    return reply.view('error', { error: enhancedError });
+  }
+});
 
 // 404 handler - Global detailed 404 response
 fastify.setNotFoundHandler((request, reply) => {
@@ -480,16 +698,20 @@ fastify.setNotFoundHandler((request, reply) => {
   });
 });
 
-// Start server
+// Enhanced server startup with better error handling
 const start = async () => {
   try {
+    console.log('🚀 Starting Mikrotik Billing System...');
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🐛 Debug Mode: ${process.env.DEBUG === 'true' ? 'ENABLED' : 'DISABLED'}`);
+    console.log(`📡 Port: ${process.env.PORT || 3006}`);
+    console.log(`🗄️  Database: ${process.env.DATABASE_URL ? 'PostgreSQL (Supabase)' : 'Local'}`);
+
     // Check for fresh migration command
     if (process.argv.includes('--fresh-migrate')) {
       console.log('🔄 Running fresh migration...');
-      // Initialize database first
       await db.initialize();
 
-      // For SQLite, just delete the database file and reinitialize
       if (process.env.DB_TYPE === 'sqlite' || process.env.DATABASE_URL.startsWith('./') || process.env.DATABASE_URL.endsWith('.db')) {
         console.log('📌 SQLite fresh migration - deleting old database...');
         const dbPath = process.env.DATABASE_URL || './database/billing.db';
@@ -497,10 +719,8 @@ const start = async () => {
           fs.unlinkSync(dbPath);
           console.log('✅ Old database deleted');
         }
-        // Reinitialize with fresh database
         await db.initialize();
       } else {
-        // PostgreSQL fresh migration
         const FreshMigrator = require('./src/database/FreshMigrator');
         const migrator = new FreshMigrator(db.getPool());
         await migrator.fresh();
@@ -513,7 +733,6 @@ const start = async () => {
     // Check for reset command
     if (process.argv.includes('--reset-db')) {
       console.log('🔄 Resetting database...');
-      // Initialize database first
       await db.initialize();
       const migrator = new FreshMigrator(db.getPool());
       await migrator.reset();
@@ -521,12 +740,34 @@ const start = async () => {
       process.exit(0);
     }
 
-    // Initialize services first
-    await initializeServices();
+    // Validate database connection first
+    console.log('🔍 Validating database connection...');
+    try {
+      await db.initialize();
+      console.log('✅ Database connection validated');
+    } catch (dbError) {
+      console.error('❌ Database connection failed:', dbError.message);
+      if (process.env.DEBUG === 'true') {
+        console.error('Database error details:', dbError.stack);
+      }
+      console.log('🔄 Continuing with limited database functionality...');
+    }
+
+    // Initialize services with error handling
+    console.log('🔧 Initializing services...');
+    try {
+      await initializeServices();
+      console.log('✅ Services initialized successfully');
+    } catch (serviceError) {
+      console.warn('⚠️ Some services failed to initialize:', serviceError.message);
+      if (process.env.DEBUG === 'true') {
+        console.warn('Service error details:', serviceError.stack);
+      }
+      console.log('🔄 Continuing with limited functionality...');
+    }
 
     // Force HTTP URLs in development
     fastify.addHook('onSend', async (request, reply, payload) => {
-      // If it's a redirect, ensure it uses HTTP for localhost
       if (reply.statusCode >= 300 && reply.statusCode < 400 && reply.getHeader('location')) {
         let location = reply.getHeader('location');
         if (location.includes('localhost:3000')) {
@@ -538,17 +779,59 @@ const start = async () => {
       return payload;
     });
 
-    await fastify.listen({ port: process.env.PORT || 3006, host: 'localhost' });
-    fastify.log.info(`Server listening on ${fastify.server.address().port}`);
+    // Connect to Mikrotik with timeout
+    console.log('🔌 Establishing Mikrotik connection...');
+    const mikrotikConnectPromise = mikrotik.connect();
+    const mikrotikTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Mikrotik connection timeout')), 10000)
+    );
 
-    // Start background tasks
-    require('./src/services/Scheduler')(fastify);
+    let mikrotikConnected = false;
+    try {
+      mikrotikConnected = await Promise.race([mikrotikConnectPromise, mikrotikTimeoutPromise]);
+      if (mikrotikConnected) {
+        console.log('✅ Mikrotik connection established');
+      } else {
+        console.warn('⚠️ Mikrotik connection failed - services will run in offline mode');
+      }
+    } catch (mikrotikError) {
+      console.warn('⚠️ Mikrotik connection failed:', mikrotikError.message);
+      console.log('🔄 Continuing in offline mode...');
+    }
 
-    // Connect to Mikrotik
-    await mikrotik.connect();
+    // Start server
+    const port = process.env.PORT || 3007; // Use 3007 to avoid conflicts
+    const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+
+    await fastify.listen({ port, host });
+
+    console.log(`🎉 Server started successfully!`);
+    console.log(`📡 Server listening on: http://${host}:${port}`);
+    console.log(`🏥 Health check: http://${host}:${port}/health`);
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`🧪 Test endpoints available:`);
+      console.log(`   - Error test: http://${host}:${port}/test-error`);
+      console.log(`   - DB test: http://${host}:${port}/test-db-error`);
+      console.log(`   - Validation test: http://${host}:${port}/test-validation-error`);
+    }
+
+    // Start background tasks after server is ready
+    console.log('⏰ Starting background tasks...');
+    try {
+      require('./src/services/Scheduler')(fastify);
+      console.log('✅ Background tasks started');
+    } catch (schedulerError) {
+      console.warn('⚠️ Background tasks failed to start:', schedulerError.message);
+    }
+
+    console.log('🚀 Mikrotik Billing System is ready!');
 
   } catch (err) {
-    fastify.log.error(err);
+    console.error('❌ Failed to start server:', err.message);
+    if (process.env.DEBUG === 'true') {
+      console.error('Stack trace:', err.stack);
+    }
     process.exit(1);
   }
 };
