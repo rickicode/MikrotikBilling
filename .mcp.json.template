@@ -1,0 +1,87 @@
+{
+   "mcpServers": {
+       "shadcn": {
+           "command": "npx",
+           "args": [
+               "shadcn@latest",
+               "mcp"
+           ]
+       },
+       "puppeteer": {
+           "command": "npx",
+           "args": [
+               "-y",
+               "@modelcontextprotocol/server-puppeteer"
+           ]
+       },
+       "playwright": {
+           "command": "npx",
+           "args": [
+               "@playwright/mcp"
+           ]
+       },
+       "github": {
+           "command": "npx",
+           "args": [
+               "-y",
+               "@modelcontextprotocol/server-github"
+           ],
+           "env": {
+               "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN_HERE"
+           }
+       },
+       "Context7": {
+           "command": "npx",
+           "args": [
+               "-y",
+               "@upstash/context7-mcp"
+           ]
+       },
+       "prisma": {
+           "command": "npx",
+           "args": [
+               "-y",
+               "prisma",
+               "mcp"
+           ]
+       },
+       "docker-mcp": {
+           "command": "uvx",
+           "args": [
+               "docker-mcp"
+           ]
+       },
+       "RedisMCPServer": {
+           "command": "uvx",
+           "args": [
+               "--from",
+               "git+https://github.com/redis/mcp-redis.git",
+               "redis-mcp-server",
+               "--url",
+               "redis://localhost:6379/0"
+           ]
+       },
+       "filesystem": {
+           "command": "npx",
+           "args": [
+               "-y",
+               "@modelcontextprotocol/server-filesystem",
+               "/home/rickicode/workspaces",
+               "/home/rickicode/workspaces/NetQ"
+           ]
+       },
+       "browser-tools": {
+           "command": "npx",
+           "args": [
+               "@agentdeskai/browser-tools-mcp@1.2.0"
+           ]
+       },
+       "web-search-prime": {
+           "type": "http",
+           "url": "https://api.z.ai/api/mcp/web_search_prime/mcp",
+           "headers": {
+               "Authorization": "Bearer 55cc29474ec341309f46c400dd2e27c1.3HWVT2Mm65IcZPN4"
+           }
+       }
+   }
+}

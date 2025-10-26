@@ -18,3 +18,4 @@ server.log
 *.tmp
 *.temp
 *.log
+.mcp.json
